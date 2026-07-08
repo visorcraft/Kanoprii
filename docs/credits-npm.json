@@ -1,0 +1,38 @@
+[
+  {
+    "name": "@tauri-apps/api",
+    "version": "2.11.1",
+    "license": "MIT OR Apache-2.0",
+    "url": "https://github.com/tauri-apps/tauri"
+  },
+  {
+    "name": "@tauri-apps/plugin-dialog",
+    "version": "2.7.1",
+    "license": "MIT OR Apache-2.0",
+    "url": "https://github.com/tauri-apps/plugins-workspace"
+  },
+  {
+    "name": "@tauri-apps/plugin-process",
+    "version": "2.3.1",
+    "license": "MIT OR Apache-2.0",
+    "url": "https://www.npmjs.com/package/@tauri-apps/plugin-process"
+  },
+  {
+    "name": "@tauri-apps/plugin-updater",
+    "version": "2.10.1",
+    "license": "MIT OR Apache-2.0",
+    "url": "https://www.npmjs.com/package/@tauri-apps/plugin-updater"
+  },
+  {
+    "name": "react",
+    "version": "19.2.7",
+    "license": "MIT",
+    "url": "https://react.dev/"
+  },
+  {
+    "name": "react-dom",
+    "version": "19.2.7",
+    "license": "MIT",
+    "url": "https://react.dev/"
+  }
+]

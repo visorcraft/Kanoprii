@@ -1,0 +1,49 @@
+[package]
+name = "kanoprii"
+version = "1.7.1"
+description = "A high-performance PDF editor"
+edition = "2021"
+license = "GPL-3.0-only"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[features]
+default = []
+wdio = ["dep:tauri-plugin-wdio", "dep:tauri-plugin-wdio-webdriver"]
+
+[dependencies]
+tauri = { version = "2", features = ["default"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+pdfium-render = "0.9.1"
+lopdf = "0.43.0"
+image = "0.25"
+fax = "0.2"
+tauri-plugin-wdio = { version = "1", optional = true }
+tauri-plugin-wdio-webdriver = { version = "1", optional = true }
+tauri-plugin-dialog = "2"
+tauri-plugin-process = "2"
+tauri-plugin-updater = "2"
+tauri-plugin-single-instance = "2"
+underskrift = { git = "https://github.com/visorcraft/underskrift", rev = "389b402c09546801cf9f3880fdf2e6c706390829" }
+tokio = { version = "1.52.3", features = ["rt-multi-thread"] }
+ureq = "3"
+sha2 = "0.11"
+url = { version = "2", default-features = false }
+ttf-parser = "0.25"
+printers = "2.3"
+
+# underskrift → josekit needs OpenSSL; Windows has no system copy, so build it
+# from source there (Linux/macOS keep using the platform OpenSSL).
+[target.'cfg(windows)'.dependencies]
+openssl-sys = { version = "0.9", features = ["vendored"] }
+windows = { version = "0.62", features = ["Win32_System_Registry", "Win32_UI_Shell", "Win32_UI_WindowsAndMessaging"] }
+
+# Optimized release profile for fast, compact production builds. `panic` is left
+# as the default (unwind) so Tauri can still catch and surface command panics.
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+strip = true

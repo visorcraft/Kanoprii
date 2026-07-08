@@ -1,0 +1,22 @@
+[advisories]
+ignore = [
+  # RUSTSEC-2023-0071: rsa 0.9.10 timing side-channel via underskrift/tsp-ltv.
+  # No fixed upstream version is available as of 2026-06-12.
+  # Tracked in: https://github.com/visorcraft/Kanoprii/issues/2
+  "RUSTSEC-2023-0071",
+  # RUSTSEC-2024-0429: unsoundness in glib::VariantStrIter Iterator impls.
+  # Comes from Tauri's webkit2gtk/wry dependency tree; not actionable here.
+  # Tracked in: https://github.com/visorcraft/Kanoprii/issues/2
+  "RUSTSEC-2024-0429",
+]
+
+[output]
+quiet = false
+deny = [
+  "unsound",
+  "yanked",
+]
+
+# Informational advisories (e.g. unmaintained GTK3-rs bindings via Tauri) are
+# logged but do not fail the build. This policy is intentional: the warnings
+# come from Tauri's own dependency tree and are not actionable inside this repo.

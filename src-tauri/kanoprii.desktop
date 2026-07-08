@@ -1,0 +1,10 @@
+[Desktop Entry]
+Categories=Office;Viewer;
+Comment={{{comment}}}
+Exec={{{exec}}} %F
+Icon={{{icon}}}
+MimeType=application/pdf;
+Name={{{name}}}
+StartupWMClass=kanoprii
+Terminal=false
+Type=Application

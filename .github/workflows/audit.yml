@@ -1,0 +1,34 @@
+name: Security audit
+
+on:
+  schedule:
+    # Run weekly on Monday at 07:42 UTC (avoid the top of the hour herd).
+    - cron: '42 7 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Install npm deps
+        run: npm ci
+      # Only audit the root workspace. The e2e workspace depends on
+      # @wdio/native-utils, which currently transitively depends on an
+      # unpatched esbuild (no fixed version available). Re-enable e2e audit once
+      # the upstream wdio dependency chain is updated.
+      - name: npm dependency audit
+        run: npm run audit
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-audit@0.22.1
+      - name: Cargo audit
+        working-directory: src-tauri
+        run: cargo audit

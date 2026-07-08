@@ -1,0 +1,35 @@
+import type { BuildAppModalCtxInputArgs } from './buildAppModalCtxArgs';
+
+export function modalCtxChromeFields(args: BuildAppModalCtxInputArgs) {
+  return {
+    closeSearchModal: args.search.closeSearchModal,
+    closeTesseractReminderModal: args.tesseract.closeTesseractReminderModal,
+    handleCopySummary: args.pdfActions.handleCopySummary,
+    handleSaveSummary: args.pdfActions.handleSaveSummary,
+    pdfSummary: args.modal.pdfSummary,
+    resolveUnsaved: args.unsaved.resolveUnsaved,
+    runPdfSearch: args.search.runPdfSearch,
+    searchInputRef: args.search.searchInputRef,
+    searchMatchCase: args.search.searchMatchCase,
+    searchQuery: args.search.searchQuery,
+    searchResultIndex: args.search.searchResultIndex,
+    searchResults: args.search.searchResults,
+    searchWholeWord: args.search.searchWholeWord,
+    setSearchMatchCase: args.search.setSearchMatchCase,
+    setSearchQuery: args.search.setSearchQuery,
+    setSearchWholeWord: args.search.setSearchWholeWord,
+    setShowSummaryModal: args.modal.setShowSummaryModal,
+    setTesseractDoNotRemind: args.help.setTesseractDoNotRemind,
+    showSearchModal: args.search.showSearchModal,
+    showSummaryModal: args.modal.showSummaryModal,
+    showTesseractModal: args.help.showTesseractModal,
+    showUpdateModal: args.help.showUpdateModal,
+    setShowUpdateModal: args.help.setShowUpdateModal,
+    updaterSupported: args.help.updaterSupported,
+    showToast: args.runtime.showToast,
+    showUnsavedModal: args.unsaved.showUnsavedModal,
+    stepSearchMatch: args.search.stepSearchMatch,
+    tesseractDoNotRemind: args.help.tesseractDoNotRemind,
+    tesseractInstallGuide: args.help.tesseractInstallGuide,
+  };
+}

@@ -1,0 +1,10 @@
+{
+  "$schema": "../../src-tauri/gen/schemas/desktop-schema.json",
+  "identifier": "e2e",
+  "description": "WebdriverIO plugin permissions for automated UI tests.",
+  "windows": ["main"],
+  "permissions": [
+    "wdio:default",
+    "wdio-webdriver:default"
+  ]
+}
