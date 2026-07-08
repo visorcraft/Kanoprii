@@ -25,5 +25,3 @@ trap cleanup EXIT INT TERM
 cp "$root/e2e/capabilities/e2e.json" "$root/src-tauri/capabilities/e2e.json"
 npm run build
 npx tauri build --debug --no-bundle --config src-tauri/tauri.e2e.conf.json -- --features wdio
-# @wdio/tauri-service resolves binaries from productName ("Kanoprii"), not the crate name.
-ln -sf "$CARGO_TARGET_DIR/debug/kanoprii" "$CARGO_TARGET_DIR/debug/kanoprii"
