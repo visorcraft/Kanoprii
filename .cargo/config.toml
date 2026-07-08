@@ -1,0 +1,8 @@
+# sccache works on every platform, so it stays global.
+[build]
+rustc-wrapper = "sccache"
+
+# mold is a Linux-only linker - scope its linker flag to Linux targets so macOS
+# and Windows builds don't try to use it (which would fail the link step).
+[target.'cfg(target_os = "linux")']
+rustflags = ["-Clink-arg=-fuse-ld=mold"]

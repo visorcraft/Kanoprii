@@ -1,0 +1,56 @@
+# Rust
+target/
+**/*.rs.bk
+
+# Node
+node_modules/
+dist/
+build/
+.env
+*.log
+/*.txt
+
+# Tauri
+src-tauri/target/
+src-tauri/bin/
+
+# Agent planning matrix (AGENTS.md is tracked; keep the rest local)
+AGENTS.md
+CLAUDE.md
+GEMINI.md
+PLAN.md
+/docs/superpowers
+
+# Worktrees
+.worktrees/
+
+# Vendored PDFium runtime library (downloaded prebuilt, not committed - see README)
+src-tauri/vendor/
+src-tauri/capabilities/e2e.json
+
+# Python
+__pycache__/
+*.py[cod]
+
+# Tooling / test artifacts
+.playwright-mcp/
+test-results/
+playwright-report/
+coverage/
+*.tsbuildinfo
+
+# Credits generation intermediate (merged into docs/credits-third-party.md)
+docs/credits-third-party-rust.md
+
+# Editors / IDEs
+.vscode/
+.idea/
+*.swp
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Local release-artifact cache kept by clean_visorcraft_repos
+/_releases/

@@ -1,0 +1,16 @@
+{
+  // Fail on high and critical severities. Moderate/low advisories are logged
+  // but do not block CI. Use the allowlist only for advisories that are
+  // transitive, have no fixed version published, and whose risk has been
+  // explicitly accepted. Document each allowlist entry with an issue link and
+  // a re-evaluation date.
+  "high": true,
+  "moderate": false,
+  "low": false,
+  "critical": true,
+
+  // Module/path allowlist (audit-ci also supports GHSA IDs via
+  // "allowlist": ["GHSA-xxxx-xxxx-xxxx"]). Keep this list empty unless
+  // there is no alternative.
+  "allowlist": []
+}
