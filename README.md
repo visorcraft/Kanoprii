@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="src/assets/panda.png" alt="Kanoprii logo" width="200" />
+  <img src="src/assets/kanoprii.png" alt="Kanoprii logo" width="200" />
 </p>
 
 <h1 align="center">Kanoprii</h1>
