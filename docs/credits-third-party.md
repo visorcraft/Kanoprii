@@ -11189,7 +11189,7 @@ insights.
 ### GNU General Public License v3.0 only
 
 Used by:
-- [`kanoprii 1.7.1`](https://crates.io/crates/kanoprii)
+- [`kanoprii 1.8.0`](https://crates.io/crates/kanoprii)
 
 ```
 GNU GENERAL PUBLIC LICENSE
