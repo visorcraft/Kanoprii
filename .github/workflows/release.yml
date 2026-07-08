@@ -1,6 +1,9 @@
 name: Release
 
 on:
+  push:
+    tags:
+      - "v*"
   workflow_dispatch:
     inputs:
       tag:
@@ -206,7 +209,7 @@ jobs:
 
       - name: Generate updater manifest (latest.json)
         env:
-          RELEASE_TAG: ${{ inputs.tag }}
+          RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
         run: python3 scripts/generate-latest-json.py release-artifacts "$RELEASE_TAG"
 
       - name: Generate SHA256 checksums
@@ -215,7 +218,7 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ inputs.tag }}
+          tag_name: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
           files: |
             release-artifacts/**
           generate_release_notes: true
