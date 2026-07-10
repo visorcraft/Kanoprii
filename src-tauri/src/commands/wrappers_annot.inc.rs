@@ -42,7 +42,10 @@ fn snapshot_pdf(source: String) -> Result<String, String> {
     pdf::history::snapshot_pdf(source)
 }
 #[tauri::command]
-fn snapshot_pdf_entry(history: Vec<HistorySnapshot>, source: String) -> Result<HistorySnapshot, String> {
+fn snapshot_pdf_entry(
+    history: Vec<HistorySnapshot>,
+    source: String,
+) -> Result<(Vec<HistorySnapshot>, HistorySnapshot), String> {
     pdf::history::snapshot_pdf_entry(history, source)
 }
 #[tauri::command]

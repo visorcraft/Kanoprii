@@ -1,6 +1,6 @@
 use crate::pdf::markdown_heuristic::{markdown_table, normalize_inline_text};
 use lopdf::{Dictionary, Document, Object, ObjectId};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashSet};
 
 #[derive(Debug, Clone)]
 struct TaggedBlock {
@@ -100,6 +100,37 @@ fn parse_struct_element(
     id: ObjectId,
     inherited_page: Option<u32>,
 ) -> Result<(Option<u32>, TaggedBlock), String> {
+    parse_struct_element_inner(doc, id, inherited_page, 0, &mut HashSet::new())
+}
+
+// ponytail: hostile `/StructTreeRoot` graphs can reference an ancestor or be
+// arbitrarily deep; cap recursion at 64 and skip already-visited ids so we
+// never stack-overflow. Mirror of `forms::walk_form_nodes_inner`.
+const STRUCT_TREE_MAX_DEPTH: u32 = 64;
+
+fn parse_struct_element_inner(
+    doc: &Document,
+    id: ObjectId,
+    inherited_page: Option<u32>,
+    depth: u32,
+    visited: &mut HashSet<ObjectId>,
+) -> Result<(Option<u32>, TaggedBlock), String> {
+    if depth >= STRUCT_TREE_MAX_DEPTH {
+        return Err(format!("struct tree exceeded max depth ({STRUCT_TREE_MAX_DEPTH})"));
+    }
+    if !visited.insert(id) {
+        // Already on the current path: a cycle. Skip the subtree rather than
+        // recursing back into ourselves.
+        let dict = doc.get_dictionary(id).map_err(|e| e.to_string())?;
+        let kind = dict
+            .get(b"S")
+            .ok()
+            .and_then(|obj| obj.as_name().ok())
+            .map(|name| String::from_utf8_lossy(name).into_owned())
+            .unwrap_or_else(|| "Span".to_string());
+        let page = page_index_for_struct(doc, dict).or(inherited_page);
+        return Ok((page, TaggedBlock { kind, text: String::new(), link_uri: None, children: Vec::new() }));
+    }
     let dict = doc.get_dictionary(id).map_err(|e| e.to_string())?;
     let page = page_index_for_struct(doc, dict).or(inherited_page);
     let kind = dict
@@ -112,11 +143,13 @@ fn parse_struct_element(
     let link_uri = if kind == "Link" { struct_link_uri(doc, dict) } else { None };
     let mut children = Vec::new();
     if let Ok(k) = dict.get(b"K") {
-        for child_id in struct_k_ids(k) {
-            let (_, child) = parse_struct_element(doc, child_id, page)?;
+        let child_ids = struct_k_ids(k);
+        for child_id in child_ids {
+            let (_, child) = parse_struct_element_inner(doc, child_id, page, depth + 1, visited)?;
             children.push(child);
         }
     }
+    visited.remove(&id);
     Ok((page, TaggedBlock { kind, text, link_uri, children }))
 }
 
@@ -540,5 +573,59 @@ pub fn plain_text_to_markdown(text: &str) -> String {
         "_(no extractable text on this page)_\n\n".to_string()
     } else {
         format!("{normalized}\n\n")
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use lopdf::{Dictionary, Object};
+
+    /// Build a minimal doc with a `/StructTreeRoot` whose `/K` is a single
+    /// element that references itself (cyclic graph).
+    fn cyclic_struct_doc() -> (Document, ObjectId) {
+        let mut doc = Document::with_version("1.4");
+        let struct_id = doc.new_object_id();
+        let mut struct_dict = Dictionary::new();
+        struct_dict.set("Type", Object::Name(b"StructElem".to_vec()));
+        struct_dict.set("S", Object::Name(b"Document".to_vec()));
+        // /K references self.
+        struct_dict.set("K", Object::Reference(struct_id));
+        doc.objects.insert(struct_id, Object::Dictionary(struct_dict));
+
+        let mut root = Dictionary::new();
+        root.set("Type", Object::Name(b"StructTreeRoot".to_vec()));
+        root.set("K", Object::Reference(struct_id));
+        let root_id = doc.add_object(Object::Dictionary(root));
+
+        let mut catalog = Dictionary::new();
+        catalog.set("Type", Object::Name(b"Catalog".to_vec()));
+        catalog.set("StructTreeRoot", Object::Reference(root_id));
+        let catalog_id = doc.add_object(Object::Dictionary(catalog));
+        doc.trailer.set("Root", Object::Reference(catalog_id));
+
+        (doc, struct_id)
+    }
+
+    #[test]
+    fn parse_struct_element_breaks_cycles() {
+        let (doc, cyclic_id) = cyclic_struct_doc();
+        // Without a guard this would recurse forever; with the cycle guard it
+        // returns Ok after visiting the cycle once.
+        let (_, block) = parse_struct_element(&doc, cyclic_id, None).expect("cycle should be skipped, not crash");
+        assert_eq!(block.kind, "Document");
+        // Exactly one child — the cycle branch produces an empty stub for the
+        // self-reference; further recursion is blocked by the visited set.
+        assert_eq!(block.children.len(), 1);
+        assert!(block.children[0].children.is_empty());
+    }
+
+    #[test]
+    fn parse_struct_element_does_not_stack_overflow_on_self_ref() {
+        // Long /K array of self-references used to recurse unbounded. Now the
+        // cycle guard skips re-entry, so the function returns Ok in bounded time.
+        let (doc, id) = cyclic_struct_doc();
+        let result = parse_struct_element(&doc, id, None);
+        assert!(result.is_ok(), "self-referential struct should not crash");
     }
 }

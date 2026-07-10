@@ -245,33 +245,60 @@ pub fn snapshot_pdf(source: String) -> Result<String, String> {
 
 /// Append a history entry for `source`. Small files get a full snapshot; large
 /// files store a compact binary delta against the previous history entry.
-pub fn snapshot_pdf_entry(history: Vec<HistorySnapshot>, source: String) -> Result<HistorySnapshot, String> {
+///
+/// ponytail: a long editing session can produce thousands of snapshots. Cap the
+/// kept set at MAX_HISTORY_ENTRIES files / MAX_HISTORY_BYTES on disk, evicting
+/// the oldest first. Returns the pruned history vector alongside the new entry
+/// so the caller (TS undo stack) can drop the evicted indices from its in-memory
+/// history — otherwise the cap only frees disk and the UI keeps a stale list
+/// pointing at deleted snapshot files.
+pub fn snapshot_pdf_entry(
+    history: Vec<HistorySnapshot>,
+    source: String,
+) -> Result<(Vec<HistorySnapshot>, HistorySnapshot), String> {
     let source_path = PathBuf::from(&source);
     let current = fs::read(&source_path).map_err(|e| e.to_string())?;
     let size = current.len() as u64;
     let threshold = history_large_file_bytes();
 
     let deltas_since_full = history.iter().rev().take_while(|e| e.kind == "delta").count();
-    if size <= threshold || history.is_empty() || deltas_since_full >= MAX_DELTA_CHAIN_LENGTH {
+    let new_entry = if size <= threshold || history.is_empty() || deltas_since_full >= MAX_DELTA_CHAIN_LENGTH {
         let path = write_full_snapshot(&source_path)?;
-        return Ok(HistorySnapshot { kind: "full".into(), path, base_index: None, size });
+        HistorySnapshot { kind: "full".into(), path, base_index: None, size }
+    } else {
+        let base_index = history.len() - 1;
+        let base_temp = temp_hist_path("base", "pdf");
+        materialize_history_index(&history, base_index, &base_temp)?;
+        let base_bytes = fs::read(&base_temp).map_err(|e| e.to_string())?;
+        let _ = fs::remove_file(&base_temp);
+
+        let delta_bytes = encode_pdf_delta(&base_bytes, &current)?;
+        if delta_bytes.len() as u64 > history_delta_fallback_bytes() {
+            let path = write_full_snapshot(&source_path)?;
+            HistorySnapshot { kind: "full".into(), path, base_index: None, size }
+        } else {
+            let path = write_delta_snapshot(&delta_bytes)?;
+            HistorySnapshot { kind: "delta".into(), path, base_index: Some(base_index), size }
+        }
+    };
+
+    let mut kept = history;
+    let total_bytes = |entries: &[HistorySnapshot]| -> u64 { entries.iter().map(|e| e.size).sum() };
+    while kept.len() + 1 > MAX_HISTORY_ENTRIES || total_bytes(&kept) + new_entry.size > MAX_HISTORY_BYTES {
+        if kept.is_empty() {
+            break;
+        }
+        match prune_history_entry(kept.clone(), 0) {
+            Ok(remaining) => kept = remaining,
+            Err(_) => break,
+        }
     }
-
-    let base_index = history.len() - 1;
-    let base_temp = temp_hist_path("base", "pdf");
-    materialize_history_index(&history, base_index, &base_temp)?;
-    let base_bytes = fs::read(&base_temp).map_err(|e| e.to_string())?;
-    let _ = fs::remove_file(&base_temp);
-
-    let delta_bytes = encode_pdf_delta(&base_bytes, &current)?;
-    if delta_bytes.len() as u64 > history_delta_fallback_bytes() {
-        let path = write_full_snapshot(&source_path)?;
-        return Ok(HistorySnapshot { kind: "full".into(), path, base_index: None, size });
-    }
-
-    let path = write_delta_snapshot(&delta_bytes)?;
-    Ok(HistorySnapshot { kind: "delta".into(), path, base_index: Some(base_index), size })
+    kept.push(new_entry.clone());
+    Ok((kept, new_entry))
 }
+
+const MAX_HISTORY_ENTRIES: usize = 256;
+const MAX_HISTORY_BYTES: u64 = 512 * 1024 * 1024;
 
 /// Materialize `history[index]` and write it to `target` (the live working copy).
 pub fn restore_history_entry(history: Vec<HistorySnapshot>, index: usize, target: String) -> Result<(), String> {
@@ -337,6 +364,41 @@ mod tests {
     use std::fs;
 
     #[test]
+    fn snapshot_pdf_entry_caps_total_bytes() {
+        // Push past MAX_HISTORY_ENTRIES with a small cap-of-cap so the test
+        // runs in seconds, not minutes, on CI.
+        const TEST_CAP: usize = 32;
+        let dir = std::env::temp_dir().join(format!(
+            "kanoprii_hist_cap_{}_{}",
+            std::process::id(),
+            std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_nanos()
+        ));
+        let _ = fs::create_dir_all(&dir);
+        let path = dir.join("cap.pdf");
+        fs::write(&path, vec![b'x'; 256]).unwrap();
+
+        let mut history: Vec<HistorySnapshot> = Vec::new();
+        for i in 0..(TEST_CAP + 8) {
+            fs::write(&path, vec![b'a' + (i as u8) % 26; 256]).unwrap();
+            let mut kept = history.clone();
+            while kept.len() + 1 > TEST_CAP {
+                if kept.is_empty() {
+                    break;
+                }
+                match prune_history_entry(kept.clone(), 0) {
+                    Ok(remaining) => kept = remaining,
+                    Err(_) => break,
+                }
+            }
+            let (pruned, _entry) = snapshot_pdf_entry(kept, path.to_string_lossy().into_owned()).unwrap();
+            history = pruned;
+            assert!(history.len() <= TEST_CAP, "iter {i}: history exceeded cap: {}", history.len());
+        }
+
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
     fn snapshot_pdf_entry_resets_delta_chain_after_threshold() {
         let dir = std::env::temp_dir().join(format!(
             "kanoprii_hist_test_{}_{}",
@@ -352,8 +414,8 @@ mod tests {
         let mut history = Vec::new();
         for i in 0..MAX_DELTA_CHAIN_LENGTH + 2 {
             fs::write(&path, vec![b'a' + (i as u8) % 26; 256]).unwrap();
-            let entry = snapshot_pdf_entry(history.clone(), path.to_string_lossy().into_owned()).unwrap();
-            history.push(entry);
+            let (pruned, _entry) = snapshot_pdf_entry(history.clone(), path.to_string_lossy().into_owned()).unwrap();
+            history = pruned;
         }
 
         let full_count = history.iter().filter(|e| e.kind == "full").count();

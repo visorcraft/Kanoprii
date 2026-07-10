@@ -95,19 +95,25 @@ export function useUndoHistory({
     if (!working || !refs) return;
     try {
       const size = await invoke<number>('file_byte_size', { path: working });
-      const snapshot = await invoke<HistorySnapshot>('snapshot_pdf_entry', {
-        history: refs.history.slice(0, refs.histIdx + 1),
-        source: working,
-      });
+      const [prunedHistory, snapshot] = await invoke<[HistorySnapshot[], HistorySnapshot]>(
+        'snapshot_pdf_entry',
+        {
+          history: refs.history.slice(0, refs.histIdx + 1),
+          source: working,
+        },
+      );
       if (size > SNAPSHOT_BYTE_LIMIT && snapshot.kind === 'delta' && !refs.deltaNotified) {
         refs.deltaNotified = true;
         showToast('Large file: using compact undo snapshots', 'success');
       }
       const redoBranch = refs.history.slice(refs.histIdx + 1);
       discardHistoryEntries(redoBranch);
-      refs.history = refs.history.slice(0, refs.histIdx + 1);
-      refs.history.push(snapshot);
-      refs.histIdx = refs.history.length - 1;
+      // Backend may have evicted the oldest entries to enforce disk caps;
+      // use the pruned list as the source of truth.
+      refs.history = prunedHistory;
+      // Adjust indices if eviction happened before our new snapshot.
+      if (refs.histIdx >= refs.history.length) refs.histIdx = refs.history.length - 1;
+      if (refs.savedIdx >= refs.history.length) refs.savedIdx = refs.history.length - 1;
       await pruneUndoHistory(refs);
       refreshUndoRedoState();
     } catch (err) {
@@ -129,7 +135,10 @@ export function useUndoHistory({
       const refs = getUndoRefs(id);
       const oldHistory = [...refs.history];
       try {
-        const baseline = await invoke<HistorySnapshot>('snapshot_pdf_entry', { history: [], source: working });
+        const [, baseline] = await invoke<[HistorySnapshot[], HistorySnapshot]>('snapshot_pdf_entry', {
+          history: [],
+          source: working,
+        });
         discardHistoryEntries(oldHistory);
         refs.history = [baseline];
         refs.histIdx = 0;

@@ -137,6 +137,12 @@ fn open_pdf_for_manual_print(path: &Path) -> Result<(), String> {
 
     unsafe {
         ShellExecuteExW(&mut info).map_err(|e| e.to_string())?;
+        // SEE_MASK_NOCLOSEPROCESS leaves the child's process handle open in
+        // `info.hProcess`; without CloseHandle each print leaks one kernel
+        // handle until process exit.
+        if !info.hProcess.is_null() {
+            windows::Win32::Foundation::CloseHandle(info.hProcess).ok();
+        }
     }
     Ok(())
 }

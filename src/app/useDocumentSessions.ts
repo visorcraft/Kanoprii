@@ -332,6 +332,14 @@ export function useDocumentSessions() {
   const removeSession = useCallback((id: DocumentSessionId) => {
     undoRefs.current.delete(id);
     setSessions((prev) => {
+      // Revoke any object URLs the removed session still owns so failed opens
+      // (usePdfOpen, useSessionPersistence bypass finalizeCloseSession) don't
+      // leak blob handles across open/close cycles.
+      const removed = prev.find((s) => s.id === id);
+      if (removed) {
+        if (removed.viewerCache.imageSrc) URL.revokeObjectURL(removed.viewerCache.imageSrc);
+        removed.viewerCache.thumbnails.forEach((url) => URL.revokeObjectURL(url));
+      }
       const next = prev.filter((s) => s.id !== id);
       setActiveId((cur) => {
         if (cur !== id) return cur;

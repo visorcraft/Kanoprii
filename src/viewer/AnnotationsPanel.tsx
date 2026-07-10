@@ -1,5 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { AnnotationData } from '../app/types';
 
 type DocAnnotation = {
@@ -40,22 +40,25 @@ export function AnnotationsPanel({
 }: AnnotationsPanelProps) {
   const [items, setItems] = useState<DocAnnotation[]>([]);
 
-  const reload = useCallback(async () => {
+  useEffect(() => {
     if (!filePath) {
       setItems([]);
       return;
     }
-    try {
-      const list = await invoke<DocAnnotation[]>('list_document_annotations', { path: filePath });
-      setItems(list);
-    } catch {
-      setItems([]);
-    }
-  }, [filePath]);
-
-  useEffect(() => {
-    void reload();
-  }, [reload, pdfRevision]);
+    let cancelled = false;
+    void (async () => {
+      try {
+        const list = await invoke<DocAnnotation[]>('list_document_annotations', { path: filePath });
+        if (cancelled) return;
+        setItems(list);
+      } catch {
+        if (!cancelled) setItems([]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [filePath, pdfRevision]);
 
   if (!filePath) return null;
 

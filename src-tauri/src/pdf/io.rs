@@ -1,10 +1,10 @@
 use crate::pdf::render;
 use lopdf::Document;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use std::io::Write;
 use std::path::{Path, PathBuf};
-use std::sync::{Mutex, OnceLock};
+use std::sync::{Arc, Mutex, OnceLock};
 use tauri::Manager;
 
 /// Load a PDF, run `f`, save back to the same path, and return `f`'s result.
@@ -12,34 +12,68 @@ pub fn mutate_pdf<T, F>(path: &Path, f: F) -> Result<T, String>
 where
     F: FnOnce(&mut Document) -> Result<T, String>,
 {
-    let _lock = path_lock(path);
-    let mut doc = Document::load(path).map_err(|e| e.to_string())?;
-    let result = f(&mut doc)?;
-    save_atomic(&mut doc, path)?;
-    render::invalidate_document_cache(path);
-    Ok(result)
+    with_path_lock(path, || {
+        let mut doc = Document::load(path).map_err(|e| e.to_string())?;
+        let result = f(&mut doc)?;
+        save_atomic(&mut doc, path)?;
+        render::invalidate_document_cache(path);
+        Ok(result)
+    })
 }
 
 /// Serialize concurrent mutations to the same PDF path. Without this, two
 /// Tauri commands editing the same file load their own pre-edit snapshots
 /// and last-write-wins: the second save clobbers the first's edit.
 ///
-/// ponytail: HashMap<PathBuf, Mutex<()>> keyed by canonical path. Entries are
-/// never removed — the map grows by one entry per distinct path ever edited,
-/// bounded by the number of distinct files the user opens (small).
-type PathLockMap = Mutex<HashMap<PathBuf, &'static Mutex<()>>>;
+/// ponytail: HashMap<PathBuf, Arc<Mutex<()>>> keyed by canonical path with a
+/// parallel LRU VecDeque. Capped at PATH_LOCK_MAX_ENTRIES so a session that
+/// opens thousands of distinct files cannot accumulate an unbounded number
+/// of mutex objects (the prior `Box::leak` design never evicted). Touching an
+/// existing entry promotes it to the LRU tail. When the cap is hit, the LRU
+/// head is dropped — if no other code is holding its `Arc`, the mutex is
+/// freed immediately. Upgrade path: per-session mutex if cross-doc contention
+/// becomes visible.
+type PathLockMap = Mutex<(HashMap<PathBuf, Arc<Mutex<()>>>, VecDeque<PathBuf>)>;
 static PATH_LOCKS: OnceLock<PathLockMap> = OnceLock::new();
 
-fn path_lock(path: &Path) -> std::sync::MutexGuard<'static, ()> {
-    let map = PATH_LOCKS.get_or_init(|| Mutex::new(HashMap::new()));
-    let key = path.canonicalize().unwrap_or_else(|_| path.to_path_buf());
-    let m: &'static Mutex<()> = {
+const PATH_LOCK_MAX_ENTRIES: usize = 256;
+
+/// Run `f` while holding the per-path mutex. The closure-based signature keeps
+/// the `Arc` (and thus the `MutexGuard`) alive for `f`'s lifetime without
+/// forcing a `'static` borrow on the guard.
+fn with_path_lock<T, F>(path: &Path, f: F) -> Result<T, String>
+where
+    F: FnOnce() -> Result<T, String>,
+{
+    let arc: Arc<Mutex<()>> = {
+        let map = PATH_LOCKS.get_or_init(|| Mutex::new((HashMap::new(), VecDeque::new())));
+        let key = path.canonicalize().unwrap_or_else(|_| path.to_path_buf());
         let mut guard = map.lock().unwrap_or_else(|p| p.into_inner());
-        // HashMap::entry is atomic; if the entry already exists we reuse the
-        // same leaked mutex and never double-allocate for the same path.
-        guard.entry(key).or_insert_with(|| Box::leak(Box::new(Mutex::new(()))))
+        let (hash, lru) = &mut *guard;
+        if let Some(existing) = hash.get(&key).cloned() {
+            // Promote to LRU tail; remove existing position first.
+            lru.retain(|p| p != &key);
+            lru.push_back(key.clone());
+            existing
+        } else {
+            if hash.len() >= PATH_LOCK_MAX_ENTRIES {
+                if let Some(victim) = lru.pop_front() {
+                    hash.remove(&victim);
+                }
+            }
+            let arc = Arc::new(Mutex::new(()));
+            hash.insert(key.clone(), arc.clone());
+            lru.push_back(key);
+            arc
+        }
     };
-    m.lock().unwrap_or_else(|p| p.into_inner())
+    let _guard = arc.lock().unwrap_or_else(|p| p.into_inner());
+    f()
+}
+
+#[cfg(test)]
+fn path_lock_count_for_tests() -> usize {
+    PATH_LOCKS.get().map(|m| m.lock().unwrap().0.len()).unwrap_or(0)
 }
 
 /// Atomically write a `lopdf::Document` to `path`.
@@ -387,5 +421,32 @@ mod tests {
         // Sanity: not a zero-byte file (would mean we crashed mid-write).
         assert!(!original_bytes.is_empty());
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn path_lock_lru_caps_total_entries() {
+        // Open more distinct paths than the cap; the LRU must hold the count
+        // at PATH_LOCK_MAX_ENTRIES. Other tests in this module may also have
+        // touched PATH_LOCKS, so we measure the delta, not the absolute count.
+        let dir = std::env::temp_dir().join(format!(
+            "kanoprii_pathlock_test_{}_{}",
+            std::process::id(),
+            std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_nanos()
+        ));
+        fs::create_dir_all(&dir).unwrap();
+        let before = path_lock_count_for_tests();
+        let extra = PATH_LOCK_MAX_ENTRIES + 32;
+        let mut created = Vec::with_capacity(extra);
+        for i in 0..extra {
+            let p = dir.join(format!("f{i}.pdf"));
+            fs::write(&p, b"%PDF-1.4\n").unwrap();
+            with_path_lock(&p, || Ok::<_, String>(())).unwrap();
+            created.push(p);
+        }
+        let after = path_lock_count_for_tests();
+        assert!(after <= PATH_LOCK_MAX_ENTRIES, "path_lock map exceeded cap: {after}");
+        assert!(after.saturating_sub(before) <= PATH_LOCK_MAX_ENTRIES);
+        let _ = fs::remove_dir_all(&dir);
+        drop(created);
     }
 }

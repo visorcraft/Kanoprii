@@ -38,9 +38,17 @@ export function useDocumentEnhancementActions(
       setHasRedactions(false);
       return;
     }
+    let cancelled = false;
     void invoke<boolean>('has_redaction_boxes', { path: opts.filePath })
-      .then(setHasRedactions)
-      .catch(() => setHasRedactions(false));
+      .then((value) => {
+        if (!cancelled) setHasRedactions(value);
+      })
+      .catch(() => {
+        if (!cancelled) setHasRedactions(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [opts.filePath, opts.currentPage, opts.pdfRevision]);
 
   const handleMakePdfSearchable = useCallback(async () => {

@@ -17534,16 +17534,15 @@ fn encode_pdf_delta_roundtrip() {
 fn snapshot_pdf_entry_uses_delta_for_large_files() {
     let path = save(&mut build_pdf(20), "delta_snap");
     let working = open_working_copy(path.clone()).unwrap();
-    let baseline = snapshot_pdf_entry(vec![], working.clone()).unwrap();
+    let (_, baseline) = snapshot_pdf_entry(vec![], working.clone()).unwrap();
     assert_eq!(baseline.kind, "full");
 
     delete_page(working.clone(), 0).unwrap();
-    let history = vec![baseline.clone()];
-    let edited = snapshot_pdf_entry(history.clone(), working.clone()).unwrap();
+    let (history, edited) = snapshot_pdf_entry(vec![baseline.clone()], working.clone()).unwrap();
     assert_eq!(edited.kind, "delta");
     assert_eq!(edited.base_index, Some(0));
 
-    restore_history_entry(history, 0, working.clone()).unwrap();
+    restore_history_entry(history.clone(), 0, working.clone()).unwrap();
     assert_eq!(get_pdf_page_count(working.clone()).unwrap(), 20);
 
     restore_history_entry(vec![baseline, edited], 1, working.clone()).unwrap();
@@ -17557,9 +17556,9 @@ fn snapshot_pdf_entry_uses_delta_for_large_files() {
 fn prune_history_entry_rematerializes_orphaned_deltas() {
     let path = save(&mut build_pdf(2), "prune_snap");
     let working = open_working_copy(path.clone()).unwrap();
-    let baseline = snapshot_pdf_entry(vec![], working.clone()).unwrap();
+    let (_, baseline) = snapshot_pdf_entry(vec![], working.clone()).unwrap();
     delete_page(working.clone(), 0).unwrap();
-    let edited = snapshot_pdf_entry(vec![baseline.clone()], working.clone()).unwrap();
+    let (_, edited) = snapshot_pdf_entry(vec![baseline.clone()], working.clone()).unwrap();
     let history = vec![baseline, edited];
 
     let pruned = prune_history_entry(history, 0).unwrap();
