@@ -264,7 +264,11 @@ pub fn snapshot_pdf_entry(
     let deltas_since_full = history.iter().rev().take_while(|e| e.kind == "delta").count();
     let new_entry = if size <= threshold || history.is_empty() || deltas_since_full >= MAX_DELTA_CHAIN_LENGTH {
         let path = write_full_snapshot(&source_path)?;
-        HistorySnapshot { kind: "full".into(), path, base_index: None, size }
+        // Track the bytes we actually wrote to disk (a delta snapshot can be
+        // orders of magnitude smaller than the source; using the source size
+        // would make the byte cap fire way too eagerly).
+        let on_disk = file_size(Path::new(&path)).unwrap_or(size);
+        HistorySnapshot { kind: "full".into(), path, base_index: None, size: on_disk }
     } else {
         let base_index = history.len() - 1;
         let base_temp = temp_hist_path("base", "pdf");
@@ -275,10 +279,12 @@ pub fn snapshot_pdf_entry(
         let delta_bytes = encode_pdf_delta(&base_bytes, &current)?;
         if delta_bytes.len() as u64 > history_delta_fallback_bytes() {
             let path = write_full_snapshot(&source_path)?;
-            HistorySnapshot { kind: "full".into(), path, base_index: None, size }
+            let on_disk = file_size(Path::new(&path)).unwrap_or(size);
+            HistorySnapshot { kind: "full".into(), path, base_index: None, size: on_disk }
         } else {
             let path = write_delta_snapshot(&delta_bytes)?;
-            HistorySnapshot { kind: "delta".into(), path, base_index: Some(base_index), size }
+            let on_disk = file_size(Path::new(&path)).unwrap_or(delta_bytes.len() as u64);
+            HistorySnapshot { kind: "delta".into(), path, base_index: Some(base_index), size: on_disk }
         }
     };
 
@@ -295,6 +301,10 @@ pub fn snapshot_pdf_entry(
     }
     kept.push(new_entry.clone());
     Ok((kept, new_entry))
+}
+
+fn file_size(path: &Path) -> Option<u64> {
+    fs::metadata(path).ok().map(|m| m.len())
 }
 
 const MAX_HISTORY_ENTRIES: usize = 256;

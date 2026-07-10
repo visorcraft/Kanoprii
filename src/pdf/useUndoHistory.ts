@@ -109,11 +109,14 @@ export function useUndoHistory({
       const redoBranch = refs.history.slice(refs.histIdx + 1);
       discardHistoryEntries(redoBranch);
       // Backend may have evicted the oldest entries to enforce disk caps;
-      // use the pruned list as the source of truth.
+      // use the pruned list as the source of truth. The new snapshot is
+      // always appended as the last element, so histIdx advances to the
+      // new tail; savedIdx shifts by however many entries were evicted.
+      const prevLen = refs.histIdx + 1;
+      const evicted = Math.max(0, prevLen + 1 - prunedHistory.length);
       refs.history = prunedHistory;
-      // Adjust indices if eviction happened before our new snapshot.
-      if (refs.histIdx >= refs.history.length) refs.histIdx = refs.history.length - 1;
-      if (refs.savedIdx >= refs.history.length) refs.savedIdx = refs.history.length - 1;
+      refs.histIdx = refs.history.length - 1;
+      refs.savedIdx = Math.max(0, refs.savedIdx - evicted);
       await pruneUndoHistory(refs);
       refreshUndoRedoState();
     } catch (err) {
