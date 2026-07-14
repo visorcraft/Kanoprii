@@ -21,7 +21,7 @@ describe('Kanoprii shell', () => {
     await openFileMenu();
     const openItem = await $('[data-testid="open-pdf"]');
     await expect(openItem).toBeDisplayed();
-    await expect(openItem).toHaveText(expect.stringContaining('Open PDF'));
+    await expect(openItem).toHaveText(expect.stringContaining('Open Document'));
   });
 
   it('opens a PDF via the path modal and shows page controls', async () => {
