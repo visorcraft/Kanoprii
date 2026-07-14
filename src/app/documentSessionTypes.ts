@@ -2,6 +2,7 @@ import type { HistorySnapshot } from '../pdf/historyTypes';
 import type { PdfTextSearchMatch } from '../modals/SearchModal';
 import type { PdfAnnotation } from '../pdf/usePdfDocument';
 import type { MarkdownOcrNotice, ViewMode } from './types';
+import type { SourceKind } from './documentImport';
 
 /**
  * Per-session vs app-wide state inventory:
@@ -53,6 +54,9 @@ export type DocumentSessionData = {
   id: DocumentSessionId;
   filePath: string;
   originalPath: string;
+  sourcePath: string;
+  sourceKind: SourceKind;
+  sourceText: string;
   isDirty: boolean;
   pageCount: number | null;
   currentPage: number;

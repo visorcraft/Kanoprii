@@ -6,6 +6,8 @@ const fixturesDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '
 export const fixturePdf = path.join(fixturesDir, 'sample.pdf');
 export const fixturePdf3p = path.join(fixturesDir, 'sample-3p.pdf');
 export const fixturePdfB = path.join(fixturesDir, 'sample-b.pdf');
+export const fixtureMarkdown = path.join(fixturesDir, 'import-markdown.md');
+export const fixtureHtml = path.join(fixturesDir, 'import-webpage.html');
 
 type TauriExecute = <T>(script: (api: { core: { invoke: (cmd: string, args?: Record<string, unknown>) => Promise<unknown> } }) => T | Promise<T>, ...args: unknown[]) => Promise<T>;
 
@@ -93,6 +95,11 @@ export async function cancelUnsavedIfPrompted() {
 }
 
 export async function openPdfViaPathModal(pdfPath: string) {
+  await openDocumentViaPathModal(pdfPath);
+  await waitForPdfOpen();
+}
+
+export async function openDocumentViaPathModal(documentPath: string) {
   await showOpenPdfModal();
   await discardUnsavedIfPrompted();
 
@@ -106,7 +113,7 @@ export async function openPdfViaPathModal(pdfPath: string) {
     setter?.call(input, filePath);
     input.dispatchEvent(new InputEvent('input', { bubbles: true, data: filePath, inputType: 'insertFromPaste' }));
     input.dispatchEvent(new Event('change', { bubbles: true }));
-  }, pdfPath);
+  }, documentPath);
 
   const submit = await $('[data-testid="open-pdf-submit"]');
   await browser.waitUntil(async () => (await submit.isEnabled()), {
@@ -118,7 +125,6 @@ export async function openPdfViaPathModal(pdfPath: string) {
   if (await pdfView.isDisplayed().catch(() => false)) {
     await pdfView.click();
   }
-  await waitForPdfOpen();
 }
 
 export async function waitForPdfOpen() {
@@ -518,4 +524,3 @@ export async function applyRedactions() {
   await (await $('[data-testid="apply-redactions-confirm"]')).click();
   await waitForPageRendered();
 }
-

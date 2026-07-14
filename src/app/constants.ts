@@ -21,6 +21,7 @@ export const STAMP_PRESETS = [
 ] as const;
 
 export const PDF_DIALOG_FILTER = [{ name: 'PDF', extensions: ['pdf'] }];
+export const DOCUMENT_DIALOG_FILTER = [{ name: 'Documents', extensions: ['pdf', 'md', 'markdown', 'html', 'htm'] }];
 export const PNG_DIALOG_FILTER = [{ name: 'PNG', extensions: ['png'] }];
 export const JPEG_DIALOG_FILTER = [{ name: 'JPEG', extensions: ['jpg', 'jpeg'] }];
 export const WEBP_DIALOG_FILTER = [{ name: 'WebP', extensions: ['webp'] }];

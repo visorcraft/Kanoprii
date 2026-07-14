@@ -1,7 +1,7 @@
 {
   "name": "kanoprii",
   "private": true,
-  "version": "1.8.3",
+  "version": "1.10.0",
   "license": "GPL-3.0-only",
   "type": "module",
   "scripts": {
@@ -19,6 +19,8 @@
     "@tauri-apps/plugin-dialog": "^2.7.1",
     "@tauri-apps/plugin-process": "^2.3.1",
     "@tauri-apps/plugin-updater": "^2.10.1",
+    "html2canvas": "^1.4.1",
+    "marked": "^18.0.6",
     "react": "^19.2.0",
     "react-dom": "^19.2.0"
   },

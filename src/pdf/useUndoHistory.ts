@@ -8,7 +8,7 @@ import {
   SNAPSHOT_BYTE_LIMIT,
 } from './historyTypes';
 
-type ViewMode = 'pdf' | 'markdown';
+type ViewMode = 'pdf' | 'markdown' | 'webpage';
 
 export type UseUndoHistoryDeps = {
   filePathRef: React.MutableRefObject<string>;

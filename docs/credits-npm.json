@@ -24,6 +24,18 @@
     "url": "https://www.npmjs.com/package/@tauri-apps/plugin-updater"
   },
   {
+    "name": "html2canvas",
+    "version": "1.4.1",
+    "license": "MIT",
+    "url": "https://www.npmjs.com/package/html2canvas"
+  },
+  {
+    "name": "marked",
+    "version": "18.0.6",
+    "license": "MIT",
+    "url": "https://www.npmjs.com/package/marked"
+  },
+  {
     "name": "react",
     "version": "19.2.7",
     "license": "MIT",

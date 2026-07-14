@@ -1,14 +1,22 @@
+import { useEffect, useRef } from 'react';
+import { invoke } from '@tauri-apps/api/core';
 import { usePdfRecents } from './usePdfRecents';
 import { usePdfDocument } from '../pdf/usePdfDocument';
 import { useUndoHistory } from '../pdf/useUndoHistory';
 import { usePdfOpen } from './usePdfOpen';
 import type { UseAppLifecycleDocumentInput } from './appLifecycleTypes';
+import { createWorkingPdf } from './documentImport';
 
 export function useAppLifecycleOpen({ input, loaders }: UseAppLifecycleDocumentInput) {
   const { doc, modal, security, refs, showToast, withLoading, filePathRef, cancelDrawing } = input;
   const {
     filePath,
     originalPath,
+    sourcePath,
+    sourceKind,
+    sourceText,
+    activeId,
+    updateSession,
     setIsDirty,
     pageCount,
     currentPage,
@@ -31,6 +39,7 @@ export function useAppLifecycleOpen({ input, loaders }: UseAppLifecycleDocumentI
   } = security;
 
   const { rememberOpenedPdf } = usePdfRecents({ rememberBrowserDirectory: loaders.rememberBrowserDirectory, setRecentPdfs });
+  const { loadFormFields } = loaders;
 
   const {
     imageSrc,
@@ -101,7 +110,7 @@ export function useAppLifecycleOpen({ input, loaders }: UseAppLifecycleDocumentI
     handleOpenRecentPdf,
   } = usePdfOpen({
     filePath,
-    originalPath,
+    originalPath: sourcePath || originalPath,
     openFilePath,
     pendingEncryptedPath,
     pdfPasswordDraft,
@@ -109,7 +118,7 @@ export function useAppLifecycleOpen({ input, loaders }: UseAppLifecycleDocumentI
     resetHistoryForOpen,
     renderPage,
     loadThumbnails,
-    loadFormFields: loaders.loadFormFields,
+    loadFormFields,
     rememberOpenedPdf,
     cancelDrawing,
     guardUnsaved: loaders.guardUnsaved,
@@ -124,6 +133,45 @@ export function useAppLifecycleOpen({ input, loaders }: UseAppLifecycleDocumentI
     setPdfPasswordDraft,
     setShowPasswordModal,
   });
+
+  const generatedViewRef = useRef('');
+  useEffect(() => {
+    if (viewMode !== 'pdf' || sourceKind === 'pdf' || !sourceKind || !sourcePath || !activeId) return;
+    const sourceDigest = `${sourceText.length}:${sourceText.slice(0, 64)}`;
+    const key = `${activeId}:${sourcePath}:${sourceDigest}`;
+    if (generatedViewRef.current === key) return;
+    generatedViewRef.current = key;
+    const sessionId = activeId;
+    void withLoading(async () => {
+      showToast('Converting document to PDF…');
+      const working = filePath || await createWorkingPdf(sourcePath, sourceText, sourceKind, {
+        onProgress: (page, total) => showToast(`Converting document: ${page} of ${total} pages`),
+      });
+      if (!filePath) {
+        await resetHistoryForOpen(working, sessionId);
+      }
+      let generatedPath = originalPath;
+      if (originalPath === sourcePath || !filePath) {
+        generatedPath = await invoke<string>('materialize_document_pdf', { working, source: sourcePath });
+        showToast(`Generated ${generatedPath}`);
+      }
+      if (!filePath) {
+        updateSession(sessionId, { filePath: working, originalPath: generatedPath });
+      } else if (generatedPath !== originalPath) {
+        updateSession(sessionId, { originalPath: generatedPath });
+      }
+      const count = await invoke<number>('get_pdf_page_count', { path: working });
+      updateSession(sessionId, { pageCount: count, currentPage: 0, pageInput: '1' });
+      await renderPage(working, 0);
+      await loadThumbnails(working);
+      await loadFormFields(working);
+      return true;
+    }).then((ok) => {
+      if (ok) return;
+      generatedViewRef.current = '';
+      setViewMode(sourceKind === 'markdown' ? 'markdown' : 'webpage');
+    });
+  }, [activeId, filePath, loadFormFields, loadThumbnails, originalPath, renderPage, resetHistoryForOpen, setViewMode, showToast, sourceKind, sourcePath, sourceText, updateSession, viewMode, withLoading]);
 
   return {
     imageSrc,

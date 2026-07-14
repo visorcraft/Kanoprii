@@ -20,7 +20,7 @@ export interface PdfAnnotation {
   is_redaction: boolean;
 }
 
-type ViewMode = 'pdf' | 'markdown';
+type ViewMode = 'pdf' | 'markdown' | 'webpage';
 
 export type UsePdfDocumentDeps = {
   filePath: string;
@@ -175,7 +175,7 @@ export function usePdfDocument({
     const render = () => {
       void withLoading(() => renderPage(filePath, clamped));
     };
-    if (viewMode === 'markdown') {
+    if (viewMode !== 'pdf') {
       window.requestAnimationFrame(() => window.requestAnimationFrame(render));
       return;
     }

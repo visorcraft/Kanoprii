@@ -35,6 +35,10 @@ pub fn default_browser_dir() -> PathBuf {
 }
 
 pub fn list_pdf_entries_for_dir(dir: &Path) -> Result<PdfBrowserListing, String> {
+    list_entries_for_dir(dir, false)
+}
+
+pub fn list_entries_for_dir(dir: &Path, include_documents: bool) -> Result<PdfBrowserListing, String> {
     let current_dir = dir.canonicalize().map_err(|e| e.to_string())?;
     if !current_dir.is_dir() {
         return Err(format!("{} is not a directory", current_dir.to_string_lossy()));
@@ -48,7 +52,11 @@ pub fn list_pdf_entries_for_dir(dir: &Path) -> Result<PdfBrowserListing, String>
         let is_dir = metadata.is_dir();
         let is_pdf =
             path.extension().and_then(|ext| ext.to_str()).map(|ext| ext.eq_ignore_ascii_case("pdf")).unwrap_or(false);
-        if !is_dir && !is_pdf {
+        let is_document = path
+            .extension()
+            .and_then(|ext| ext.to_str())
+            .is_some_and(|ext| matches!(ext.to_ascii_lowercase().as_str(), "pdf" | "md" | "markdown" | "html" | "htm"));
+        if !(is_dir || is_pdf || include_documents && is_document) {
             continue;
         }
         entries.push(PdfBrowserEntry {

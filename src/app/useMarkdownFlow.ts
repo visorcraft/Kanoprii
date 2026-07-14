@@ -14,6 +14,8 @@ import { MARKDOWN_DIALOG_FILTER } from './constants';
 type UseMarkdownFlowOptions = {
   filePath: string;
   originalPath: string;
+  sourceKind: 'pdf' | 'markdown' | 'html' | null;
+  sourceText: string;
   viewMode: ViewMode;
   markdownText: string;
   markdownPath: string;
@@ -75,11 +77,17 @@ export function useMarkdownFlow(opts: UseMarkdownFlowOptions) {
   }, [opts, saveMarkdownToPath]);
 
   const toggleMarkdownView = useCallback(async () => {
-    if (!opts.filePath) return;
     if (opts.viewMode === 'markdown') {
       opts.setViewMode('pdf');
       return;
     }
+    if (opts.sourceKind === 'markdown') {
+      opts.setMarkdownText(opts.sourceText);
+      opts.setMarkdownRevision(0);
+      opts.setViewMode('markdown');
+      return;
+    }
+    if (!opts.filePath) return;
     if (opts.shouldShowTesseractReminder()) {
       opts.setTesseractReminderSource('markdown');
       opts.setShowTesseractModal(true);

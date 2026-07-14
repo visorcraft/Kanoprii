@@ -5,6 +5,61 @@ use crate::pdf::page_tree::{flatten_pages, get_pages_kids, set_pages_kids};
 use lopdf::{Dictionary, Document, Object, Stream};
 use std::path::Path;
 
+/// Build a PDF from a slice of image page buffers. JPEG inputs (0xFF 0xD8 magic)
+/// are embedded directly via DCTDecode with header-only dimension reads, skipping
+/// the decode/re-encode round-trip. Other inputs fall back to decode + JPEG re-encode.
+pub fn create_pdf_from_image_pages(pages: &[Vec<u8>], output: &Path) -> Result<(), String> {
+    if pages.is_empty() {
+        return Err("Document produced no pages".to_string());
+    }
+    let mut doc = Document::with_version("1.4");
+    let pages_id = doc.new_object_id();
+    let mut kids = Vec::with_capacity(pages.len());
+    for page_bytes in pages {
+        let (jpeg, width, height) = if page_bytes.starts_with(&[0xFF, 0xD8]) {
+            let (w, h) = image::ImageReader::new(std::io::Cursor::new(page_bytes))
+                .with_guessed_format()
+                .map_err(|e| e.to_string())?
+                .into_dimensions()
+                .map_err(|e| e.to_string())?;
+            (page_bytes.to_vec(), w, h)
+        } else {
+            let img = image::load_from_memory(page_bytes).map_err(|e| e.to_string())?.to_rgb8();
+            let (width, height) = img.dimensions();
+            let mut jpeg = Vec::new();
+            image::DynamicImage::ImageRgb8(img)
+                .write_to(&mut std::io::Cursor::new(&mut jpeg), image::ImageFormat::Jpeg)
+                .map_err(|e| e.to_string())?;
+            (jpeg, width, height)
+        };
+        let image_id = embed_jpeg_xobject(&mut doc, jpeg, width, height);
+        let mut xobjects = Dictionary::new();
+        xobjects.set(b"Im1", Object::Reference(image_id));
+        let mut resources = Dictionary::new();
+        resources.set(b"XObject", Object::Dictionary(xobjects));
+        let content_id = doc
+            .add_object(Object::Stream(Stream::new(Dictionary::new(), b"q 612 0 0 792 0 0 cm /Im1 Do Q\n".to_vec())));
+        let mut page = Dictionary::new();
+        page.set("Type", Object::Name(b"Page".to_vec()));
+        page.set("Parent", Object::Reference(pages_id));
+        page.set("Resources", Object::Dictionary(resources));
+        page.set("MediaBox", Object::Array(vec![0.into(), 0.into(), 612.into(), 792.into()]));
+        page.set("Contents", Object::Reference(content_id));
+        kids.push(Object::Reference(doc.add_object(Object::Dictionary(page))));
+    }
+    let mut pages_dict = Dictionary::new();
+    pages_dict.set("Type", Object::Name(b"Pages".to_vec()));
+    pages_dict.set("Count", Object::Integer(kids.len() as i64));
+    pages_dict.set("Kids", Object::Array(kids));
+    doc.objects.insert(pages_id, Object::Dictionary(pages_dict));
+    let mut catalog = Dictionary::new();
+    catalog.set("Type", Object::Name(b"Catalog".to_vec()));
+    catalog.set("Pages", Object::Reference(pages_id));
+    let catalog_id = doc.add_object(Object::Dictionary(catalog));
+    doc.trailer.set("Root", Object::Reference(catalog_id));
+    crate::pdf::io::save_atomic(&mut doc, output)
+}
+
 pub fn insert_image_page(path: &Path, at_index: u32, image_path: &Path) -> Result<u32, String> {
     let image_path = image_path.to_path_buf();
     if !image_path.is_file() {

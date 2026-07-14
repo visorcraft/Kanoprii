@@ -119,6 +119,8 @@ export function buildAppShellRenderInput(args: BuildAppShellRenderInputArgs) {
         markdownOcrNotice: args.doc.markdownOcrNotice,
         markdownPath: args.doc.markdownPath,
         markdownText: args.doc.markdownText,
+        sourcePath: args.doc.sourcePath,
+        sourceText: args.doc.sourceText,
       },
       sidebar: {
         thumbnails: args.viewer.thumbnails,

@@ -16,7 +16,7 @@ export interface FormFieldData {
   checked: boolean;
 }
 
-export type ViewMode = 'pdf' | 'markdown';
+export type ViewMode = 'pdf' | 'markdown' | 'webpage';
 export type WorkspaceViewMode = 'tabs' | 'birdseye';
 export type ScrollViewMode = 'single' | 'continuous';
 

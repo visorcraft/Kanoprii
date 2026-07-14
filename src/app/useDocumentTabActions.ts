@@ -85,7 +85,7 @@ export function useDocumentTabActions(deps: TabActionsDeps) {
       deps.cancelDrawing();
       deps.doc.setActiveSession(sessionId);
       const session = deps.doc.sessions.find((s) => s.id === sessionId);
-      if (session?.filePath && !session.viewerCache.imageSrc) {
+      if (session?.filePath && session.viewMode === 'pdf' && !session.viewerCache.imageSrc) {
         void deps.renderPage(session.filePath, session.currentPage);
         void deps.loadThumbnails(session.filePath);
         void deps.loadFormFields(session.filePath);

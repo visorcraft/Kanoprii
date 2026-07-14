@@ -18,12 +18,12 @@ import {
 import type { MarkdownOcrNotice, ViewMode } from './types';
 
 function tabLabel(session: DocumentSessionData, all: DocumentSessionData[]): string {
-  const stem = fileStemFromPath(session.originalPath || session.filePath);
+  const stem = fileStemFromPath(session.sourcePath || session.originalPath || session.filePath);
   const dupes = all.filter(
-    (s) => fileStemFromPath(s.originalPath || s.filePath) === stem,
+    (s) => fileStemFromPath(s.sourcePath || s.originalPath || s.filePath) === stem,
   );
   if (dupes.length <= 1) return stem;
-  const path = session.originalPath || session.filePath;
+  const path = session.sourcePath || session.originalPath || session.filePath;
   const parts = path.replace(/\\/g, '/').split('/');
   const parent = parts.length >= 2 ? parts[parts.length - 2] : '';
   return parent ? `${stem} (${parent})` : stem;
@@ -71,7 +71,7 @@ export function useDocumentSessions() {
         id: s.id,
         label: tabLabel(s, sessions),
         dirty: s.isDirty,
-        originalPath: s.originalPath,
+        originalPath: s.sourcePath || s.originalPath,
         filePath: s.filePath,
       })),
     [sessions],
@@ -284,7 +284,7 @@ export function useDocumentSessions() {
   const findSessionByOriginal = useCallback(
     (originalPath: string) => {
       const norm = normalizeDocPath(originalPath);
-      return sessions.find((s) => normalizeDocPath(s.originalPath) === norm) ?? null;
+      return sessions.find((s) => normalizeDocPath(s.sourcePath || s.originalPath) === norm) ?? null;
     },
     [sessions],
   );
@@ -296,7 +296,7 @@ export function useDocumentSessions() {
   }, [getUndoRefs]);
 
   const findReusableEmptySession = useCallback(() => {
-    return sessions.find((s) => !s.filePath && !s.originalPath) ?? null;
+    return sessions.find((s) => !s.filePath && !s.originalPath && !s.sourcePath) ?? null;
   }, [sessions]);
 
   /** Focus an already-open path, or return the session id to load into. */
@@ -428,6 +428,9 @@ export function useDocumentSessions() {
       patchSearch,
       filePath: activeSession?.filePath ?? empty.filePath,
       originalPath: activeSession?.originalPath ?? empty.originalPath,
+      sourcePath: activeSession?.sourcePath ?? empty.sourcePath,
+      sourceKind: activeSession?.sourceKind ?? empty.sourceKind,
+      sourceText: activeSession?.sourceText ?? empty.sourceText,
       isDirty: activeSession?.isDirty ?? false,
       isDirtyRef,
       pageCount: activeSession?.pageCount ?? null,
@@ -466,6 +469,7 @@ export function useDocumentSessions() {
       setCanUndo,
       setCanRedo,
       hasOpenPdf: !!activeSession?.filePath,
+      hasOpenDocument: !!(activeSession?.sourcePath || activeSession?.originalPath),
     }),
     [sessions, activeId],
   );

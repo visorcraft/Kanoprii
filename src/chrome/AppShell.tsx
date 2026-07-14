@@ -67,7 +67,7 @@ export function AppShell({
   dismissToast,
   appearance,
 }: AppShellProps) {
-  const hasDocument = !!body.filePath;
+  const hasDocument = !!(body.viewer.sourcePath || body.filePath);
   useFocusCycle(activeSurface === 'document');
 
   const handlePanelError = (error: Error) => {

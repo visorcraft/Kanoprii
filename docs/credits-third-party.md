@@ -18,7 +18,7 @@ If you have questions about license compliance, please contact
 ## Licenses in use
 
 - **Apache License 2.0** (488 crates)
-- **MIT License** (149 crates)
+- **MIT License** (150 crates)
 - **Unicode License v3** (19 crates)
 - **BSD 3-Clause &quot;New&quot; or &quot;Revised&quot; License** (12 crates)
 - **BSD 2-Clause &quot;Simplified&quot; License** (6 crates)
@@ -12478,6 +12478,38 @@ SOFTWARE.
 ### MIT License
 
 Used by:
+- [`http-range 0.1.5`](https://github.com/bancek/rust-http-range.git)
+
+```
+MIT License
+
+Copyright (c) 2016 Luka Zakrajšek
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the &quot;Software&quot;), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED &quot;AS IS&quot;, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+```
+
+---
+
+### MIT License
+
+Used by:
 - [`precomputed-hash 0.1.1`](https://github.com/emilio/precomputed-hash)
 
 ```
@@ -15454,6 +15486,8 @@ shipped in release builds.
 - **@tauri-apps/plugin-dialog** 2.7.1 - MIT OR Apache-2.0
 - **@tauri-apps/plugin-process** 2.3.1 - MIT OR Apache-2.0
 - **@tauri-apps/plugin-updater** 2.10.1 - MIT OR Apache-2.0
+- **html2canvas** 1.4.1 - MIT
+- **marked** 18.0.6 - MIT
 - **react** 19.2.7 - MIT
 - **react-dom** 19.2.7 - MIT
 
@@ -15464,6 +15498,8 @@ shipped in release builds.
 ### MIT License
 
 Used by:
+- [`html2canvas 1.4.1`](https://www.npmjs.com/package/html2canvas)
+- [`marked 18.0.6`](https://www.npmjs.com/package/marked)
 - [`react 19.2.7`](https://react.dev/)
 - [`react-dom 19.2.7`](https://react.dev/)
 

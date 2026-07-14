@@ -52,8 +52,8 @@ Three things we care about:
 - Page navigation via menus, quick bar, thumbnails, keyboard, mouse wheel at scroll edges, and a clickable **Bookmarks** outline
 - **Find text** across the document with match highlighting (Ctrl/Cmd+F); **selectable text layer** with native copy and **Highlight Selection**
 - **Continuous scroll** mode (View → Continuous scroll) with virtualized page rendering
-- **Document tabs** - multiple PDFs open at once (Ctrl+Tab / Ctrl+W)
-- Open via **File → Open PDF** (Ctrl/Cmd+O), in-app path entry, **Recently Opened**, built-in PDF browser, or **native open/save dialogs**
+- **Document tabs** - multiple PDF, Markdown, and HTML documents open at once (Ctrl+Tab / Ctrl+W)
+- Open PDF, Markdown (`.md`), or HTML (`.html`) via **File → Open Document** (Ctrl/Cmd+O), in-app path entry, **Recently Opened**, built-in browser, or **native open/save dialogs**
 
 **Organize pages**
 - **Delete**, **duplicate**, **rotate** (90° steps), and **drag-and-drop reorder**
@@ -84,6 +84,7 @@ Three things we care about:
 - **Password protect** - export an encrypted copy; **decrypt** to `_decrypted.pdf`; open encrypted PDFs with a prompt
 
 **Convert & export**
+- **Markdown / HTML → PDF** - Markdown opens in Markdown view; HTML opens in a sandboxed Webpage view with local CSS and assets. Switching to PDF View renders a collision-safe sibling PDF without overwriting an existing file.
 - **PDF → Markdown** - tagged-PDF structure when available (headings, lists, tables with THead/TBody, links, TOC, captions, code, notes, inline emphasis); otherwise PDFium heuristic layout with column reading order, paragraph merge, header/footer stripping, and link/URL autodetection; on save, scanned/sparse pages, embedded images (JPEG/PNG/Gray/CMYK/Indexed/JPX, CCITT Fax scans, RunLength 1-bit), and painted Form XObjects (vector charts rasterized via PDFium, including nested form content) land in `<md-stem>_assets/` with optional Tesseract OCR; auto-save sibling `.md` or **Save As…** for a custom path
 - **Summarize** - extractive overview, key points, and extracted headings/emails/URLs/dates
 - **Optimize** - strip metadata, recompress images, prune unused objects, compress streams

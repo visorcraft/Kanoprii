@@ -255,6 +255,48 @@ fn convert_pdf_to_markdown(path: String) -> Result<String, String> {
     pdf_to_markdown(&PathBuf::from(path), None, None)
 }
 #[tauri::command]
+fn read_text_document(path: String) -> Result<String, String> {
+    let path = PathBuf::from(path);
+    let supported = path
+        .extension()
+        .and_then(|ext| ext.to_str())
+        .is_some_and(|ext| matches!(ext.to_ascii_lowercase().as_str(), "md" | "markdown" | "html" | "htm"));
+    if !supported {
+        return Err("Only Markdown and HTML documents are supported".to_string());
+    }
+    let metadata = fs::metadata(&path).map_err(|e| e.to_string())?;
+    if metadata.len() > 16 * 1024 * 1024 {
+        return Err("Text document is larger than 16 MB".to_string());
+    }
+    fs::read_to_string(path).map_err(|e| e.to_string())
+}
+#[tauri::command]
+fn create_pdf_from_document_pages(pages: Vec<Vec<u8>>) -> Result<String, String> {
+    let path = pdf::history::temp_hist_path("document", "pdf");
+    pdf::page_images::create_pdf_from_image_pages(&pages, &path)?;
+    Ok(path.to_string_lossy().into_owned())
+}
+#[tauri::command]
+fn create_pdf_from_markdown_text(text: String) -> Result<String, String> {
+    pdf::markdown_pdf::write_markdown_pdf(&text)
+}
+#[tauri::command]
+fn materialize_document_pdf(working: String, source: String) -> Result<String, String> {
+    let source = PathBuf::from(source);
+    let mut target = source.with_extension("pdf");
+    if target.exists() {
+        let stem = source.file_stem().and_then(|value| value.to_str()).unwrap_or("document");
+        target = source.with_file_name(format!("{stem}_converted.pdf"));
+        let mut suffix = 2;
+        while target.exists() {
+            target = source.with_file_name(format!("{stem}_converted_{suffix}.pdf"));
+            suffix += 1;
+        }
+    }
+    pdf::history::save_working_copy(working, target.to_string_lossy().into_owned())?;
+    Ok(target.to_string_lossy().into_owned())
+}
+#[tauri::command]
 fn save_pdf_markdown(path: String, overwrite: bool, output_path: Option<String>) -> Result<MarkdownSaveResult, String> {
     let pdf_path = PathBuf::from(path);
     let markdown_path = output_path.map(PathBuf::from).unwrap_or_else(|| pdf_path.with_extension("md"));

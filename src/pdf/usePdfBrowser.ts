@@ -59,10 +59,11 @@ export function usePdfBrowser({
   const [browserListing, setBrowserListing] = useState<PdfBrowserListing | null>(null);
   const [browserPathInput, setBrowserPathInput] = useState('');
 
-  const loadPdfBrowser = async (path?: string) => {
+  const loadPdfBrowser = async (path?: string, includeDocuments = browserTarget === 'open') => {
     await withLoading(async () => {
       const listing = await invoke<PdfBrowserListing>('list_pdf_browser_entries', {
         path: path && path.trim() ? path.trim() : null,
+        includeDocuments,
       });
       setBrowserListing(listing);
       setBrowserPathInput(listing.currentDir);
@@ -84,7 +85,7 @@ export function usePdfBrowser({
     const startPath = target === 'open'
       ? lastBrowserDir || directoryFromPath(openFilePath) || directoryFromPath(originalPath)
       : directoryFromPath(sourcePath) || lastBrowserDir || directoryFromPath(originalPath);
-    void loadPdfBrowser(startPath);
+    void loadPdfBrowser(startPath, target === 'open');
   };
 
   const commitBrowserPath = () => {

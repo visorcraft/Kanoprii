@@ -2,6 +2,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { useCallback } from 'react';
 import type { DocumentSessionData } from './documentSessionTypes';
 import type { ViewMode } from './types';
+import { sourceKindFromPath } from './documentImport';
 
 type UsePdfOpenOptions = {
   filePath: string;
@@ -65,6 +66,33 @@ export function usePdfOpen({
     let needsPassword = false;
     try {
       loaded = (await withLoading(async () => {
+        const sourceKind = sourceKindFromPath(path);
+        if (!sourceKind) throw new Error('Kanoprii supports PDF, Markdown, and HTML files');
+        if (sourceKind !== 'pdf') {
+          const sourceText = await invoke<string>('read_text_document', { path });
+          updateSession(sessionId, {
+            sourcePath: path,
+            sourceKind,
+            sourceText,
+            originalPath: path,
+            filePath: '',
+            viewMode: sourceKind === 'markdown' ? 'markdown' : 'webpage',
+            markdownText: sourceKind === 'markdown' ? sourceText : '',
+            markdownPath: sourceKind === 'markdown' ? path : '',
+            markdownOcrNotice: null,
+            pdfRevision: 0,
+            markdownRevision: sourceKind === 'markdown' ? 0 : null,
+            pageCount: null,
+            currentPage: 0,
+            zoom: 1,
+            pageInput: '1',
+            zoomInput: '100',
+            isDirty: false,
+          });
+          cancelDrawing();
+          rememberOpenedPdf(path);
+          return true;
+        }
         const encrypted = await invoke<boolean>('pdf_is_encrypted', { path });
         if (encrypted && !password) {
           setPendingEncryptedPath(path);
@@ -78,6 +106,9 @@ export function usePdfOpen({
           : await invoke<string>('open_working_copy', { original: path });
         const count = await invoke<number>('get_pdf_page_count', { path: working });
         updateSession(sessionId, {
+          sourcePath: path,
+          sourceKind: 'pdf',
+          sourceText: '',
           originalPath: path,
           filePath: working,
           viewMode: 'pdf' as ViewMode,

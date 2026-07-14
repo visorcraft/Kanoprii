@@ -12,7 +12,7 @@ import {
   TIFF_DIALOG_FILTER,
   WEBP_DIALOG_FILTER,
 } from './constants';
-import { ensureExtension, pickPdfWithNativeDialog, pickSaveWithNativeDialog } from './utils';
+import { ensureExtension, pickDocumentWithNativeDialog, pickPdfWithNativeDialog, pickSaveWithNativeDialog } from './utils';
 import type { ImageExportFormat } from '../pdf/imageExportCommands';
 import { imageExportExtension } from '../pdf/imageExportCommands';
 import type { PngExportScope } from './types';
@@ -55,7 +55,7 @@ type UseNativeFilePickersOptions = {
 
 export function useNativeFilePickers(opts: UseNativeFilePickersOptions) {
   const chooseOpenPdfNative = useCallback(async () => {
-    const path = await pickPdfWithNativeDialog(opts.openFilePath || opts.lastBrowserDir || opts.originalPath);
+    const path = await pickDocumentWithNativeDialog(opts.openFilePath || opts.lastBrowserDir || opts.originalPath);
     if (!path) return false;
     opts.setOpenFilePath(path);
     opts.rememberBrowserDirectory(path);

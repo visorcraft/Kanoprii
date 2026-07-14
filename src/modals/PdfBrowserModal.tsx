@@ -43,7 +43,7 @@ export function PdfBrowserModal({
 
   return (
     <Modal onClose={onClose}>
-      <h3>Browse PDF</h3>
+      <h3>Browse Documents</h3>
       <label htmlFor={folderId}>Folder:</label>
       <div className="modal-path-row">
         <input
@@ -65,12 +65,12 @@ export function PdfBrowserModal({
         )}
         {listing?.entries.map((entry) => (
           <button key={entry.path} className="file-browser-row" onClick={() => onEntryClick(entry)}>
-            <span className="file-browser-kind">{entry.isDir ? 'Folder' : 'PDF'}</span>
+            <span className="file-browser-kind">{entry.isDir ? 'Folder' : 'File'}</span>
             <span className="file-browser-name">{entry.name}</span>
           </button>
         ))}
         {listing && listing.entries.length === 0 && (
-          <p className="muted browser-empty">No folders or PDF files here</p>
+          <p className="muted browser-empty">No supported documents here</p>
         )}
       </div>
       <div className="modal-actions">

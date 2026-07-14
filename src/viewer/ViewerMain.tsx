@@ -4,6 +4,7 @@ import type { MarkdownOcrNotice, PdfPageSize, ScrollViewMode, ViewMode } from '.
 import { ContinuousViewer } from './ContinuousViewer';
 import { PdfPageView } from './PdfPageView';
 import { PageControls } from './PageControls';
+import { documentHtml } from '../app/documentImport';
 
 type ViewerMainProps = {
   filePath: string;
@@ -18,6 +19,8 @@ type ViewerMainProps = {
   markdownOcrNotice: MarkdownOcrNotice | null;
   markdownPath: string;
   markdownText: string;
+  sourcePath: string;
+  sourceText: string;
   onOpenMarkdownSaveAs: () => void;
   continuous: React.ComponentProps<typeof ContinuousViewer> | null;
   pdfPage: React.ComponentProps<typeof PdfPageView>;
@@ -36,6 +39,8 @@ export function ViewerMain({
   markdownOcrNotice,
   markdownPath,
   markdownText,
+  sourcePath,
+  sourceText,
   onOpenMarkdownSaveAs,
   continuous,
   pdfPage,
@@ -44,13 +49,13 @@ export function ViewerMain({
   return (
     <main className="main">
       <div
-        className={`page-scroll${!filePath ? ' welcome-scroll' : ''}${viewMode === 'markdown' ? ' markdown-scroll' : ''}${scrollViewMode === 'continuous' ? ' continuous-scroll' : ''}`}
+        className={`page-scroll${!sourcePath && !filePath ? ' welcome-scroll' : ''}${viewMode === 'markdown' ? ' markdown-scroll' : ''}${scrollViewMode === 'continuous' ? ' continuous-scroll' : ''}`}
         ref={scrollRef}
         onWheel={onWheel}
         tabIndex={0}
         aria-label="Document pages"
       >
-        {!filePath ? (
+        {!sourcePath && !filePath ? (
           <button
             type="button"
             className="welcome-splash"
@@ -61,8 +66,16 @@ export function ViewerMain({
             <img src={kanopriiWelcome} alt="" className="welcome-kanoprii" aria-hidden="true" />
             <span className="welcome-hint">Click to open a PDF</span>
           </button>
+        ) : viewMode === 'webpage' ? (
+          <iframe
+            className="webpage-viewer"
+            data-testid="webpage-view"
+            title="Webpage"
+            sandbox="allow-same-origin"
+            srcDoc={documentHtml(sourcePath, sourceText, 'html')}
+          />
         ) : viewMode === 'markdown' ? (
-          <div className="markdown-viewer">
+          <div className="markdown-viewer" data-testid="markdown-source-view">
             <div className="markdown-header">
               <span>Markdown</span>
               {markdownOcrNotice && (

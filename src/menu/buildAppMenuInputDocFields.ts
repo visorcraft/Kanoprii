@@ -4,6 +4,8 @@ import type { BuildAppMenuInputArgs } from './buildAppMenuInputArgs';
 export function menuInputDocFields(args: BuildAppMenuInputArgs): Pick<
   BuildAppMenuSourceInput,
   | 'filePath'
+  | 'hasDocument'
+  | 'pdfReady'
   | 'isDirty'
   | 'canUndo'
   | 'canRedo'
@@ -103,6 +105,8 @@ export function menuInputDocFields(args: BuildAppMenuInputArgs): Pick<
   const { doc, annotation, panels, history, chrome, help, pdfActions } = args;
   return {
     filePath: doc.filePath,
+    hasDocument: !!(doc.sourcePath || doc.originalPath),
+    pdfReady: doc.sourceKind === 'pdf' || doc.originalPath !== doc.sourcePath,
     isDirty: doc.isDirty,
     canUndo: history.canUndo,
     canRedo: history.canRedo,

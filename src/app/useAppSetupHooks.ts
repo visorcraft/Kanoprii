@@ -37,7 +37,7 @@ export function useAppSetupHooks(input: UseAppSetupHooksInput) {
 
   const { windowTitle } = useWindowTitle({
     filePath: input.doc.filePath,
-    originalPath: input.doc.originalPath,
+    originalPath: input.doc.sourcePath || input.doc.originalPath,
     isDirty: input.doc.isDirty,
     isDirtyRef: input.doc.isDirtyRef,
     filePathRef: input.refs.filePathRef,

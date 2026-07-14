@@ -8,7 +8,7 @@ import type { AppSurface, SettingsFocusSection } from '../app/useAppSurfaceState
 import type { ShortcutBindings } from '../app/useShortcutBindingsState';
 
 export type BuildAppMenuInputArgs = {
-  doc: Pick<DocumentState, 'filePath' | 'isDirty' | 'pageCount' | 'currentPage' | 'viewMode' | 'scrollViewMode' | 'ocrAvailable'>;
+  doc: Pick<DocumentState, 'filePath' | 'originalPath' | 'sourcePath' | 'sourceKind' | 'isDirty' | 'pageCount' | 'currentPage' | 'viewMode' | 'scrollViewMode' | 'ocrAvailable'>;
   annotation: Pick<AnnotationState, 'highlightMode' | 'noteMode' | 'drawMode' | 'shapeMode' | 'stampMode' | 'redactMode' | 'imageInsertMode' | 'textEditMode' | 'editTextRunMode' | 'vectorEditMode'>;
   panels: Pick<PanelsState, 'showFormsPanel' | 'showBookmarksPanel' | 'showSignaturesPanel' | 'showAnnotationsPanel' | 'showPdfUaPanel' | 'showHiddenLayers'>;
   history: { canUndo: boolean; canRedo: boolean; undo: () => void; redo: () => void };

@@ -7,6 +7,7 @@ import type { ShortcutBindings } from '../app/useShortcutBindingsState';
 export type BuildAppMenuSourceInput = Omit<
   AppMenuContextSource,
   | 'hasPdf'
+  | 'hasDocument'
   | 'tesseractInstalled'
   | 'workspaceView'
   | 'requestClosePdf'
@@ -31,6 +32,8 @@ export type BuildAppMenuSourceInput = Omit<
   | 'shortcutBindings'
 > & {
   filePath: string;
+  hasDocument: boolean;
+  pdfReady: boolean;
   ocrAvailable: boolean | null;
   surface: { activeSurface: AppSurface; openSettings: (focus?: SettingsFocusSection) => void };
   workspace: { workspaceView: WorkspaceViewMode; setWorkspaceView: (mode: WorkspaceViewMode) => void };
@@ -58,6 +61,8 @@ export type BuildAppMenuSourceInput = Omit<
 export function buildAppMenuSource(input: BuildAppMenuSourceInput): AppMenuContextSource {
   const {
     filePath,
+    hasDocument,
+    pdfReady,
     ocrAvailable,
     guardUnsaved,
     closePdf,
@@ -85,7 +90,8 @@ export function buildAppMenuSource(input: BuildAppMenuSourceInput): AppMenuConte
   return {
     ...passthrough,
     updaterSupported,
-    hasPdf: !!filePath,
+    hasPdf: !!filePath && pdfReady,
+    hasDocument,
     tesseractInstalled: ocrAvailable === true,
     requestClosePdf: () => guardUnsaved(closePdf),
     quitApp: () => guardUnsaved(exitApp),

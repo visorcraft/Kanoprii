@@ -26,7 +26,7 @@ export function AppBody({ filePath, sidebar, viewer, workspaceView, birdsEye }: 
 
   return (
     <div className="app-body">
-      {filePath && <PdfSidebar {...sidebar} />}
+      {filePath && viewer.viewMode === 'pdf' && <PdfSidebar {...sidebar} />}
       <div className="viewer-main" tabIndex={-1} aria-label="Document viewer">
         <ViewerMain {...viewer} filePath={filePath} />
       </div>

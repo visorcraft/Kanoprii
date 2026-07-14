@@ -31,6 +31,7 @@ export function OpenPdfModal({
   const pathId = useId();
   const [step, setStep] = useState<'path' | 'view'>('path');
   const canContinue = !!filePath.trim();
+  const opensInSourceView = (path: string) => /\.(?:md|markdown|html?|htm)$/i.test(path.trim());
 
   useEffect(() => {
     if (!canContinue) setStep('path');
@@ -42,6 +43,10 @@ export function OpenPdfModal({
 
   const acceptPath = () => {
     if (!canContinue) return;
+    if (opensInSourceView(filePath)) {
+      void onOpenPdfView();
+      return;
+    }
     if (openDirectlyInBirdsEye) {
       void onOpenBirdsEye();
     } else {
@@ -58,13 +63,13 @@ export function OpenPdfModal({
 
   return (
     <Modal onClose={onClose}>
-      <h3>Open PDF</h3>
+      <h3>Open Document</h3>
       {step === 'path' ? (
         <>
           {!nativeDialogs && (
             <p className="modal-help">Native file picker is disabled for this session. Enter a path or use Browse….</p>
           )}
-          <label htmlFor={pathId}>PDF path:</label>
+          <label htmlFor={pathId}>Document path:</label>
           <div className="modal-path-row">
             <input
               id={pathId}
@@ -73,7 +78,7 @@ export function OpenPdfModal({
               onChange={(e) => onFilePathChange(e.target.value)}
               onKeyDown={onFieldKeyDown}
               className="modal-input"
-              placeholder="/path/to/document.pdf"
+              placeholder="/path/to/document.pdf, .md, or .html"
               data-testid="open-pdf-path"
               autoFocus
             />
@@ -93,7 +98,7 @@ export function OpenPdfModal({
             <button onClick={onBrowse} className="btn">Browse…</button>
           </div>
           {recentPdfs.length > 0 && (
-            <div className="recent-list" aria-label="Recently opened PDFs">
+            <div className="recent-list" aria-label="Recently opened documents">
               <h4>Recently Opened</h4>
               {recentPdfs.map((path) => (
                 <button
@@ -101,6 +106,10 @@ export function OpenPdfModal({
                   className="recent-row"
                   onClick={() => {
                     onFilePathChange(path);
+                    if (opensInSourceView(path)) {
+                      void onOpenPdfView(path);
+                      return;
+                    }
                     if (openDirectlyInBirdsEye) {
                       void onOpenBirdsEye(path);
                     } else {

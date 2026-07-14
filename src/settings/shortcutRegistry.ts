@@ -71,7 +71,7 @@ export type ShortcutBinding = {
 };
 
 export const SHORTCUT_REGISTRY: ShortcutBinding[] = [
-  { commandId: 'open-pdf', category: 'Global', label: 'Open PDF', defaultShortcuts: ['Ctrl+O'] },
+  { commandId: 'open-pdf', category: 'Global', label: 'Open Document', defaultShortcuts: ['Ctrl+O'] },
   { commandId: 'command-palette', category: 'Global', label: 'Command palette', defaultShortcuts: ['Ctrl+Shift+P'] },
   { commandId: 'quit', category: 'Global', label: 'Quit', defaultShortcuts: ['Ctrl+Q'] },
 

@@ -5,7 +5,7 @@ import type { ShortcutBindings } from '../app/useShortcutBindingsState';
 export type KeyboardShortcutRow = { keys: string; action: string };
 
 const GROUPED_ROWS: { label: string; commandIds: ShortcutCommandId[] }[] = [
-  { label: 'Open PDF', commandIds: ['open-pdf'] },
+  { label: 'Open Document', commandIds: ['open-pdf'] },
   { label: 'Command palette', commandIds: ['command-palette'] },
   { label: 'Save / Save As', commandIds: ['save', 'save-as'] },
   { label: 'Close PDF', commandIds: ['close-pdf'] },

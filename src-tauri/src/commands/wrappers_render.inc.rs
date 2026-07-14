@@ -74,7 +74,7 @@ fn set_pdf_metadata(
     Ok(())
 }
 #[tauri::command]
-fn list_pdf_browser_entries(path: Option<String>) -> Result<pdf::browser::PdfBrowserListing, String> {
+fn list_pdf_browser_entries(path: Option<String>, include_documents: Option<bool>) -> Result<pdf::browser::PdfBrowserListing, String> {
     let dir = path
         .filter(|path| !path.trim().is_empty())
         .map(PathBuf::from)
@@ -84,7 +84,11 @@ fn list_pdf_browser_entries(path: Option<String>) -> Result<pdf::browser::PdfBro
     } else {
         dir
     };
-    pdf::browser::list_pdf_entries_for_dir(&dir)
+    if include_documents.unwrap_or(false) {
+        pdf::browser::list_entries_for_dir(&dir, true)
+    } else {
+        pdf::browser::list_pdf_entries_for_dir(&dir)
+    }
 }
 #[tauri::command]
 fn render_pdf_page(path: String, page_index: u32, width: i32, height: i32) -> Result<Vec<u8>, String> {

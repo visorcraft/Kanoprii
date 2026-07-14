@@ -19,19 +19,19 @@ export interface SessionState {
 }
 
 const SAVE_DEBOUNCE_MS = 200;
-const VALID_VIEW_MODES: ViewMode[] = ['pdf', 'markdown'];
+const VALID_VIEW_MODES: ViewMode[] = ['pdf', 'markdown', 'webpage'];
 const VALID_SCROLL_MODES: Array<'single' | 'continuous'> = ['single', 'continuous'];
 const VALID_WORKSPACE_VIEW_MODES: WorkspaceViewMode[] = ['tabs', 'birdseye'];
 
 function toState(sessions: DocumentSessionData[], activeId: string | null, workspaceView: WorkspaceViewMode): SessionState {
-  const withPath = sessions.filter((s) => s.originalPath);
+  const withPath = sessions.filter((s) => s.sourcePath || s.originalPath);
   const activeIndex = activeId ? withPath.findIndex((s) => s.id === activeId) : 0;
   return {
     version: 1,
     active_index: Math.max(0, activeIndex),
     workspace_view: workspaceView,
     sessions: withPath.map((s) => ({
-      original_path: s.originalPath,
+      original_path: s.sourcePath || s.originalPath,
       page: s.currentPage,
       zoom: s.zoom,
       view_mode: s.viewMode,
@@ -141,7 +141,7 @@ export function useSessionPersistence({
         const sessionId = ensureSessionForOpen(s.original_path);
         if (sessionId === null) {
           // Already open - update its target state for later.
-          const existing = sessions.find((es) => es.originalPath === s.original_path);
+          const existing = sessions.find((es) => (es.sourcePath || es.originalPath) === s.original_path);
           if (existing) {
             opened.push({
               sessionId: existing.id,

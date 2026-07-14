@@ -1,3 +1,4 @@
+import fs from 'node:fs';
 import {
   applyRedactions,
   clickMenuAction,
@@ -6,6 +7,9 @@ import {
   findText,
   fixturePdf,
   fixturePdf3p,
+  fixtureMarkdown,
+  fixtureHtml,
+  openDocumentViaPathModal,
   openPdfViaPathModal,
   resetToWelcome,
   selectTextLayerSpan,
@@ -116,6 +120,72 @@ describe('v0.5 viewer features', () => {
     await applyRedactions();
     await findText('Hello');
     await waitForNoSearchResults();
+  });
+
+  it('shows top-menu submenus outside the root scroller', async () => {
+    await resetToWelcome();
+    await openPdfViaPathModal(fixturePdf);
+    await waitForPdfOpen();
+    await $('[data-testid="menu-document"]').click();
+    await $('[data-testid="submenu-crop"]').moveTo();
+    await $('[data-testid="crop"]').moveTo();
+    await browser.waitUntil(
+      async () => browser.execute(() => {
+        const root = document.querySelector<HTMLElement>('.menu-bar-entry > .menu-dropdown');
+        const nested = document.querySelector<HTMLElement>('body > .menu-dropdown-nested');
+        if (!root || !nested) return false;
+        const rect = nested.getBoundingClientRect();
+        return root.scrollWidth === root.clientWidth
+          && getComputedStyle(nested).position === 'fixed'
+          && rect.right <= window.innerWidth
+          && rect.bottom <= window.innerHeight;
+      }),
+      { timeout: 5_000, timeoutMsg: 'expected visible submenu without root horizontal scroll' },
+    );
+  });
+
+  it('opens Markdown and generates PDF view', async () => {
+    const output = fixtureMarkdown.replace(/\.md$/, '.pdf');
+    fs.rmSync(output, { force: true });
+    await resetToWelcome();
+    try {
+      await openDocumentViaPathModal(fixtureMarkdown);
+      const source = await $('[data-testid="markdown-source-view"]');
+      await browser.waitUntil(async () => source.isDisplayed().catch(() => false) || $('[data-testid="toast"]').isDisplayed().catch(() => false), {
+        timeout: 30_000,
+        timeoutMsg: 'expected Markdown source view or error toast',
+      });
+      if (!(await source.isDisplayed().catch(() => false))) throw new Error(await $('[data-testid="toast"]').getText());
+      await clickMenuAction('view', 'view-pdf');
+      await waitForPdfOpen();
+      if (!fs.existsSync(output)) throw new Error('expected generated Markdown PDF');
+    } finally {
+      fs.rmSync(output, { force: true });
+    }
+  });
+
+  it('opens HTML with sibling CSS and generates PDF view', async () => {
+    const output = fixtureHtml.replace(/\.html$/, '.pdf');
+    fs.rmSync(output, { force: true });
+    await resetToWelcome();
+    try {
+      await openDocumentViaPathModal(fixtureHtml);
+      const frame = await $('[data-testid="webpage-view"]');
+      await frame.waitForDisplayed({ timeout: 30_000 });
+      await browser.waitUntil(
+        async () => browser.execute(() => {
+          const iframe = document.querySelector<HTMLIFrameElement>('[data-testid="webpage-view"]');
+          const heading = iframe?.contentDocument?.querySelector('h1');
+          return heading ? getComputedStyle(heading).color === 'rgb(12, 34, 56)' : false;
+        }),
+        { timeout: 10_000, timeoutMsg: 'expected sibling HTML stylesheet' },
+      );
+      await clickMenuAction('view', 'view-pdf');
+      await waitForPdfOpen();
+      if (!fs.existsSync(output)) throw new Error('expected generated HTML PDF');
+    } finally {
+      fs.rmSync(output, { force: true });
+    }
   });
 
   it('check for updates menu item exists in Help menu', async () => {

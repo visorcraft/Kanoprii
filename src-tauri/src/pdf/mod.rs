@@ -15,6 +15,7 @@ pub mod io;
 pub mod markdown;
 pub mod markdown_heuristic;
 pub mod markdown_images;
+pub mod markdown_pdf;
 pub mod markdown_pipeline;
 pub mod markdown_tagged;
 pub mod merge_split;

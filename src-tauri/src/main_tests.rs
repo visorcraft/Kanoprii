@@ -17352,7 +17352,7 @@ fn list_pdf_browser_entries_lists_pdfs_and_directories() {
     fs::write(dir.join("notes.txt"), b"text").unwrap();
     fs::create_dir_all(dir.join("nested")).unwrap();
 
-    let listing = list_pdf_browser_entries(Some(dir.to_string_lossy().into_owned())).unwrap();
+    let listing = list_pdf_browser_entries(Some(dir.to_string_lossy().into_owned()), None).unwrap();
     let names: Vec<&str> = listing.entries.iter().map(|entry| entry.name.as_str()).collect();
     assert!(names.contains(&"nested"));
     assert!(names.contains(&"sample.pdf"));
@@ -17373,7 +17373,7 @@ fn list_pdf_browser_entries_from_file_path_uses_parent_dir() {
     fs::copy(&standalone, &pdf_path).unwrap();
     let _ = fs::remove_file(&standalone);
 
-    let listing = list_pdf_browser_entries(Some(pdf_path.to_string_lossy().into_owned())).unwrap();
+    let listing = list_pdf_browser_entries(Some(pdf_path.to_string_lossy().into_owned()), None).unwrap();
     assert_eq!(listing.current_dir, dir.canonicalize().unwrap().to_string_lossy());
     assert!(listing.entries.iter().any(|entry| entry.name == "target.pdf"));
 
@@ -17383,10 +17383,87 @@ fn list_pdf_browser_entries_from_file_path_uses_parent_dir() {
 #[test]
 fn list_pdf_browser_entries_rejects_missing_directory() {
     let missing = std::env::temp_dir().join(format!("pp_browser_missing_{}", std::process::id()));
-    match list_pdf_browser_entries(Some(missing.to_string_lossy().into_owned())) {
+    match list_pdf_browser_entries(Some(missing.to_string_lossy().into_owned()), None) {
         Ok(_) => panic!("expected missing directory to fail"),
         Err(message) => assert!(!message.is_empty()),
     }
+}
+
+#[test]
+fn text_documents_load_and_generate_pdf_pages() {
+    let dir = std::env::temp_dir().join(format!("pp_text_document_{}", std::process::id()));
+    let _ = fs::remove_dir_all(&dir);
+    fs::create_dir_all(&dir).unwrap();
+    let markdown = dir.join("notes.md");
+    fs::write(&markdown, "# Notes\n").unwrap();
+    assert_eq!(read_text_document(markdown.to_string_lossy().into_owned()).unwrap(), "# Notes\n");
+
+    let mut png = Vec::new();
+    image::DynamicImage::new_rgb8(8, 8).write_to(&mut std::io::Cursor::new(&mut png), image::ImageFormat::Png).unwrap();
+    let working = create_pdf_from_document_pages(vec![png]).unwrap();
+    assert_eq!(get_pdf_page_count(working.clone()).unwrap(), 1);
+    let existing = dir.join("notes.pdf");
+    fs::write(&existing, b"keep").unwrap();
+    let generated = materialize_document_pdf(working, markdown.to_string_lossy().into_owned()).unwrap();
+    assert!(generated.ends_with("notes_converted.pdf"));
+    assert_eq!(fs::read(existing).unwrap(), b"keep");
+    assert_eq!(get_pdf_page_count(generated).unwrap(), 1);
+
+    let listing = list_pdf_browser_entries(Some(dir.to_string_lossy().into_owned()), Some(true)).unwrap();
+    assert!(listing.entries.iter().any(|entry| entry.name == "notes.md"));
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn markdown_text_lays_out_to_multipage_pdf() {
+    use pdf::markdown_pdf::markdown_to_pdf;
+    let sample = "# Heading One\n\nFirst paragraph with **bold** and `code` and [a link](https://example.com).\n\n## Heading Two\n\n```rust\nfn main() { println!(\"hi\"); }\n```\n\n- item one\n- item two\n- item three\n\n| Col A | Col B |\n|---|---|\n| 1 | 2 |\n| 3 | 4 |\n\nFinal paragraph.\n";
+    let out = std::env::temp_dir().join(format!("pp_md_{}.pdf", std::process::id()));
+    markdown_to_pdf(sample, &out).unwrap();
+    assert_eq!(get_pdf_page_count(out.to_string_lossy().into_owned()).unwrap(), 1);
+    let _ = fs::remove_file(&out);
+
+    let big = "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore.\n"
+        .repeat(400);
+    let big_md = format!("# Big\n\n{big}");
+    let out2 = std::env::temp_dir().join(format!("pp_md_big_{}.pdf", std::process::id()));
+    markdown_to_pdf(&big_md, &out2).unwrap();
+    let count = get_pdf_page_count(out2.to_string_lossy().into_owned()).unwrap();
+    assert!(count >= 3, "expected >=3 pages, got {count}");
+    let _ = fs::remove_file(&out2);
+
+    if let Ok(real) = fs::read_to_string("/tmp/mongrel/MONGRELDB_AI_0523_FINAL_HARDENING_AUDIT.md") {
+        let out3 = std::env::temp_dir().join(format!("pp_md_real_{}.pdf", std::process::id()));
+        markdown_to_pdf(&real, &out3).unwrap();
+        let real_count = get_pdf_page_count(out3.to_string_lossy().into_owned()).unwrap();
+        assert!(real_count >= 10, "real audit doc expected >=10 pages, got {real_count}");
+        let _ = fs::remove_file(&out3);
+    }
+}
+
+#[test]
+fn image_pages_pdf_embeds_jpeg_directly_and_png_via_fallback() {
+    use pdf::page_images::create_pdf_from_image_pages;
+    let out_jpeg = std::env::temp_dir().join(format!("pp_img_jpeg_{}.pdf", std::process::id()));
+    let out_png = std::env::temp_dir().join(format!("pp_img_png_{}.pdf", std::process::id()));
+
+    let mut jpeg = Vec::new();
+    image::DynamicImage::new_rgb8(12, 8)
+        .write_to(&mut std::io::Cursor::new(&mut jpeg), image::ImageFormat::Jpeg)
+        .unwrap();
+    assert!(jpeg.starts_with(&[0xFF, 0xD8]));
+    create_pdf_from_image_pages(&[jpeg], &out_jpeg).unwrap();
+    assert_eq!(get_pdf_page_count(out_jpeg.to_string_lossy().into_owned()).unwrap(), 1);
+
+    let mut png = Vec::new();
+    image::DynamicImage::new_rgb8(10, 6)
+        .write_to(&mut std::io::Cursor::new(&mut png), image::ImageFormat::Png)
+        .unwrap();
+    create_pdf_from_image_pages(&[png], &out_png).unwrap();
+    assert_eq!(get_pdf_page_count(out_png.to_string_lossy().into_owned()).unwrap(), 1);
+
+    let _ = fs::remove_file(&out_jpeg);
+    let _ = fs::remove_file(&out_png);
 }
 
 #[test]

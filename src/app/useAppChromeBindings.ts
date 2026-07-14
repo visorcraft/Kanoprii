@@ -109,6 +109,9 @@ export function useAppChromeBindings(input: UseAppChromeBindingsInput) {
   const appMenus = buildAppMenuInput({
     doc: {
       filePath: input.doc.filePath,
+      originalPath: input.doc.originalPath,
+      sourcePath: input.doc.sourcePath,
+      sourceKind: input.doc.sourceKind,
       isDirty: input.doc.isDirty,
       pageCount: input.doc.pageCount,
       currentPage: input.doc.currentPage,

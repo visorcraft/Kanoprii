@@ -256,9 +256,9 @@ export function useAppRuntimeWiring(bootstrap: Bootstrap) {
   const moveToNewWindow = useCallback(
     (id: string) => {
       const session = doc.sessions.find((s) => s.id === id);
-      if (!session?.originalPath) return;
+      if (!session?.sourcePath && !session?.originalPath) return;
       const run = () =>
-        spawnDocumentWindow(session.originalPath, id, {
+        spawnDocumentWindow(session.sourcePath || session.originalPath, id, {
           finalizeClose: tabActions.finalizeCloseSession,
           showToast,
         });

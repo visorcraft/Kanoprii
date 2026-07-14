@@ -16,6 +16,7 @@ export function buildViewMenu(ctx: AppMenuContext): MenuRoot {
     }, {
       shortcutCommandId: 'markdown-view',
       active: ctx.workspaceView === 'tabs' && ctx.viewMode === 'markdown',
+      disabled: ctx.viewMode === 'webpage' && !ctx.hasPdf,
     }),
     sep(),
     act(

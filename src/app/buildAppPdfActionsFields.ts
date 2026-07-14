@@ -173,6 +173,8 @@ export function documentPdfActionFields(d: DocumentState) {
     pageCount: d.pageCount,
     pageInput: d.pageInput,
     pdfRevision: d.pdfRevision,
+    sourceKind: d.sourceKind,
+    sourceText: d.sourceText,
     setCurrentPage: d.setCurrentPage,
     setMarkdownOcrNotice: d.setMarkdownOcrNotice,
     setMarkdownPath: d.setMarkdownPath,

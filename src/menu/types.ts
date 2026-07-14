@@ -34,13 +34,14 @@ export type FlatMenuAction = MenuAction & {
 
 export interface AppMenuContext {
   hasPdf: boolean;
+  hasDocument: boolean;
   isDirty: boolean;
   canUndo: boolean;
   canRedo: boolean;
   pageCount: number | null;
   currentPage: number;
   workspaceView: WorkspaceViewMode;
-  viewMode: 'pdf' | 'markdown';
+  viewMode: 'pdf' | 'markdown' | 'webpage';
   scrollViewMode: 'single' | 'continuous';
   highlightMode: boolean;
   noteMode: boolean;
@@ -230,13 +231,14 @@ export type SortHandler = (desc: boolean) => void | Promise<void>;
 /** Raw handlers from App before menu-specific void wrapping. */
 export type AppMenuContextSource = {
   hasPdf: boolean;
+  hasDocument: boolean;
   isDirty: boolean;
   canUndo: boolean;
   canRedo: boolean;
   pageCount: number | null;
   currentPage: number;
   workspaceView: WorkspaceViewMode;
-  viewMode: 'pdf' | 'markdown';
+  viewMode: 'pdf' | 'markdown' | 'webpage';
   scrollViewMode: 'single' | 'continuous';
   highlightMode: boolean;
   noteMode: boolean;

@@ -6,7 +6,7 @@ export function buildFileEditMenus(ctx: AppMenuContext): { fileMenu: MenuRoot; e
     id: 'file',
     label: 'File',
     items: [
-      act('open', 'Open PDF…', ctx.openPdf, { shortcutCommandId: 'open-pdf' }),
+      act('open', 'Open Document…', ctx.openPdf, { shortcutCommandId: 'open-pdf' }),
       ...(ctx.hasPdf
         ? [
             sep(),
@@ -28,6 +28,9 @@ export function buildFileEditMenus(ctx: AppMenuContext): { fileMenu: MenuRoot; e
             sep(),
             act('close', 'Close', ctx.requestClosePdf, { shortcutCommandId: 'close-pdf' }),
           ]
+        : []),
+      ...(!ctx.hasPdf && ctx.hasDocument
+        ? [sep(), act('close', 'Close', ctx.requestClosePdf, { shortcutCommandId: 'close-pdf' })]
         : []),
       sep(),
       act('quit', 'Quit', ctx.quitApp, { shortcutCommandId: 'quit' }),

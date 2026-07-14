@@ -5,6 +5,7 @@ import { voidRun } from './menuBuilders';
 export function menuContextDocAnnotFields(source: AppMenuContextSource): Pick<
   AppMenuContext,
   | 'hasPdf'
+  | 'hasDocument'
   | 'isDirty'
   | 'canUndo'
   | 'canRedo'
@@ -105,6 +106,7 @@ export function menuContextDocAnnotFields(source: AppMenuContextSource): Pick<
 > {
   return {
     hasPdf: source.hasPdf,
+    hasDocument: source.hasDocument,
     isDirty: source.isDirty,
     canUndo: source.canUndo,
     canRedo: source.canRedo,

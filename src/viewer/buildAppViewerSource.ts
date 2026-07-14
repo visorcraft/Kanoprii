@@ -64,6 +64,8 @@ export type BuildAppViewerSourceInput = {
   markdownOcrNotice: ViewerMainProps['markdownOcrNotice'];
   markdownPath: ViewerMainProps['markdownPath'];
   markdownText: ViewerMainProps['markdownText'];
+  sourcePath: ViewerMainProps['sourcePath'];
+  sourceText: ViewerMainProps['sourceText'];
   openMarkdownSaveAs: ViewerMainProps['onOpenMarkdownSaveAs'];
   zoom: PdfPageProps['zoom'];
   imageSrc: PdfPageProps['imageSrc'];
@@ -249,6 +251,8 @@ export function buildAppViewerSource(input: BuildAppViewerSourceInput): BuildVie
     markdownOcrNotice: input.markdownOcrNotice,
     markdownPath: input.markdownPath,
     markdownText: input.markdownText,
+    sourcePath: input.sourcePath,
+    sourceText: input.sourceText,
     onOpenMarkdownSaveAs: input.openMarkdownSaveAs,
     pdfPage,
     pageControls,

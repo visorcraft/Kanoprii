@@ -3,7 +3,7 @@ import type { BuildAppViewerSourceInput } from './buildAppViewerSource';
 export type BuildAppShellViewerInputArgs = {
   document: Pick<
     BuildAppViewerSourceInput,
-    'filePath' | 'viewMode' | 'scrollViewMode' | 'pageCount' | 'currentPage' | 'pageSizes' | 'zoom' | 'markdownOcrNotice' | 'markdownPath' | 'markdownText'
+    'filePath' | 'viewMode' | 'scrollViewMode' | 'pageCount' | 'currentPage' | 'pageSizes' | 'zoom' | 'markdownOcrNotice' | 'markdownPath' | 'markdownText' | 'sourcePath' | 'sourceText'
   >;
   sidebar: Pick<
     BuildAppViewerSourceInput,

@@ -3,6 +3,7 @@ import {
   BMP_DIALOG_FILTER,
   CERT_DIALOG_FILTER,
   DEFAULT_TESSERACT_GUIDE,
+  DOCUMENT_DIALOG_FILTER,
   GIF_DIALOG_FILTER,
   JPEG_DIALOG_FILTER,
   MARKDOWN_DIALOG_FILTER,
@@ -173,6 +174,17 @@ export const pickPdfWithNativeDialog = async (defaultPath?: string): Promise<str
     directory: false,
     defaultPath: defaultPath?.trim() || undefined,
     filters: PDF_DIALOG_FILTER,
+  });
+  if (selected === null) return null;
+  return typeof selected === 'string' ? selected : selected[0] ?? null;
+};
+
+export const pickDocumentWithNativeDialog = async (defaultPath?: string): Promise<string | null> => {
+  const selected = await openNativeDialog({
+    multiple: false,
+    directory: false,
+    defaultPath: defaultPath?.trim() || undefined,
+    filters: DOCUMENT_DIALOG_FILTER,
   });
   if (selected === null) return null;
   return typeof selected === 'string' ? selected : selected[0] ?? null;

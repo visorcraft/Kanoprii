@@ -1,10 +1,12 @@
 import React, {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
 } from 'react';
+import { createPortal } from 'react-dom';
 import { AboutModal } from '../about/AboutModal';
 import { CreditsModal } from '../credits/CreditsModal';
 import { LicensesModal } from '../licenses/LicensesModal';
@@ -56,6 +58,21 @@ function MenuDropdownItem({
   onClose: () => void;
 }) {
   const [subOpen, setSubOpen] = useState(false);
+  const itemRef = useRef<HTMLDivElement>(null);
+  const submenuRef = useRef<HTMLDivElement>(null);
+  const [submenuPosition, setSubmenuPosition] = useState({ left: 0, top: 0 });
+
+  useLayoutEffect(() => {
+    if (!subOpen || !itemRef.current || !submenuRef.current) return;
+    const item = itemRef.current.getBoundingClientRect();
+    const submenu = submenuRef.current.getBoundingClientRect();
+    setSubmenuPosition({
+      left: item.right + submenu.width + 2 > window.innerWidth
+        ? item.left - submenu.width - 2
+        : item.right + 2,
+      top: Math.max(4, Math.min(item.top - 6, window.innerHeight - submenu.height - 4)),
+    });
+  }, [subOpen]);
 
   if ('separator' in entry) {
     return <div className="menu-separator" role="separator" />;
@@ -64,14 +81,26 @@ function MenuDropdownItem({
   if ('items' in entry && !('id' in entry)) {
     return (
       <div
+        ref={itemRef}
         className="menu-item menu-item-submenu"
+        data-testid={`submenu-${entry.label.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`}
         onMouseEnter={() => setSubOpen(true)}
-        onMouseLeave={() => setSubOpen(false)}
+        onMouseLeave={(event) => {
+          if (!submenuRef.current?.contains(event.relatedTarget as Node)) setSubOpen(false);
+        }}
       >
         <span className="menu-item-label">{entry.label}</span>
         <span className="menu-item-chevron">›</span>
-        {subOpen && (
-          <div className="menu-dropdown menu-dropdown-nested">
+        {subOpen && createPortal(
+          <div
+            ref={submenuRef}
+            className="menu-dropdown menu-dropdown-nested"
+            style={submenuPosition}
+            onMouseLeave={(event) => {
+              const related = event.relatedTarget as Element | null;
+              if (!itemRef.current?.contains(related) && !related?.closest('.menu-dropdown-nested')) setSubOpen(false);
+            }}
+          >
             {entry.items.map((child, index) => (
               <MenuDropdownItem
                 key={`${entry.label}-${index}`}
@@ -79,7 +108,8 @@ function MenuDropdownItem({
                 onClose={onClose}
               />
             ))}
-          </div>
+          </div>,
+          document.body,
         )}
       </div>
     );
@@ -118,7 +148,8 @@ function MenuBar({ menus }: { menus: MenuRoot[] }) {
   useEffect(() => {
     if (!openId) return;
     const onPointerDown = (event: MouseEvent) => {
-      if (!barRef.current?.contains(event.target as Node)) setOpenId(null);
+      const target = event.target as Element;
+      if (!barRef.current?.contains(target) && !target.closest('.menu-dropdown-nested')) setOpenId(null);
     };
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') setOpenId(null);
