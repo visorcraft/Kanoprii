@@ -171,5 +171,8 @@ describe('PDF Edit Mode', () => {
       async () => !(await $('.image-selection-overlay').isDisplayed().catch(() => false)),
       { timeout: 15_000, timeoutMsg: 'expected image selection overlay to disappear after rotate apply' },
     );
+
+    const errorToast = await $('[role="alert"]');
+    expect(await errorToast.isDisplayed().catch(() => false)).toBe(false);
   });
 });

@@ -275,6 +275,7 @@ pub fn transform_page_image(
     rotation_degrees: f64,
 ) -> Result<(), String> {
     validate_rect_finite(new_rect, "new rect")?;
+    finite_f64(rotation_degrees, "rotation")?;
     let page_id = doc.page_iter().nth(page_index as usize).ok_or_else(|| "page index out of range".to_string())?;
     let contents = page_contents_id(doc, page_id)?;
     let content_obj = doc.get_object(contents).map_err(|e| e.to_string())?;
@@ -288,6 +289,10 @@ pub fn transform_page_image(
     let target = images.get(image_index).ok_or_else(|| "image index out of range".to_string())?;
     let target_name = find_xobject_name(doc, page_index, target.object_id)?;
 
+    // Build the `cm` matrix that maps the unit image square onto a rectangle
+    // of size (w, h), rotated by theta about its center (cx, cy). The first
+    // two columns (a, b) and (c, d) are the transformed axes; (e, f) translate
+    // the result so the rectangle stays centered at (cx, cy).
     let theta = rotation_degrees.to_radians();
     let (sin, cos) = theta.sin_cos();
     let w = new_rect.width;

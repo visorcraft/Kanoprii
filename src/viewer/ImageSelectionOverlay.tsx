@@ -67,6 +67,15 @@ export function ImageSelectionOverlay({
     containerRef.current?.focus();
   }, []);
 
+  useEffect(() => {
+    if (dragging === 'rotate') {
+      document.body.style.cursor = 'grabbing';
+      return () => {
+        document.body.style.cursor = '';
+      };
+    }
+  }, [dragging]);
+
   const handleMouseDown = useCallback(
     (e: React.MouseEvent, kind: 'move' | 'resize' | 'rotate') => {
       e.stopPropagation();
@@ -94,7 +103,8 @@ export function ImageSelectionOverlay({
         const cy = box.top + box.height / 2;
         const angle = Math.atan2(e.clientY - cy, e.clientX - cx);
         const degrees = -((angle * 180) / Math.PI + 90);
-        updateRotation(degrees);
+        const normalized = ((degrees % 360) + 360) % 360;
+        updateRotation(normalized);
         return;
       }
 
