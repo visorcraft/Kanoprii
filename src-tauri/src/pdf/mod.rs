@@ -5,6 +5,7 @@ pub mod browser;
 pub mod content;
 pub mod coords;
 pub mod crop;
+pub mod edit_types;
 pub mod export;
 pub mod fonts;
 pub mod form_merge;

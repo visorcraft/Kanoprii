@@ -109,6 +109,7 @@ include!("parity_batch8_generated.inc.rs");
 
 include!("commands/wrappers_doc.inc.rs");
 include!("commands/wrappers_annot.inc.rs");
+include!("commands/wrappers_edit.inc.rs");
 
 pub fn print_temp_dir() -> PathBuf {
     std::env::temp_dir().join("kanoprii_print")
