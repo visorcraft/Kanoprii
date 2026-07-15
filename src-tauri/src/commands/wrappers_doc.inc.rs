@@ -297,6 +297,10 @@ fn materialize_document_pdf(working: String, source: String) -> Result<String, S
     Ok(target.to_string_lossy().into_owned())
 }
 #[tauri::command]
+fn discard_document_pdf(generated: String, source: String) -> Result<(), String> {
+    pdf::history::discard_document_pdf(generated, source)
+}
+#[tauri::command]
 fn save_pdf_markdown(path: String, overwrite: bool, output_path: Option<String>) -> Result<MarkdownSaveResult, String> {
     let pdf_path = PathBuf::from(path);
     let markdown_path = output_path.map(PathBuf::from).unwrap_or_else(|| pdf_path.with_extension("md"));

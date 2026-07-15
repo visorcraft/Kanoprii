@@ -17415,6 +17415,40 @@ fn text_documents_load_and_generate_pdf_pages() {
 }
 
 #[test]
+fn discard_document_pdf_removes_materialized_sibling_and_rejects_unrelated_paths() {
+    let dir = std::env::temp_dir().join(format!("pp_discard_doc_{}", std::process::id()));
+    let _ = fs::remove_dir_all(&dir);
+    fs::create_dir_all(&dir).unwrap();
+    let markdown = dir.join("notes.md");
+    fs::write(&markdown, "# Notes\n").unwrap();
+
+    let mut png = Vec::new();
+    image::DynamicImage::new_rgb8(8, 8).write_to(&mut std::io::Cursor::new(&mut png), image::ImageFormat::Png).unwrap();
+    let working = create_pdf_from_document_pages(vec![png]).unwrap();
+    let generated = materialize_document_pdf(working, markdown.to_string_lossy().into_owned()).unwrap();
+    let generated_path = std::path::PathBuf::from(&generated);
+    assert!(generated_path.exists());
+
+    // Happy path: discarding the materialized sibling succeeds.
+    discard_document_pdf(generated.clone(), markdown.to_string_lossy().into_owned()).unwrap();
+    assert!(!generated_path.exists());
+
+    // Idempotent: a second discard does not error (file already gone).
+    discard_document_pdf(generated.clone(), markdown.to_string_lossy().into_owned()).unwrap();
+
+    // Reject paths that don't match the materialize pattern, even if the
+    // caller claims a sibling source. The check is the only thing keeping a
+    // hostile frontend from deleting arbitrary user files via this command.
+    let unrelated_pdf = dir.join("user_report.pdf");
+    fs::write(&unrelated_pdf, b"important").unwrap();
+    let err =
+        discard_document_pdf(unrelated_pdf.to_string_lossy().into_owned(), markdown.to_string_lossy().into_owned());
+    assert!(err.is_err(), "expected rejection of non-materialize-named pdf");
+    assert_eq!(fs::read(&unrelated_pdf).unwrap(), b"important", "user file must be untouched");
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
 fn markdown_text_lays_out_to_multipage_pdf() {
     use pdf::markdown_pdf::markdown_to_pdf;
     let sample = "# Heading One\n\nFirst paragraph with **bold** and `code` and [a link](https://example.com).\n\n## Heading Two\n\n```rust\nfn main() { println!(\"hi\"); }\n```\n\n- item one\n- item two\n- item three\n\n| Col A | Col B |\n|---|---|\n| 1 | 2 |\n| 3 | 4 |\n\nFinal paragraph.\n";
