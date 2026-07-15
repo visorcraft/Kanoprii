@@ -23,6 +23,7 @@ type PageImageHit = {
   viewerRect: Rect;
   width?: number;
   height?: number;
+  rotation: number;
 };
 
 type TextLine = {
@@ -111,7 +112,7 @@ export function usePageInteractionEdit(deps: UsePageInteractionEditOptions) {
           y >= rect.y &&
           y <= rect.y + rect.h
         ) {
-          return { index: img.index, viewerRect: rect, width: img.width, height: img.height };
+          return { index: img.index, viewerRect: rect, width: img.width, height: img.height, rotation: 0 };
         }
       }
       return null;
@@ -316,6 +317,7 @@ export function usePageInteractionEdit(deps: UsePageInteractionEditOptions) {
           pageIndex: draft.pageIndex,
           imageIndex: draft.index,
           newRect,
+          rotation: draft.rotation ?? 0,
         },
         reloadAt: draft.pageIndex,
         toast: 'Image updated',

@@ -207,7 +207,10 @@ function PdfPageViewInner({
                 <ImageSelectionOverlay
                   draft={pdfEdit.imageDraft}
                   zoom={zoom}
-                  onUpdate={pdfEdit.onUpdateImageRect}
+                  onUpdate={({ rect, rotation }) => {
+                    pdfEdit.onUpdateImageRect(rect);
+                    pdfEdit.onUpdateImageRotation(rotation);
+                  }}
                   onApply={pdfEdit.onApply}
                   onDelete={pdfEdit.onDeleteImage}
                   onCancel={pdfEdit.onCancel}

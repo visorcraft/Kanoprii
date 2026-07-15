@@ -19899,7 +19899,7 @@ fn transform_page_image_rewrites_cm_matrix() {
     let path = save(&mut build_pdf_with_image(), "transform_image");
     let new_rect = PdfRect { x: 10.0, y: 20.0, width: 30.0, height: 40.0 };
     let mut doc = Document::load(&path).unwrap();
-    pdf::edit_object::transform_page_image(&mut doc, 0, 0, &new_rect).unwrap();
+    pdf::edit_object::transform_page_image(&mut doc, 0, 0, &new_rect, 0.0).unwrap();
     doc.save(&path).unwrap();
 
     let doc = Document::load(&path).unwrap();
@@ -19941,7 +19941,7 @@ fn transform_page_image_rejects_unsupported_pattern() {
     let path = save(&mut build_pdf_with_unsupported_image(), "transform_unsupported");
     let new_rect = PdfRect { x: 10.0, y: 20.0, width: 30.0, height: 40.0 };
     let mut doc = Document::load(&path).unwrap();
-    let err = pdf::edit_object::transform_page_image(&mut doc, 0, 0, &new_rect).unwrap_err();
+    let err = pdf::edit_object::transform_page_image(&mut doc, 0, 0, &new_rect, 0.0).unwrap_err();
     assert!(err.contains("not supported"), "expected unsupported pattern error, got {err}");
     std::fs::remove_file(&path).ok();
 }

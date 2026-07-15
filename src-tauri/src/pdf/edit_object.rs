@@ -272,6 +272,7 @@ pub fn transform_page_image(
     page_index: u32,
     image_index: usize,
     new_rect: &PdfRect,
+    rotation_degrees: f64,
 ) -> Result<(), String> {
     validate_rect_finite(new_rect, "new rect")?;
     let page_id = doc.page_iter().nth(page_index as usize).ok_or_else(|| "page index out of range".to_string())?;
@@ -287,6 +288,28 @@ pub fn transform_page_image(
     let target = images.get(image_index).ok_or_else(|| "image index out of range".to_string())?;
     let target_name = find_xobject_name(doc, page_index, target.object_id)?;
 
+    let theta = rotation_degrees.to_radians();
+    let (sin, cos) = theta.sin_cos();
+    let w = new_rect.width;
+    let h = new_rect.height;
+    let cx = new_rect.x + w / 2.0;
+    let cy = new_rect.y + h / 2.0;
+    let a = w * cos;
+    let b = w * sin;
+    let c = -h * sin;
+    let d = h * cos;
+    let e = cx - (a + c) / 2.0;
+    let f = cy - (b + d) / 2.0;
+
+    // Avoid negative zero in encoded content streams.
+    let sanitize = |v: f64| if v.abs() < 1e-12 { 0.0 } else { v };
+    let a = sanitize(a);
+    let b = sanitize(b);
+    let c = sanitize(c);
+    let d = sanitize(d);
+    let e = sanitize(e);
+    let f = sanitize(f);
+
     let mut found = false;
     for (i, op) in content.operations.iter().enumerate() {
         if op.operator == "Do"
@@ -295,12 +318,12 @@ pub fn transform_page_image(
             && content.operations[i - 1].operator == "cm"
         {
             content.operations[i - 1].operands = vec![
-                Object::Real(new_rect.width as f32),
-                Object::Real(0.0),
-                Object::Real(0.0),
-                Object::Real(new_rect.height as f32),
-                Object::Real(new_rect.x as f32),
-                Object::Real(new_rect.y as f32),
+                Object::Real(a as f32),
+                Object::Real(b as f32),
+                Object::Real(c as f32),
+                Object::Real(d as f32),
+                Object::Real(e as f32),
+                Object::Real(f as f32),
             ];
             found = true;
             break;
@@ -493,6 +516,82 @@ mod tests {
         }
     }
 
+    fn build_doc_with_image() -> (lopdf::Document, lopdf::ObjectId, lopdf::ObjectId) {
+        let mut doc = lopdf::Document::with_version("1.4");
+        let pages_id = doc.new_object_id();
+        let page_id = doc.new_object_id();
+        let content_id = doc.new_object_id();
+        let image_id = doc.new_object_id();
+
+        let content_bytes = b"q 100 0 0 100 50 50 cm /Im1 Do Q\n".to_vec();
+        doc.set_object(content_id, lopdf::Object::Stream(lopdf::Stream::new(lopdf::Dictionary::new(), content_bytes)));
+
+        doc.set_object(
+            image_id,
+            lopdf::Object::Stream(lopdf::Stream::new(
+                lopdf::Dictionary::from_iter(vec![
+                    (b"Type".to_vec(), lopdf::Object::Name(b"XObject".to_vec())),
+                    (b"Subtype".to_vec(), lopdf::Object::Name(b"Image".to_vec())),
+                    (b"Width".to_vec(), lopdf::Object::Integer(100)),
+                    (b"Height".to_vec(), lopdf::Object::Integer(100)),
+                ]),
+                vec![],
+            )),
+        );
+
+        doc.set_object(
+            page_id,
+            lopdf::Object::Dictionary(lopdf::Dictionary::from_iter(vec![
+                (b"Type".to_vec(), lopdf::Object::Name(b"Page".to_vec())),
+                (b"Parent".to_vec(), lopdf::Object::Reference(pages_id)),
+                (
+                    b"MediaBox".to_vec(),
+                    lopdf::Object::Array(vec![
+                        lopdf::Object::Integer(0),
+                        lopdf::Object::Integer(0),
+                        lopdf::Object::Integer(612),
+                        lopdf::Object::Integer(792),
+                    ]),
+                ),
+                (b"Contents".to_vec(), lopdf::Object::Reference(content_id)),
+                (
+                    b"Resources".to_vec(),
+                    lopdf::Object::Dictionary(lopdf::Dictionary::from_iter(vec![(
+                        b"XObject".to_vec(),
+                        lopdf::Object::Dictionary(lopdf::Dictionary::from_iter(vec![(
+                            b"Im1".to_vec(),
+                            lopdf::Object::Reference(image_id),
+                        )])),
+                    )])),
+                ),
+            ])),
+        );
+
+        doc.set_object(
+            pages_id,
+            lopdf::Object::Dictionary(lopdf::Dictionary::from_iter(vec![
+                (b"Type".to_vec(), lopdf::Object::Name(b"Pages".to_vec())),
+                (b"Kids".to_vec(), lopdf::Object::Array(vec![lopdf::Object::Reference(page_id)])),
+                (b"Count".to_vec(), lopdf::Object::Integer(1)),
+            ])),
+        );
+
+        let catalog_id = doc.new_object_id();
+        doc.set_object(
+            catalog_id,
+            lopdf::Object::Dictionary(lopdf::Dictionary::from_iter(vec![
+                (b"Type".to_vec(), lopdf::Object::Name(b"Catalog".to_vec())),
+                (b"Pages".to_vec(), lopdf::Object::Reference(pages_id)),
+            ])),
+        );
+        doc.trailer.set(b"Root", lopdf::Object::Reference(catalog_id));
+        (doc, page_id, content_id)
+    }
+
+    fn assert_real_eq(actual: f64, expected: f64, epsilon: f64) {
+        assert!((actual - expected).abs() < epsilon, "expected {expected} +/- {epsilon}, got {actual}");
+    }
+
     #[test]
     fn edit_paragraph_replaces_two_lines() {
         let ops =
@@ -518,5 +617,44 @@ mod tests {
         let (mut doc, _) = build_doc_with_text("BT /F1 12 Tf 1 0 0 1 100 700 Tm (Hello) Tj ET");
         let result = edit_paragraph(&mut doc, 0, &[0, 5], "Text", &style_with_align("left"), &full_page_box());
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn transform_page_image_rotates_90_degrees() {
+        let (mut doc, _page_id, content_id) = build_doc_with_image();
+        let new_rect = PdfRect { x: 50.0, y: 50.0, width: 100.0, height: 100.0 };
+        transform_page_image(&mut doc, 0, 0, &new_rect, 90.0).unwrap();
+
+        let content_obj = doc.get_object(content_id).unwrap();
+        let stream = content_obj.as_stream().unwrap();
+        let decoded = stream.decode_content().unwrap();
+        let cm_op = decoded
+            .operations
+            .iter()
+            .enumerate()
+            .find(|(i, op)| {
+                op.operator == "cm" && i + 1 < decoded.operations.len() && decoded.operations[i + 1].operator == "Do"
+            })
+            .map(|(_, op)| op)
+            .expect("cm Do pair not found");
+
+        let vals: Vec<f64> = cm_op
+            .operands
+            .iter()
+            .map(|o| match o {
+                lopdf::Object::Real(v) => *v as f64,
+                lopdf::Object::Integer(v) => *v as f64,
+                _ => f64::NAN,
+            })
+            .collect();
+        assert_eq!(vals.len(), 6);
+        // For a 100x100 box centered at (100,100) rotated 90 degrees:
+        // a=0, b=100, c=-100, d=0, e=150, f=50.
+        assert_real_eq(vals[0], 0.0, 1e-4);
+        assert_real_eq(vals[1], 100.0, 1e-4);
+        assert_real_eq(vals[2], -100.0, 1e-4);
+        assert_real_eq(vals[3], 0.0, 1e-4);
+        assert_real_eq(vals[4], 150.0, 1e-4);
+        assert_real_eq(vals[5], 50.0, 1e-4);
     }
 }

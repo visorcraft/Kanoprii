@@ -6,7 +6,7 @@ import './ImageSelectionOverlay.css';
 type ImageSelectionOverlayProps = {
   draft: ImageEditDraft;
   zoom: number;
-  onUpdate: (rect: Rect) => void;
+  onUpdate: (payload: { rect: Rect; rotation: number }) => void;
   onApply: () => void;
   onDelete: () => void;
   onCancel: () => void;
@@ -37,15 +37,22 @@ export function ImageSelectionOverlay({
   onCancel,
 }: ImageSelectionOverlayProps) {
   const [rect, setRect] = useState<Rect>(draft.pageRect);
-  const [dragging, setDragging] = useState<'move' | 'resize' | null>(null);
+  const [rotation, setRotation] = useState<number>(draft.rotation ?? 0);
+  const [dragging, setDragging] = useState<'move' | 'resize' | 'rotate' | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const dragStartPosRef = useRef<{ x: number; y: number } | null>(null);
   const dragStartRectRef = useRef<Rect | null>(null);
   const rectRef = useRef(rect);
+  const rotationRef = useRef(rotation);
 
   const updateRect = useCallback((next: Rect) => {
     rectRef.current = next;
     setRect(next);
+  }, []);
+
+  const updateRotation = useCallback((next: number) => {
+    rotationRef.current = next;
+    setRotation(next);
   }, []);
 
   useEffect(() => {
@@ -53,11 +60,15 @@ export function ImageSelectionOverlay({
   }, [draft.pageRect, updateRect]);
 
   useEffect(() => {
+    updateRotation(draft.rotation ?? 0);
+  }, [draft.rotation, updateRotation]);
+
+  useEffect(() => {
     containerRef.current?.focus();
   }, []);
 
   const handleMouseDown = useCallback(
-    (e: React.MouseEvent, kind: 'move' | 'resize') => {
+    (e: React.MouseEvent, kind: 'move' | 'resize' | 'rotate') => {
       e.stopPropagation();
       e.preventDefault();
       containerRef.current?.focus();
@@ -76,6 +87,17 @@ export function ImageSelectionOverlay({
     if (!startPos || !startRect) return;
 
     const onMouseMove = (e: MouseEvent) => {
+      if (dragging === 'rotate') {
+        const box = containerRef.current?.getBoundingClientRect();
+        if (!box) return;
+        const cx = box.left + box.width / 2;
+        const cy = box.top + box.height / 2;
+        const angle = Math.atan2(e.clientY - cy, e.clientX - cx);
+        const degrees = (angle * 180) / Math.PI + 90;
+        updateRotation(degrees);
+        return;
+      }
+
       const dx = (e.clientX - startPos.x) / zoom;
       const dy = (e.clientY - startPos.y) / zoom;
 
@@ -123,7 +145,7 @@ export function ImageSelectionOverlay({
 
     const onMouseUp = () => {
       setDragging(null);
-      onUpdate(rectRef.current);
+      onUpdate({ rect: rectRef.current, rotation: rotationRef.current });
       dragStartPosRef.current = null;
       dragStartRectRef.current = null;
     };
@@ -134,7 +156,7 @@ export function ImageSelectionOverlay({
       window.removeEventListener('mousemove', onMouseMove);
       window.removeEventListener('mouseup', onMouseUp);
     };
-  }, [dragging, onUpdate, updateRect, zoom]);
+  }, [dragging, onUpdate, updateRect, updateRotation, zoom]);
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
@@ -169,9 +191,19 @@ export function ImageSelectionOverlay({
       aria-label="Image selection"
     >
       <div
+        className="image-selection-inner"
+        style={{ transform: `rotate(${rotation}deg)` }}
+        aria-hidden="true"
+      />
+      <div
         className="image-selection-handle-br"
         onMouseDown={(e) => handleMouseDown(e, 'resize')}
         aria-label="Resize image"
+      />
+      <div
+        className="image-selection-handle-rotate"
+        onMouseDown={(e) => handleMouseDown(e, 'rotate')}
+        aria-label="Rotate image"
       />
     </div>
   );

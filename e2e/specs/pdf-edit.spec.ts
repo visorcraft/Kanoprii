@@ -2,6 +2,7 @@ import { browser, expect } from '@wdio/globals';
 import {
   clickMenuAction,
   fixturePdf,
+  fixturePdfImage,
   fixturePdfParagraph,
   openPdfViaPathModal,
   resetToWelcome,
@@ -114,6 +115,61 @@ describe('PDF Edit Mode', () => {
     await browser.waitUntil(
       async () => !(await $('.rich-text-edit-textarea').isDisplayed().catch(() => false)),
       { timeout: 15_000, timeoutMsg: 'expected rich-text edit overlay to disappear after paragraph apply' },
+    );
+  });
+
+  it('enters edit mode, selects an image, rotates it, and applies', async () => {
+    await openPdfViaPathModal(fixturePdfImage);
+    await waitForPdfOpen();
+    await waitForPageRendered();
+
+    await enterPdfEditMode();
+    const editBtn = await $('[aria-label="Edit mode"]');
+    await editBtn.waitForDisplayed({ timeout: 10_000 });
+
+    // Click near the center of the page to select the full-page image.
+    const { cx, cy } = await browser.execute(() => {
+      const img = document.querySelector('.page-image') as HTMLImageElement | null;
+      if (!img) throw new Error('missing page image');
+      const rect = img.getBoundingClientRect();
+      return { cx: Math.round(rect.left + rect.width / 2), cy: Math.round(rect.top + rect.height / 2) };
+    });
+
+    await browser
+      .action('pointer')
+      .move({ x: cx, y: cy })
+      .down({ button: 0 })
+      .up({ button: 0 })
+      .perform();
+
+    const overlay = await $('.image-selection-overlay');
+    await overlay.waitForDisplayed({ timeout: 10_000 });
+
+    const rotator = await $('.image-selection-handle-rotate');
+    await rotator.waitForDisplayed({ timeout: 10_000 });
+
+    // Drag the rotation handle from the top-center of the overlay to the right.
+    const { rx, ry } = await browser.execute(() => {
+      const el = document.querySelector('.image-selection-overlay') as HTMLElement | null;
+      if (!el) throw new Error('missing image selection overlay');
+      const rect = el.getBoundingClientRect();
+      return { rx: Math.round(rect.left + rect.width / 2), ry: Math.round(rect.top) - 18 };
+    });
+
+    await browser
+      .action('pointer')
+      .move({ x: rx, y: ry })
+      .down({ button: 0 })
+      .move({ x: rx + 120, y: ry })
+      .up({ button: 0 })
+      .perform();
+
+    // Apply the image rotation with Enter (the overlay keeps focus during drag).
+    await browser.keys('Enter');
+
+    await browser.waitUntil(
+      async () => !(await $('.image-selection-overlay').isDisplayed().catch(() => false)),
+      { timeout: 15_000, timeoutMsg: 'expected image selection overlay to disappear after rotate apply' },
     );
   });
 });

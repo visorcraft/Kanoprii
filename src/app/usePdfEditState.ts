@@ -65,6 +65,8 @@ export interface ImageEditDraft {
   height?: number;
   /** Rectangle in natural page coordinates (800x1132 viewer space) for the selection frame. */
   pageRect: Rect;
+  /** Rotation angle in degrees, counter-clockwise from upright. */
+  rotation?: number;
 }
 
 export interface ParagraphEditDraft {
@@ -179,6 +181,10 @@ export function usePdfEditState() {
     setImageDraft((prev) => (prev ? { ...prev, pageRect: rect } : null));
   }, []);
 
+  const onUpdateImageRotation = useCallback((rotation: number) => {
+    setImageDraft((prev) => (prev ? { ...prev, rotation } : null));
+  }, []);
+
   const onDeleteParagraph = useCallback(async () => {
     if (callbacksRef.current.onDeleteParagraph) {
       await callbacksRef.current.onDeleteParagraph();
@@ -221,6 +227,7 @@ export function usePdfEditState() {
       setEditMode,
       clearEditMode,
       onUpdateImageRect,
+      onUpdateImageRotation,
       onDeleteParagraph,
       onDeleteImage,
       bindEditCallbacks,
@@ -246,6 +253,7 @@ export function usePdfEditState() {
       setEditMode,
       clearEditMode,
       onUpdateImageRect,
+      onUpdateImageRotation,
       onDeleteParagraph,
       onDeleteImage,
       bindEditCallbacks,

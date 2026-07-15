@@ -41,9 +41,10 @@ fn transform_page_image(
     page_index: u32,
     image_index: usize,
     new_rect: PdfRect,
+    rotation: f64,
 ) -> Result<(), String> {
     crate::pdf::io::mutate_pdf(&PathBuf::from(path), |doc| {
-        crate::pdf::edit_object::transform_page_image(doc, page_index, image_index, &new_rect)
+        crate::pdf::edit_object::transform_page_image(doc, page_index, image_index, &new_rect, rotation)
     })
 }
 
