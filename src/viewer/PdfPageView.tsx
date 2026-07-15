@@ -177,6 +177,7 @@ function PdfPageViewInner({
               pdfEdit.textDraft.pageIndex === currentPage && (
                 <RichTextEditOverlay
                   draft={pdfEdit.textDraft}
+                  zoom={zoom}
                   onUpdate={pdfEdit.onUpdate}
                   onApply={pdfEdit.onApply}
                   onCancel={pdfEdit.onCancel}
@@ -197,6 +198,7 @@ function PdfPageViewInner({
               pdfEdit.paragraphEditing && (
                 <RichTextEditOverlay
                   draft={pdfEdit.paragraphDraft}
+                  zoom={zoom}
                   onUpdate={pdfEdit.onUpdateParagraph}
                   onApply={pdfEdit.onApply}
                   onCancel={pdfEdit.onCancel}

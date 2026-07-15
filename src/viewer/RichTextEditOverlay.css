@@ -25,3 +25,40 @@
 .rich-text-edit-textarea:focus {
   border-color: var(--pp-accent, #0066cc);
 }
+
+.rich-text-resize-handle-tl,
+.rich-text-resize-handle-tr,
+.rich-text-resize-handle-bl,
+.rich-text-resize-handle-br {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  background: var(--pp-accent, #0066cc);
+  border: 1px solid var(--pp-surface, #fff);
+  border-radius: 2px;
+  z-index: 11;
+}
+
+.rich-text-resize-handle-tl {
+  top: -6px;
+  left: -6px;
+  cursor: nwse-resize;
+}
+
+.rich-text-resize-handle-tr {
+  top: -6px;
+  right: -6px;
+  cursor: nesw-resize;
+}
+
+.rich-text-resize-handle-bl {
+  bottom: -6px;
+  left: -6px;
+  cursor: nesw-resize;
+}
+
+.rich-text-resize-handle-br {
+  bottom: -6px;
+  right: -6px;
+  cursor: nwse-resize;
+}

@@ -29,6 +29,61 @@ describe('PDF Edit Mode', () => {
     await resetToWelcome();
   });
 
+  it('enters edit mode, resizes the rich-text edit box, and applies', async () => {
+    await openPdfViaPathModal(fixturePdf);
+    await waitForPdfOpen();
+    await waitForPageRendered();
+
+    await enterPdfEditMode();
+    const editBtn = await $('[aria-label="Edit mode"]');
+    await editBtn.waitForDisplayed({ timeout: 10_000 });
+
+    const { cx, cy } = await browser.execute(() => {
+      const span = Array.from(document.querySelectorAll('.text-layer span')).find((el) =>
+        el.textContent?.includes('Hello'),
+      ) as HTMLElement | null;
+      if (!span) throw new Error('missing text layer span containing "Hello"');
+      const rect = span.getBoundingClientRect();
+      return { cx: Math.round(rect.left + rect.width / 2), cy: Math.round(rect.top + rect.height / 2) };
+    });
+
+    await browser
+      .action('pointer')
+      .move({ x: cx, y: cy })
+      .down({ button: 0 })
+      .up({ button: 0 })
+      .perform();
+
+    const textarea = await $('.rich-text-edit-textarea');
+    await textarea.waitForDisplayed({ timeout: 10_000 });
+
+    const handle = await $('.rich-text-resize-handle-br');
+    await handle.waitForDisplayed({ timeout: 10_000 });
+
+    const { hx, hy } = await browser.execute(() => {
+      const el = document.querySelector('.rich-text-resize-handle-br') as HTMLElement | null;
+      if (!el) throw new Error('missing resize handle');
+      const rect = el.getBoundingClientRect();
+      return { hx: Math.round(rect.left + rect.width / 2), hy: Math.round(rect.top + rect.height / 2) };
+    });
+
+    await browser
+      .action('pointer')
+      .move({ x: hx, y: hy })
+      .down({ button: 0 })
+      .move({ x: hx + 60, y: hy + 40 })
+      .up({ button: 0 })
+      .perform();
+
+    const applyBtn = await $('.edit-toolbar-apply');
+    await applyBtn.click();
+
+    await browser.waitUntil(
+      async () => !(await $('.rich-text-edit-textarea').isDisplayed().catch(() => false)),
+      { timeout: 15_000, timeoutMsg: 'expected rich-text edit overlay to disappear after resize apply' },
+    );
+  });
+
   it('enters edit mode, edits an existing text line, and applies', async () => {
     await openPdfViaPathModal(fixturePdf);
     await waitForPdfOpen();
