@@ -24,6 +24,7 @@ type PdfPageViewProps = {
   redactMode: boolean;
   imageInsertMode: boolean;
   textEditMode: boolean;
+  editTextRunMode: boolean;
   vectorEditMode: boolean;
   formAddMode: boolean;
   onPageClick?: (e: React.MouseEvent) => void;
@@ -73,6 +74,7 @@ function PdfPageViewInner({
   redactMode,
   imageInsertMode,
   textEditMode,
+  editTextRunMode,
   vectorEditMode,
   formAddMode,
   onPageClick,
@@ -114,6 +116,7 @@ function PdfPageViewInner({
     redactMode ? 'redact-cursor' : '',
     imageInsertMode ? 'image-insert-cursor' : '',
     textEditMode ? 'text-edit-cursor' : '',
+    editTextRunMode ? 'text-edit-cursor' : '',
     textEditActiveRun ? 'text-edit-cursor' : '',
     vectorEditMode ? 'vector-edit-cursor' : '',
     formAddMode ? 'form-add-cursor' : '',

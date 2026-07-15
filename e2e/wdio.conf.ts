@@ -19,6 +19,7 @@ export const config = {
   specs: [
     path.join(root, 'e2e', 'specs', 'smoke.spec.ts'),
     path.join(root, 'e2e', 'specs', 'features.spec.ts'),
+    path.join(root, 'e2e', 'specs', 'pdf-edit.spec.ts'),
     path.join(root, 'e2e', 'specs', 'multitab.spec.ts'),
     path.join(root, 'e2e', 'specs', 'updater.spec.ts'),
     path.join(root, 'e2e', 'specs', 'restore-setup.spec.ts'),

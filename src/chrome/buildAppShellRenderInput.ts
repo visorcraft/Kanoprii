@@ -186,6 +186,7 @@ export function buildAppShellRenderInput(args: BuildAppShellRenderInputArgs) {
         redactMode: args.annotation.redactMode,
         imageInsertMode: args.annotation.imageInsertMode,
         textEditMode: args.annotation.textEditMode,
+        editTextRunMode: args.annotation.editTextRunMode,
         vectorEditMode: args.annotation.vectorEditMode,
         formAddMode: args.annotation.formAddMode,
         shapeKind: args.annotation.shapeKind,

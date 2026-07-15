@@ -72,6 +72,7 @@ export type BuildAppShellViewerInputArgs = {
     | 'redactMode'
     | 'imageInsertMode'
     | 'textEditMode'
+    | 'editTextRunMode'
     | 'vectorEditMode'
     | 'formAddMode'
     | 'shapeKind'

@@ -83,6 +83,7 @@ export function ContinuousViewer({
                 redactMode={isActive ? pdfPage.redactMode : false}
                 imageInsertMode={isActive ? pdfPage.imageInsertMode : false}
                 textEditMode={isActive ? pdfPage.textEditMode : false}
+                editTextRunMode={isActive ? pdfPage.editTextRunMode : false}
                 vectorEditMode={isActive ? pdfPage.vectorEditMode : false}
                 formAddMode={isActive ? pdfPage.formAddMode : false}
                 annotations={isActive ? pdfPage.annotations : EMPTY_ANNOTATIONS}

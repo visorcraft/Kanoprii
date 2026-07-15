@@ -88,6 +88,7 @@ export type BuildAppViewerSourceInput = {
   redactMode: PdfPageProps['redactMode'];
   imageInsertMode: PdfPageProps['imageInsertMode'];
   textEditMode: PdfPageProps['textEditMode'];
+  editTextRunMode: PdfPageProps['editTextRunMode'];
   vectorEditMode: PdfPageProps['vectorEditMode'];
   formAddMode: PdfPageProps['formAddMode'];
   handlePageClick: PdfPageProps['onPageClick'];
@@ -182,6 +183,7 @@ export function buildAppViewerSource(input: BuildAppViewerSourceInput): BuildVie
     redactMode: input.redactMode,
     imageInsertMode: input.imageInsertMode,
     textEditMode: input.textEditMode,
+    editTextRunMode: input.editTextRunMode,
     vectorEditMode: input.vectorEditMode,
     formAddMode: input.formAddMode,
     onPageClick: input.handlePageClick,
