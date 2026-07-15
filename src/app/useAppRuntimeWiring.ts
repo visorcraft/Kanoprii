@@ -176,6 +176,11 @@ export function useAppRuntimeWiring(bootstrap: Bootstrap) {
 
   const openPathPendingRef = useRef(false);
 
+  // Latest coldStartReady setter without retriggering the once-on-mount launch
+  // effect (which would otherwise re-run on every doc-state change).
+  const setColdStartReadyRef = useRef(doc.setColdStartReady);
+  setColdStartReadyRef.current = doc.setColdStartReady;
+
   // Always point at the latest loader. The listener and the launch-path pull are
   // registered once (empty deps); without this ref they would capture a stale
   // loadPdfFromPath - both calling outdated logic and deduping against stale
@@ -219,6 +224,7 @@ export function useAppRuntimeWiring(bootstrap: Bootstrap) {
         if (ok && isTauriRuntime()) {
           void emit('spawn-loaded', { token: spawnParams.token });
         }
+        setColdStartReadyRef.current(true);
         return;
       }
       // Drain any file paths this process was launched with (file-association /
@@ -239,13 +245,16 @@ export function useAppRuntimeWiring(bootstrap: Bootstrap) {
       if (persistence?.restoreSessions) {
         await persistence.restoreSessions(() => openPathPendingRef.current);
       }
-      // Open launch files after restore so an already-restored document is
-      // focused (deduped) rather than opened a second time. Use the ref so the
-      // dedup sees the just-restored sessions.
+      // Open launch files AFTER restore and AWAIT them so any cold-start PDF
+      // finishes loading before the markdown -> PDF generation effect is allowed
+      // to run (gated by coldStartReady below). Without the await + gate, the
+      // md-pdf materialize/render async races the launch open and can lose the
+      // launch file's viewer slot to the older md-derived render.
       for (const path of launchPaths) {
-        void loadPdfFromPathRef.current(path);
+        await loadPdfFromPathRef.current(path);
       }
       openPathPendingRef.current = false;
+      setColdStartReadyRef.current(true);
     })();
   // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional: stable option object / destructured deps
   }, []);

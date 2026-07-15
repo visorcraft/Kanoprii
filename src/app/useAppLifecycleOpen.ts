@@ -38,6 +38,11 @@ export function useAppLifecycleOpen({ input, loaders }: UseAppLifecycleDocumentI
     setShowPasswordModal,
   } = security;
 
+  // Cold-start gate: suppress md/html -> PDF generation until session restore +
+  // launch-path drain have completed (see useAppRuntimeWiring). Prevents the
+  // slow materialize/render async from racing a concurrent cold-start PDF open.
+  const coldStartReady = input.doc.coldStartReady;
+
   const { rememberOpenedPdf } = usePdfRecents({ rememberBrowserDirectory: loaders.rememberBrowserDirectory, setRecentPdfs });
   const { loadFormFields } = loaders;
 
@@ -136,6 +141,7 @@ export function useAppLifecycleOpen({ input, loaders }: UseAppLifecycleDocumentI
 
   const generatedViewRef = useRef('');
   useEffect(() => {
+    if (!coldStartReady) return;
     if (viewMode !== 'pdf' || sourceKind === 'pdf' || !sourceKind || !sourcePath || !activeId) return;
     const sourceDigest = `${sourceText.length}:${sourceText.slice(0, 64)}`;
     const key = `${activeId}:${sourcePath}:${sourceDigest}`;
@@ -171,7 +177,7 @@ export function useAppLifecycleOpen({ input, loaders }: UseAppLifecycleDocumentI
       generatedViewRef.current = '';
       setViewMode(sourceKind === 'markdown' ? 'markdown' : 'webpage');
     });
-  }, [activeId, filePath, loadFormFields, loadThumbnails, originalPath, renderPage, resetHistoryForOpen, setViewMode, showToast, sourceKind, sourcePath, sourceText, updateSession, viewMode, withLoading]);
+  }, [activeId, coldStartReady, filePath, loadFormFields, loadThumbnails, originalPath, renderPage, resetHistoryForOpen, setViewMode, showToast, sourceKind, sourcePath, sourceText, updateSession, viewMode, withLoading]);
 
   return {
     imageSrc,
