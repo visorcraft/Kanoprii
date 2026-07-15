@@ -105,6 +105,71 @@ describe('PDF Edit Mode', () => {
     );
   });
 
+  it('enters edit mode, drags the rich-text edit box by the move handle, and applies', async () => {
+    await openPdfViaPathModal(fixturePdf);
+    await waitForPdfOpen();
+    await waitForPageRendered();
+
+    await enterPdfEditMode();
+    const editBtn = await $('[aria-label="Edit mode"]');
+    await editBtn.waitForDisplayed({ timeout: 10_000 });
+
+    const { cx, cy } = await getCenterOfTextSpan('Hello');
+
+    await browser
+      .action('pointer')
+      .move({ x: cx, y: cy })
+      .down({ button: 0 })
+      .up({ button: 0 })
+      .perform();
+
+    const textarea = await $('.rich-text-edit-textarea');
+    await textarea.waitForDisplayed({ timeout: 10_000 });
+
+    const moveHandle = await $('.rich-text-move-handle');
+    await moveHandle.waitForDisplayed({ timeout: 10_000 });
+
+    const before = await browser.execute(() => {
+      const el = document.querySelector('.rich-text-edit-overlay') as HTMLElement | null;
+      if (!el) throw new Error('missing overlay');
+      const rect = el.getBoundingClientRect();
+      return { x: rect.left, y: rect.top };
+    });
+
+    const { hx, hy } = await browser.execute(() => {
+      const el = document.querySelector('.rich-text-move-handle') as HTMLElement | null;
+      if (!el) throw new Error('missing move handle');
+      const rect = el.getBoundingClientRect();
+      return { hx: Math.round(rect.left + rect.width / 2), hy: Math.round(rect.top + rect.height / 2) };
+    });
+
+    await browser
+      .action('pointer')
+      .move({ x: hx, y: hy })
+      .down({ button: 0 })
+      .move({ x: hx + 80, y: hy + 60 })
+      .up({ button: 0 })
+      .perform();
+
+    const after = await browser.execute(() => {
+      const el = document.querySelector('.rich-text-edit-overlay') as HTMLElement | null;
+      if (!el) throw new Error('missing overlay');
+      const rect = el.getBoundingClientRect();
+      return { x: rect.left, y: rect.top };
+    });
+
+    expect(Math.round(after.x)).not.toEqual(Math.round(before.x));
+    expect(Math.round(after.y)).not.toEqual(Math.round(before.y));
+
+    const applyBtn = await $('.edit-toolbar-apply');
+    await applyBtn.click();
+
+    await browser.waitUntil(
+      async () => !(await $('.rich-text-edit-textarea').isDisplayed().catch(() => false)),
+      { timeout: 15_000, timeoutMsg: 'expected rich-text edit overlay to disappear after move apply' },
+    );
+  });
+
   it('enters edit mode, edits an existing text line, and applies', async () => {
     await openPdfViaPathModal(fixturePdf);
     await waitForPdfOpen();

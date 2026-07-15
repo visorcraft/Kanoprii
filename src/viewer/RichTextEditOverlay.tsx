@@ -4,7 +4,8 @@ import { VIEWER_PAGE_H, VIEWER_PAGE_W } from '../app/constants';
 import { EditToolbar } from './EditToolbar';
 import './RichTextEditOverlay.css';
 
-type HandleKind = 'tl' | 'tr' | 'bl' | 'br';
+type ResizeHandleKind = 'tl' | 'tr' | 'bl' | 'br';
+type HandleKind = ResizeHandleKind | 'move';
 
 type RichTextEditOverlayProps = {
   draft: TextEditDraft | ParagraphEditDraft;
@@ -21,7 +22,7 @@ function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
 }
 
-function getFixedCorner(rect: Rect, kind: HandleKind): { x: number; y: number } {
+function getFixedCorner(rect: Rect, kind: ResizeHandleKind): { x: number; y: number } {
   switch (kind) {
     case 'br':
       return { x: rect.x, y: rect.y };
@@ -34,7 +35,15 @@ function getFixedCorner(rect: Rect, kind: HandleKind): { x: number; y: number } 
   }
 }
 
-function clampResize(rect: Rect, fixed: { x: number; y: number }, kind: HandleKind): Rect {
+function clampMove(rect: Rect): Rect {
+  return {
+    ...rect,
+    x: clamp(rect.x, 0, VIEWER_PAGE_W - rect.w),
+    y: clamp(rect.y, 0, VIEWER_PAGE_H - rect.h),
+  };
+}
+
+function clampResize(rect: Rect, fixed: { x: number; y: number }, kind: ResizeHandleKind): Rect {
   switch (kind) {
     case 'br': {
       const x = fixed.x;
@@ -104,7 +113,7 @@ export function RichTextEditOverlay({
   }, []);
 
   const handleHandleKeyDown = useCallback(
-    (e: React.KeyboardEvent, kind: HandleKind) => {
+    (e: React.KeyboardEvent, kind: ResizeHandleKind) => {
       if (!['ArrowRight', 'ArrowLeft', 'ArrowUp', 'ArrowDown'].includes(e.key)) return;
       e.preventDefault();
       e.stopPropagation();
@@ -179,6 +188,18 @@ export function RichTextEditOverlay({
       const dx = (e.clientX - startPos.x) / zoom;
       const dy = (e.clientY - startPos.y) / zoom;
 
+      if (dragging === 'move') {
+        updateRect(
+          clampMove({
+            x: startRect.x + dx,
+            y: startRect.y + dy,
+            w: startRect.w,
+            h: startRect.h,
+          }),
+        );
+        return;
+      }
+
       let next: Rect;
       switch (dragging) {
         case 'br':
@@ -217,14 +238,14 @@ export function RichTextEditOverlay({
 
   const { style } = draft;
 
-  const handleLabels: Record<HandleKind, string> = {
+  const handleLabels: Record<ResizeHandleKind, string> = {
     tl: 'Resize text box top-left',
     tr: 'Resize text box top-right',
     bl: 'Resize text box bottom-left',
     br: 'Resize text box bottom-right',
   };
 
-  const renderHandle = (kind: HandleKind) => (
+  const renderHandle = (kind: ResizeHandleKind) => (
     <div
       key={kind}
       className={`rich-text-resize-handle-${kind}`}
@@ -238,7 +259,7 @@ export function RichTextEditOverlay({
 
   return (
     <div
-      className="rich-text-edit-overlay"
+      className={`rich-text-edit-overlay ${dragging === 'move' ? 'moving' : ''}`}
       style={{
         position: 'absolute',
         left: rect.x,
@@ -279,6 +300,13 @@ export function RichTextEditOverlay({
           color: `rgb(${style.color.r}, ${style.color.g}, ${style.color.b})`,
           textAlign: style.align,
         }}
+      />
+      <div
+        className="rich-text-move-handle"
+        role="button"
+        tabIndex={0}
+        aria-label="Move text box"
+        onMouseDown={(e) => handleMouseDown(e, 'move')}
       />
       {renderHandle('tl')}
       {renderHandle('tr')}

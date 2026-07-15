@@ -63,6 +63,30 @@
   cursor: nwse-resize;
 }
 
+.rich-text-move-handle {
+  position: absolute;
+  top: -10px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 24px;
+  height: 6px;
+  background: var(--pp-accent, #0066cc);
+  border: 1px solid var(--pp-surface, #fff);
+  border-radius: 3px;
+  z-index: 12;
+  cursor: grab;
+}
+
+.rich-text-edit-overlay.moving .rich-text-move-handle,
+.rich-text-move-handle:active {
+  cursor: grabbing;
+}
+
+.rich-text-move-handle:focus-visible {
+  outline: 2px solid var(--pp-focus-ring, var(--pp-accent, #0066cc));
+  outline-offset: 2px;
+}
+
 .rich-text-resize-handle-tl:focus-visible,
 .rich-text-resize-handle-tr:focus-visible,
 .rich-text-resize-handle-bl:focus-visible,
