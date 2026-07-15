@@ -22,8 +22,9 @@ fn add_text_box(
     style: TextStyle,
     box_rect: PdfRect,
 ) -> Result<(), String> {
-    let _ = (path, page_index, text, style, box_rect);
-    Ok(())
+    crate::pdf::io::mutate_pdf(&PathBuf::from(path), |doc| {
+        crate::pdf::edit_object::add_text_box(doc, page_index, &text, &style, &box_rect)
+    })
 }
 
 #[tauri::command]

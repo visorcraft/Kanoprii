@@ -1,7 +1,7 @@
 use super::*;
 use lopdf::{Dictionary, Document, Stream};
 use pdf::coords::pdf_rect_to_viewer_px;
-use pdf::edit_object::edit_text_line;
+use pdf::edit_object::{add_text_box, edit_text_line};
 use pdf::edit_types::{PdfRect, RgbColor, TextStyle};
 use pdf::markdown_heuristic::{
     apply_links_to_text, format_markdown_lines, is_symbol_glyph_candidate, map_symbol_glyph, merge_wrapped_line_pair,
@@ -19619,6 +19619,183 @@ fn edit_text_line_styled_replaces_text_without_panic() {
 
     let content = String::from_utf8_lossy(&read_page_content(&doc, page_id).unwrap()).into_owned();
     assert!(content.contains("World"), "replacement text should appear in the content stream");
+
+    std::fs::remove_file(&path).ok();
+}
+
+#[test]
+fn add_text_box_wraps_text_and_appends_to_page() {
+    let path = save(&mut build_pdf(1), "add_text_box");
+    let mut doc = Document::load(&path).unwrap();
+    let style = TextStyle {
+        font_family: "Helvetica".to_string(),
+        font_size: 12.0,
+        bold: false,
+        italic: false,
+        underline: false,
+        color: RgbColor { r: 0.0, g: 0.0, b: 0.0 },
+        align: "left".to_string(),
+    };
+    let box_rect = PdfRect { x: 72.0, y: 72.0, width: 100.0, height: 200.0 };
+    add_text_box(&mut doc, 0, "Hello world wide text", &style, &box_rect).unwrap();
+
+    let page_id = *doc.get_pages().get(&1).unwrap();
+    let content = String::from_utf8_lossy(&read_page_content(&doc, page_id).unwrap()).into_owned();
+    assert!(content.contains("Hello world"), "first wrapped line should appear");
+    assert!(content.contains("wide text"), "second wrapped line should appear");
+
+    std::fs::remove_file(&path).ok();
+}
+
+fn text_box_style() -> TextStyle {
+    TextStyle {
+        font_family: "Helvetica".to_string(),
+        font_size: 12.0,
+        bold: false,
+        italic: false,
+        underline: false,
+        color: RgbColor { r: 0.1, g: 0.2, b: 0.3 },
+        align: "left".to_string(),
+    }
+}
+
+fn tm_x_values(content: &str) -> Vec<f64> {
+    content
+        .split("Tm")
+        .filter_map(|s| {
+            let tokens: Vec<&str> = s.split_whitespace().collect();
+            if tokens.len() >= 2 {
+                tokens[tokens.len() - 2].parse().ok()
+            } else {
+                None
+            }
+        })
+        .collect()
+}
+
+#[test]
+fn add_text_box_emits_color_operators() {
+    let path = save(&mut build_pdf(1), "add_text_box_color");
+    let mut doc = Document::load(&path).unwrap();
+    add_text_box(&mut doc, 0, "Hello", &text_box_style(), &PdfRect { x: 72.0, y: 72.0, width: 200.0, height: 100.0 })
+        .unwrap();
+
+    let page_id = *doc.get_pages().get(&1).unwrap();
+    let content = String::from_utf8_lossy(&read_page_content(&doc, page_id).unwrap()).into_owned();
+    assert!(content.contains("rg"), "fill color operator missing");
+    assert!(content.contains("RG"), "stroke color operator missing");
+
+    std::fs::remove_file(&path).ok();
+}
+
+#[test]
+fn add_text_box_bold_draws_twice() {
+    let path = save(&mut build_pdf(1), "add_text_box_bold");
+    let mut doc = Document::load(&path).unwrap();
+    let mut style = text_box_style();
+    style.bold = true;
+    add_text_box(&mut doc, 0, "Hello", &style, &PdfRect { x: 72.0, y: 72.0, width: 200.0, height: 100.0 }).unwrap();
+
+    let page_id = *doc.get_pages().get(&1).unwrap();
+    let content = String::from_utf8_lossy(&read_page_content(&doc, page_id).unwrap()).into_owned();
+    assert_eq!(content.matches("Tj").count(), 3, "bold should emit two new text show operators plus the original one");
+
+    std::fs::remove_file(&path).ok();
+}
+
+#[test]
+fn add_text_box_italic_uses_shear_matrix() {
+    let path = save(&mut build_pdf(1), "add_text_box_italic");
+    let mut doc = Document::load(&path).unwrap();
+    let mut style = text_box_style();
+    style.italic = true;
+    add_text_box(&mut doc, 0, "Hello", &style, &PdfRect { x: 72.0, y: 72.0, width: 200.0, height: 100.0 }).unwrap();
+
+    let page_id = *doc.get_pages().get(&1).unwrap();
+    let content = String::from_utf8_lossy(&read_page_content(&doc, page_id).unwrap()).into_owned();
+    assert!(content.contains("1 0 0.25 1"), "italic should use a shear matrix");
+
+    std::fs::remove_file(&path).ok();
+}
+
+#[test]
+fn add_text_box_underline_emits_stroke() {
+    let path = save(&mut build_pdf(1), "add_text_box_underline");
+    let mut doc = Document::load(&path).unwrap();
+    let mut style = text_box_style();
+    style.underline = true;
+    add_text_box(&mut doc, 0, "Hello", &style, &PdfRect { x: 72.0, y: 72.0, width: 200.0, height: 100.0 }).unwrap();
+
+    let page_id = *doc.get_pages().get(&1).unwrap();
+    let content = String::from_utf8_lossy(&read_page_content(&doc, page_id).unwrap()).into_owned();
+    assert!(content.contains(" m "), "underline should contain a moveto");
+    assert!(content.contains(" l "), "underline should contain a lineto");
+    assert!(content.contains(" S"), "underline should contain a stroke operator");
+
+    std::fs::remove_file(&path).ok();
+}
+
+#[test]
+fn add_text_box_alignment_offsets_differ() {
+    let path_left = save(&mut build_pdf(1), "add_text_box_align_left");
+    let path_center = save(&mut build_pdf(1), "add_text_box_align_center");
+    let path_right = save(&mut build_pdf(1), "add_text_box_align_right");
+
+    let box_rect = PdfRect { x: 72.0, y: 72.0, width: 200.0, height: 100.0 };
+
+    let left_x = {
+        let mut doc = Document::load(&path_left).unwrap();
+        add_text_box(&mut doc, 0, "Hello", &text_box_style(), &box_rect).unwrap();
+        let page_id = *doc.get_pages().get(&1).unwrap();
+        let content = String::from_utf8_lossy(&read_page_content(&doc, page_id).unwrap()).into_owned();
+        tm_x_values(&content)[0]
+    };
+    let center_x = {
+        let mut doc = Document::load(&path_center).unwrap();
+        let mut style = text_box_style();
+        style.align = "center".to_string();
+        add_text_box(&mut doc, 0, "Hello", &style, &box_rect).unwrap();
+        let page_id = *doc.get_pages().get(&1).unwrap();
+        let content = String::from_utf8_lossy(&read_page_content(&doc, page_id).unwrap()).into_owned();
+        tm_x_values(&content)[0]
+    };
+    let right_x = {
+        let mut doc = Document::load(&path_right).unwrap();
+        let mut style = text_box_style();
+        style.align = "right".to_string();
+        add_text_box(&mut doc, 0, "Hello", &style, &box_rect).unwrap();
+        let page_id = *doc.get_pages().get(&1).unwrap();
+        let content = String::from_utf8_lossy(&read_page_content(&doc, page_id).unwrap()).into_owned();
+        tm_x_values(&content)[0]
+    };
+
+    assert!(left_x < center_x, "center should shift text right: left={left_x} center={center_x}");
+    assert!(center_x < right_x, "right should shift text further right: center={center_x} right={right_x}");
+
+    std::fs::remove_file(&path_left).ok();
+    std::fs::remove_file(&path_center).ok();
+    std::fs::remove_file(&path_right).ok();
+}
+
+#[test]
+fn add_text_box_rejects_non_positive_box() {
+    let path = save(&mut build_pdf(1), "add_text_box_bad_box");
+    let mut doc = Document::load(&path).unwrap();
+    let mut box_rect = PdfRect { x: 72.0, y: 72.0, width: 200.0, height: 100.0 };
+    box_rect.width = 0.0;
+    let err = add_text_box(&mut doc, 0, "Hello", &text_box_style(), &box_rect).unwrap_err();
+    assert!(err.contains("positive width"), "got: {err}");
+
+    std::fs::remove_file(&path).ok();
+}
+
+#[test]
+fn add_text_box_rejects_box_too_short() {
+    let path = save(&mut build_pdf(1), "add_text_box_short");
+    let mut doc = Document::load(&path).unwrap();
+    let box_rect = PdfRect { x: 72.0, y: 72.0, width: 1000.0, height: 1.0 };
+    let err = add_text_box(&mut doc, 0, "Hello", &text_box_style(), &box_rect).unwrap_err();
+    assert!(err.contains("too short"), "got: {err}");
 
     std::fs::remove_file(&path).ok();
 }

@@ -1,5 +1,6 @@
 use crate::pdf::content::append_page_content;
-use crate::pdf::coords::{finite_f64, viewer_rect_to_pdf};
+use crate::pdf::coords::viewer_rect_to_pdf;
+use crate::pdf::edit_object::validate_style_inputs;
 use crate::pdf::edit_types::{PdfRect, TextStyle};
 use crate::pdf::fonts::{
     ensure_font_family, ensure_full_font, font_has_glyphs_for, measure_text_width, style_supports_text,
@@ -100,27 +101,6 @@ pub fn replace_text_line(path: &Path, page_index: u32, line_index: usize, new_te
         append_page_content(doc, page_id, text_ops.as_bytes())?;
         Ok(())
     })
-}
-
-fn validate_style_inputs(style: &TextStyle, box_rect: &PdfRect) -> Result<(), String> {
-    finite_f64(style.font_size, "font size")?;
-    finite_f64(box_rect.x, "box x")?;
-    finite_f64(box_rect.y, "box y")?;
-    finite_f64(box_rect.width, "box width")?;
-    finite_f64(box_rect.height, "box height")?;
-    if box_rect.width <= 0.0 || box_rect.height <= 0.0 {
-        return Err("Box rect must have positive width and height".into());
-    }
-    finite_f64(style.color.r, "color r")?;
-    finite_f64(style.color.g, "color g")?;
-    finite_f64(style.color.b, "color b")?;
-    if !(0.0..=1.0).contains(&style.color.r)
-        || !(0.0..=1.0).contains(&style.color.g)
-        || !(0.0..=1.0).contains(&style.color.b)
-    {
-        return Err("Color components must be in the range [0, 1]".into());
-    }
-    Ok(())
 }
 
 /// Replace a decoded text line with styled text (Phase 1 full editing).
