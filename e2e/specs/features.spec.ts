@@ -127,7 +127,12 @@ describe('v0.5 viewer features', () => {
     await openPdfViaPathModal(fixturePdf);
     await waitForPdfOpen();
     await $('[data-testid="menu-document"]').click();
+    // Wait for the Document dropdown to render, then the submenu trigger
+    // inside it, before hovering. WDIO's moveTo fires mouseover/mouseenter
+    // which the React onMouseEnter handler turns into the portal-rendered
+    // submenu.
     const submenu = await $('[data-testid="submenu-crop"]');
+    await submenu.waitForDisplayed({ timeout: 5_000 });
     await submenu.moveTo();
     // The submenu renders through a body portal; wait for the nested action
     // to appear before hovering it (otherwise moveTo runs before React
