@@ -204,12 +204,15 @@ mod tests {
     use super::*;
     use lopdf::{Dictionary, Object, Stream};
     use std::fs;
+    use std::sync::atomic::{AtomicU64, Ordering};
+
+    static TEST_DIR_COUNTER: AtomicU64 = AtomicU64::new(0);
 
     fn test_dir() -> PathBuf {
         std::env::temp_dir().join(format!(
             "kanoprii_render_test_{}_{}",
             std::process::id(),
-            std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_nanos()
+            TEST_DIR_COUNTER.fetch_add(1, Ordering::Relaxed)
         ))
     }
 
