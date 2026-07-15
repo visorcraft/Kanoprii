@@ -57,13 +57,6 @@ export type DocumentSessionData = {
   sourcePath: string;
   sourceKind: SourceKind;
   sourceText: string;
-  /**
-   * Path to the auto-materialized sibling PDF (next to a markdown/HTML source)
-   * used as the save target for "Save" while the source itself stays the
-   * identity in `sourcePath`/`originalPath`. Empty for plain PDF sessions.
-   * Tracked so it can be cleaned up on window close.
-   */
-  generatedPdfPath: string;
   isDirty: boolean;
   pageCount: number | null;
   currentPage: number;

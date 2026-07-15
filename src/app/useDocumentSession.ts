@@ -16,7 +16,6 @@ export function createEmptySessionData(id: string): DocumentSessionData {
     sourcePath: '',
     sourceKind: 'pdf',
     sourceText: '',
-    generatedPdfPath: '',
     isDirty: false,
     pageCount: null,
     currentPage: 0,

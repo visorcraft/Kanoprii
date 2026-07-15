@@ -431,7 +431,6 @@ export function useDocumentSessions() {
       sourcePath: activeSession?.sourcePath ?? empty.sourcePath,
       sourceKind: activeSession?.sourceKind ?? empty.sourceKind,
       sourceText: activeSession?.sourceText ?? empty.sourceText,
-      generatedPdfPath: activeSession?.generatedPdfPath ?? empty.generatedPdfPath,
       isDirty: activeSession?.isDirty ?? false,
       isDirtyRef,
       pageCount: activeSession?.pageCount ?? null,

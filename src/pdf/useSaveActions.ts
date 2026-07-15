@@ -5,12 +5,6 @@ import { useAnnouncer } from '../ui/useAnnouncer';
 type UseSaveActionsOptions = {
   filePath: string;
   originalPath: string;
-  /**
-   * Auto-materialized sibling PDF path (markdown/HTML -> PDF view). When set,
-   * "Save" writes here so the source document is not overwritten. Empty for
-   * plain PDF sessions, in which case `originalPath` is used.
-   */
-  generatedPdfPath: string;
   nativeDialogs: boolean;
   withLoading: <T>(fn: () => Promise<T>) => Promise<T | undefined>;
   markSaved: () => void;
@@ -25,20 +19,16 @@ type UseSaveActionsOptions = {
 
 export function useSaveActions(opts: UseSaveActionsOptions) {
   const { announce } = useAnnouncer();
-  // Save target: prefer the auto-generated sibling PDF (so "Save" on a
-  // markdown-derived PDF view writes the .pdf sibling, not the .md source);
-  // fall back to the plain-PDF original path.
-  const saveTarget = opts.generatedPdfPath || opts.originalPath;
 
   const handleSave = useCallback(async () => {
-    if (!opts.filePath || !saveTarget) return;
+    if (!opts.filePath || !opts.originalPath) return;
     await opts.withLoading(async () => {
-      await invoke('save_working_copy', { working: opts.filePath, target: saveTarget });
+      await invoke('save_working_copy', { working: opts.filePath, target: opts.originalPath });
       opts.markSaved();
       opts.showToast('Saved');
       announce('Saved');
     });
-  }, [opts, saveTarget, announce]);
+  }, [opts, announce]);
 
   const handleSaveAs = useCallback(async () => {
     const target = opts.saveAsPath.trim();
@@ -70,9 +60,9 @@ export function useSaveActions(opts: UseSaveActionsOptions) {
       void saveAsViaNativeDialog();
       return;
     }
-    opts.setSaveAsPath(saveTarget);
+    opts.setSaveAsPath(opts.originalPath);
     opts.setShowSaveAsModal(true);
-  }, [opts, saveAsViaNativeDialog, saveTarget]);
+  }, [opts, saveAsViaNativeDialog]);
 
   return { handleSave, handleSaveAs, openSaveAs };
 }
