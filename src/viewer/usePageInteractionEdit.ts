@@ -128,7 +128,7 @@ export function usePageInteractionEdit(deps: UsePageInteractionEditOptions) {
     ) => {
       if (!session?.filePath) return;
 
-      if (pdfEdit.mode === 'text') {
+      if (pdfEdit.mode === 'text' || pdfEdit.mode === 'idle') {
         const lines = await loadPageTextLines(session, pageIndex);
         let hitLine: TextLine | null = null;
         for (let i = lines.length - 1; i >= 0; i -= 1) {
@@ -152,13 +152,34 @@ export function usePageInteractionEdit(deps: UsePageInteractionEditOptions) {
             style: pdfEdit.style,
             lineIndex: hitLine.lineIndex,
           });
-        } else {
+        } else if (pdfEdit.mode === 'text') {
           pdfEdit.startInsertingText(pageIndex, point, {
             x: point.x - 50,
             y: point.y - 10,
             w: 100,
             h: 20,
           });
+        } else {
+          // In idle mode, decide text vs. image by hit-testing.
+          const image = await hitTestImageFn?.(pageIndex, point.x, point.y);
+          if (image) {
+            pdfEdit.startEditingImage({
+              pageIndex,
+              point,
+              path: session.filePath,
+              index: image.index,
+              width: image.width,
+              height: image.height,
+              pageRect: image.viewerRect,
+            });
+          } else {
+            pdfEdit.startInsertingText(pageIndex, point, {
+              x: point.x - 50,
+              y: point.y - 10,
+              w: 100,
+              h: 20,
+            });
+          }
         }
       } else if (pdfEdit.mode === 'image') {
         const image = await hitTestImageFn?.(pageIndex, point.x, point.y);

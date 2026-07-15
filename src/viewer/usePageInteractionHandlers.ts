@@ -266,7 +266,7 @@ export function usePageInteractionHandlers(opts: PageInteractionHandlerOptions) 
   const handlePageClick = useCallback((e: React.MouseEvent) => {
     if (opts.drawMode) return;
 
-    if (opts.pdfEdit.mode !== 'idle') {
+    if (opts.pdfEdit.editMode) {
       if (!opts.session) return;
       e.preventDefault();
       const coords = getImageCoords(e.clientX, e.clientY);
