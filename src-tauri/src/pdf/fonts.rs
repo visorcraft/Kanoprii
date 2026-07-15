@@ -1,5 +1,6 @@
 use std::collections::BTreeMap;
 
+use crate::pdf::edit_types::TextStyle;
 use lopdf::{Dictionary, Document, Object, ObjectId, Stream};
 
 static EMBEDDED_FONT_BYTES: &[u8] = include_bytes!("../../vendor/fonts/LiberationSans-Regular.ttf");
@@ -17,6 +18,74 @@ pub fn font_has_glyphs_for(text: &str) -> bool {
         }
     }
     true
+}
+
+/// Map a text style to a PDF font resource name and ensure that font is
+/// registered on `page_id`. Phase 1 only has the regular faces bundled, so
+/// bold/italic requests still fall back to the regular face; the synthetic
+/// bold/italic styling is applied via the text matrix in the caller.
+// #[allow(dead_code)] is temporary: these helpers are consumed by edit_object.rs
+// in the upcoming `edit_text_line` / `add_text_box` implementation tasks.
+#[allow(dead_code)]
+pub fn ensure_font_family(doc: &mut Document, style: &TextStyle, page_id: ObjectId) -> Result<String, String> {
+    let base_name = match style.font_family.as_str() {
+        "Helvetica" => "Helv",
+        "LiberationSans" => "PPFullFont",
+        "Courier" => "Cour",
+        other => return Err(format!("unsupported font family: {}", other)),
+    };
+
+    // TODO(Phase 1 synthetic fallback): bold/italic suffixes are computed here
+    // for future use, but for now we always register and return the regular face.
+    let _variant_suffix = if style.bold && style.italic {
+        "BI"
+    } else if style.bold {
+        "B"
+    } else if style.italic {
+        "I"
+    } else {
+        ""
+    };
+
+    match base_name {
+        "Helv" => crate::pdf::page_text::ensure_helvetica_font(doc, page_id)?,
+        "PPFullFont" => ensure_full_font(doc, page_id)?,
+        "Cour" => ensure_courier_font(doc, page_id)?,
+        _ => unreachable!(),
+    };
+
+    Ok(base_name.to_string())
+}
+
+/// Validate that `text` can be rendered with the requested style. For Phase 1
+/// only the bundled LiberationSans font can be checked for glyph coverage.
+#[allow(dead_code)]
+pub fn style_supports_text(style: &TextStyle, text: &str) -> Result<(), String> {
+    if style.font_family == "LiberationSans" && !font_has_glyphs_for(text) {
+        return Err("text contains characters not supported by LiberationSans".into());
+    }
+    Ok(())
+}
+
+/// Ensure the page has a standard Type1 Courier font resource.
+#[allow(dead_code)]
+fn ensure_courier_font(doc: &mut Document, page_id: ObjectId) -> Result<String, String> {
+    let mut resources = page_resources_for_edit(doc, page_id);
+    let mut fonts =
+        resources.get(b"Font").ok().and_then(|obj| dictionary_object_to_owned(doc, obj)).unwrap_or_default();
+    if fonts.get(b"Cour").is_err() {
+        fonts.set(
+            b"Cour",
+            Object::Dictionary(Dictionary::from_iter(vec![
+                (b"Type".to_vec(), Object::Name(b"Font".to_vec())),
+                (b"Subtype".to_vec(), Object::Name(b"Type1".to_vec())),
+                (b"BaseFont".to_vec(), Object::Name(b"Courier".to_vec())),
+            ])),
+        );
+    }
+    resources.set(b"Font", Object::Dictionary(fonts));
+    doc.get_dictionary_mut(page_id).map_err(|e| e.to_string())?.set(b"Resources", Object::Dictionary(resources));
+    Ok("Cour".to_string())
 }
 
 /// Ensure the page (and document) has the embedded full font available.
@@ -281,5 +350,100 @@ mod tests {
         let resources = page.get(b"Resources").unwrap().as_dict().unwrap();
         assert!(resources.get(b"XObject").unwrap().as_dict().unwrap().get(b"ImParent").is_ok());
         assert!(resources.get(b"Font").unwrap().as_dict().unwrap().get(b"PPFullFont").is_ok());
+    }
+
+    fn style(family: &str) -> TextStyle {
+        TextStyle {
+            font_family: family.to_string(),
+            font_size: 12.0,
+            bold: false,
+            italic: false,
+            underline: false,
+            color: crate::pdf::edit_types::RgbColor { r: 0.0, g: 0.0, b: 0.0 },
+            align: "left".to_string(),
+        }
+    }
+
+    #[test]
+    fn ensure_font_family_registers_helvetica() {
+        let (mut doc, page_id) = build_doc_with_inherited_resources();
+        let name = ensure_font_family(&mut doc, &style("Helvetica"), page_id).unwrap();
+        assert_eq!(name, "Helv");
+        let page = doc.get_dictionary(page_id).unwrap();
+        let fonts = page.get(b"Resources").unwrap().as_dict().unwrap().get(b"Font").unwrap().as_dict().unwrap();
+        assert!(fonts.get(b"Helv").is_ok());
+    }
+
+    #[test]
+    fn ensure_font_family_registers_liberation_sans() {
+        let (mut doc, page_id) = build_doc_with_inherited_resources();
+        let name = ensure_font_family(&mut doc, &style("LiberationSans"), page_id).unwrap();
+        assert_eq!(name, "PPFullFont");
+        let page = doc.get_dictionary(page_id).unwrap();
+        let fonts = page.get(b"Resources").unwrap().as_dict().unwrap().get(b"Font").unwrap().as_dict().unwrap();
+        assert!(fonts.get(b"PPFullFont").is_ok());
+    }
+
+    #[test]
+    fn ensure_font_family_registers_courier() {
+        let (mut doc, page_id) = build_doc_with_inherited_resources();
+        let name = ensure_font_family(&mut doc, &style("Courier"), page_id).unwrap();
+        assert_eq!(name, "Cour");
+        let page = doc.get_dictionary(page_id).unwrap();
+        let fonts = page.get(b"Resources").unwrap().as_dict().unwrap().get(b"Font").unwrap().as_dict().unwrap();
+        assert!(fonts.get(b"Cour").is_ok());
+    }
+
+    #[test]
+    fn ensure_courier_font_preserves_inherited_resources() {
+        let (mut doc, page_id) = build_doc_with_inherited_resources();
+        let name = ensure_courier_font(&mut doc, page_id).unwrap();
+        assert_eq!(name, "Cour");
+        let page = doc.get_dictionary(page_id).unwrap();
+        let resources = page.get(b"Resources").unwrap().as_dict().unwrap();
+        assert!(resources.get(b"XObject").unwrap().as_dict().unwrap().get(b"ImParent").is_ok());
+        assert!(resources.get(b"Font").unwrap().as_dict().unwrap().get(b"Cour").is_ok());
+    }
+
+    #[test]
+    fn ensure_font_family_rejects_unsupported_family() {
+        let (mut doc, page_id) = build_doc_with_inherited_resources();
+        let mut s = style("Helvetica");
+        s.font_family = "ComicSans".to_string();
+        let err = ensure_font_family(&mut doc, &s, page_id).unwrap_err();
+        assert!(err.contains("unsupported font family"));
+    }
+
+    #[test]
+    fn ensure_font_family_bold_italic_falls_back_to_base_face() {
+        let (mut doc, page_id) = build_doc_with_inherited_resources();
+        let mut s = style("Helvetica");
+        s.bold = true;
+        s.italic = true;
+        let name = ensure_font_family(&mut doc, &s, page_id).unwrap();
+        // Phase 1 returns the regular face name; synthetic bold/italic is applied
+        // by the caller through the text rendering matrix.
+        assert_eq!(name, "Helv");
+    }
+
+    #[test]
+    fn style_supports_text_accepts_ascii() {
+        let s = style("LiberationSans");
+        style_supports_text(&s, "Hello, world!").unwrap();
+    }
+
+    #[test]
+    fn style_supports_text_rejects_missing_glyph_for_liberation() {
+        let s = style("LiberationSans");
+        let err = style_supports_text(&s, "Hello 😀").unwrap_err();
+        assert!(err.contains("not supported by LiberationSans"));
+    }
+
+    #[test]
+    fn style_supports_text_skips_coverage_check_for_helvetica() {
+        let s = style("Helvetica");
+        // Emoji would fail LiberationSans coverage, but Helvetica uses a standard
+        // Type1 font and is not validated against the bundled TTF.
+        style_supports_text(&s, "Hello 😀").unwrap();
     }
 }
