@@ -20,6 +20,17 @@ async function enterPdfEditMode() {
   await clickMenuAction('annotate', 'pdf-edit');
 }
 
+async function getCenterOfTextSpan(text: string): Promise<{ cx: number; cy: number }> {
+  return browser.execute((t) => {
+    const span = Array.from(document.querySelectorAll('.text-layer span')).find((el) =>
+      el.textContent?.includes(t),
+    ) as HTMLElement | null;
+    if (!span) throw new Error(`missing text layer span containing "${t}"`);
+    const rect = span.getBoundingClientRect();
+    return { cx: Math.round(rect.left + rect.width / 2), cy: Math.round(rect.top + rect.height / 2) };
+  }, text);
+}
+
 describe('PDF Edit Mode', () => {
   before(async () => {
     await waitForShell();
@@ -38,14 +49,7 @@ describe('PDF Edit Mode', () => {
     const editBtn = await $('[aria-label="Edit mode"]');
     await editBtn.waitForDisplayed({ timeout: 10_000 });
 
-    const { cx, cy } = await browser.execute(() => {
-      const span = Array.from(document.querySelectorAll('.text-layer span')).find((el) =>
-        el.textContent?.includes('Hello'),
-      ) as HTMLElement | null;
-      if (!span) throw new Error('missing text layer span containing "Hello"');
-      const rect = span.getBoundingClientRect();
-      return { cx: Math.round(rect.left + rect.width / 2), cy: Math.round(rect.top + rect.height / 2) };
-    });
+    const { cx, cy } = await getCenterOfTextSpan('Hello');
 
     await browser
       .action('pointer')
@@ -59,6 +63,13 @@ describe('PDF Edit Mode', () => {
 
     const handle = await $('.rich-text-resize-handle-br');
     await handle.waitForDisplayed({ timeout: 10_000 });
+
+    const before = await browser.execute(() => {
+      const el = document.querySelector('.rich-text-edit-overlay') as HTMLElement | null;
+      if (!el) throw new Error('missing overlay');
+      const rect = el.getBoundingClientRect();
+      return { width: rect.width, height: rect.height };
+    });
 
     const { hx, hy } = await browser.execute(() => {
       const el = document.querySelector('.rich-text-resize-handle-br') as HTMLElement | null;
@@ -74,6 +85,16 @@ describe('PDF Edit Mode', () => {
       .move({ x: hx + 60, y: hy + 40 })
       .up({ button: 0 })
       .perform();
+
+    const after = await browser.execute(() => {
+      const el = document.querySelector('.rich-text-edit-overlay') as HTMLElement | null;
+      if (!el) throw new Error('missing overlay');
+      const rect = el.getBoundingClientRect();
+      return { width: rect.width, height: rect.height };
+    });
+
+    expect(after.width).toBeGreaterThan(before.width);
+    expect(after.height).toBeGreaterThan(before.height);
 
     const applyBtn = await $('.edit-toolbar-apply');
     await applyBtn.click();
@@ -94,14 +115,7 @@ describe('PDF Edit Mode', () => {
     await editBtn.waitForDisplayed({ timeout: 10_000 });
     await expect(editBtn).toHaveAttribute('aria-pressed', 'true');
 
-    const { cx, cy } = await browser.execute(() => {
-      const span = Array.from(document.querySelectorAll('.text-layer span')).find((el) =>
-        el.textContent?.includes('Hello'),
-      ) as HTMLElement | null;
-      if (!span) throw new Error('missing text layer span containing "Hello"');
-      const rect = span.getBoundingClientRect();
-      return { cx: Math.round(rect.left + rect.width / 2), cy: Math.round(rect.top + rect.height / 2) };
-    });
+    const { cx, cy } = await getCenterOfTextSpan('Hello');
 
     await browser
       .action('pointer')
@@ -132,14 +146,7 @@ describe('PDF Edit Mode', () => {
     const editBtn = await $('[aria-label="Edit mode"]');
     await editBtn.waitForDisplayed({ timeout: 10_000 });
 
-    const { cx, cy } = await browser.execute(() => {
-      const span = Array.from(document.querySelectorAll('.text-layer span')).find((el) =>
-        el.textContent?.includes('First line'),
-      ) as HTMLElement | null;
-      if (!span) throw new Error('missing text layer span containing "First line"');
-      const rect = span.getBoundingClientRect();
-      return { cx: Math.round(rect.left + rect.width / 2), cy: Math.round(rect.top + rect.height / 2) };
-    });
+    const { cx, cy } = await getCenterOfTextSpan('First line');
 
     await browser
       .action('pointer')

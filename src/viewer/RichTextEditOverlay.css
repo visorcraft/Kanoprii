@@ -62,3 +62,11 @@
   right: -6px;
   cursor: nwse-resize;
 }
+
+.rich-text-resize-handle-tl:focus-visible,
+.rich-text-resize-handle-tr:focus-visible,
+.rich-text-resize-handle-bl:focus-visible,
+.rich-text-resize-handle-br:focus-visible {
+  outline: 2px solid var(--pp-focus-ring, var(--pp-accent, #0066cc));
+  outline-offset: 2px;
+}

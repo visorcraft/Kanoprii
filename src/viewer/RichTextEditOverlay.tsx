@@ -21,14 +21,50 @@ function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
 }
 
-function clampRect(rect: Rect): Rect {
-  const x = clamp(rect.x, 0, VIEWER_PAGE_W - MIN_W);
-  const y = clamp(rect.y, 0, VIEWER_PAGE_H - MIN_H);
-  const maxW = VIEWER_PAGE_W - x;
-  const maxH = VIEWER_PAGE_H - y;
-  const w = clamp(rect.w, MIN_W, maxW);
-  const h = clamp(rect.h, MIN_H, maxH);
-  return { x, y, w, h };
+function getFixedCorner(rect: Rect, kind: HandleKind): { x: number; y: number } {
+  switch (kind) {
+    case 'br':
+      return { x: rect.x, y: rect.y };
+    case 'tr':
+      return { x: rect.x, y: rect.y + rect.h };
+    case 'bl':
+      return { x: rect.x + rect.w, y: rect.y };
+    case 'tl':
+      return { x: rect.x + rect.w, y: rect.y + rect.h };
+  }
+}
+
+function clampResize(rect: Rect, fixed: { x: number; y: number }, kind: HandleKind): Rect {
+  switch (kind) {
+    case 'br': {
+      const x = fixed.x;
+      const y = fixed.y;
+      const w = clamp(rect.w, MIN_W, VIEWER_PAGE_W - x);
+      const h = clamp(rect.h, MIN_H, VIEWER_PAGE_H - y);
+      return { x, y, w, h };
+    }
+    case 'tr': {
+      const x = fixed.x;
+      const y = clamp(rect.y, 0, fixed.y - MIN_H);
+      const w = clamp(rect.w, MIN_W, VIEWER_PAGE_W - x);
+      const h = fixed.y - y;
+      return { x, y, w, h };
+    }
+    case 'bl': {
+      const x = clamp(rect.x, 0, fixed.x - MIN_W);
+      const y = fixed.y;
+      const w = fixed.x - x;
+      const h = clamp(rect.h, MIN_H, VIEWER_PAGE_H - y);
+      return { x, y, w, h };
+    }
+    case 'tl': {
+      const x = clamp(rect.x, 0, fixed.x - MIN_W);
+      const y = clamp(rect.y, 0, fixed.y - MIN_H);
+      const w = fixed.x - x;
+      const h = fixed.y - y;
+      return { x, y, w, h };
+    }
+  }
 }
 
 export function RichTextEditOverlay({
@@ -67,6 +103,71 @@ export function RichTextEditOverlay({
     dragStartRectRef.current = rectRef.current;
   }, []);
 
+  const handleHandleKeyDown = useCallback(
+    (e: React.KeyboardEvent, kind: HandleKind) => {
+      if (!['ArrowRight', 'ArrowLeft', 'ArrowUp', 'ArrowDown'].includes(e.key)) return;
+      e.preventDefault();
+      e.stopPropagation();
+      const current = rectRef.current;
+      const next: Rect = { ...current };
+      switch (kind) {
+        case 'br':
+          if (e.key === 'ArrowRight') next.w += 5;
+          if (e.key === 'ArrowLeft') next.w -= 5;
+          if (e.key === 'ArrowDown') next.h += 5;
+          if (e.key === 'ArrowUp') next.h -= 5;
+          break;
+        case 'tr':
+          if (e.key === 'ArrowRight') next.w += 5;
+          if (e.key === 'ArrowLeft') next.w -= 5;
+          if (e.key === 'ArrowDown') {
+            next.y += 5;
+            next.h -= 5;
+          }
+          if (e.key === 'ArrowUp') {
+            next.y -= 5;
+            next.h += 5;
+          }
+          break;
+        case 'bl':
+          if (e.key === 'ArrowRight') {
+            next.x += 5;
+            next.w -= 5;
+          }
+          if (e.key === 'ArrowLeft') {
+            next.x -= 5;
+            next.w += 5;
+          }
+          if (e.key === 'ArrowDown') next.h += 5;
+          if (e.key === 'ArrowUp') next.h -= 5;
+          break;
+        case 'tl':
+          if (e.key === 'ArrowRight') {
+            next.x += 5;
+            next.w -= 5;
+          }
+          if (e.key === 'ArrowLeft') {
+            next.x -= 5;
+            next.w += 5;
+          }
+          if (e.key === 'ArrowDown') {
+            next.y += 5;
+            next.h -= 5;
+          }
+          if (e.key === 'ArrowUp') {
+            next.y -= 5;
+            next.h += 5;
+          }
+          break;
+      }
+      const fixed = getFixedCorner(current, kind);
+      const clamped = clampResize(next, fixed, kind);
+      updateRect(clamped);
+      onUpdate({ pageRect: clamped });
+    },
+    [onUpdate, updateRect],
+  );
+
   useEffect(() => {
     if (!dragging) return;
 
@@ -95,7 +196,8 @@ export function RichTextEditOverlay({
         default:
           return;
       }
-      updateRect(clampRect(next));
+      const fixed = getFixedCorner(startRect, dragging);
+      updateRect(clampResize(next, fixed, dragging));
     };
 
     const onMouseUp = () => {
@@ -114,6 +216,25 @@ export function RichTextEditOverlay({
   }, [dragging, onUpdate, updateRect, zoom]);
 
   const { style } = draft;
+
+  const handleLabels: Record<HandleKind, string> = {
+    tl: 'Resize text box top-left',
+    tr: 'Resize text box top-right',
+    bl: 'Resize text box bottom-left',
+    br: 'Resize text box bottom-right',
+  };
+
+  const renderHandle = (kind: HandleKind) => (
+    <div
+      key={kind}
+      className={`rich-text-resize-handle-${kind}`}
+      role="button"
+      tabIndex={0}
+      aria-label={handleLabels[kind]}
+      onMouseDown={(e) => handleMouseDown(e, kind)}
+      onKeyDown={(e) => handleHandleKeyDown(e, kind)}
+    />
+  );
 
   return (
     <div
@@ -159,26 +280,10 @@ export function RichTextEditOverlay({
           textAlign: style.align,
         }}
       />
-      <div
-        className="rich-text-resize-handle-tl"
-        onMouseDown={(e) => handleMouseDown(e, 'tl')}
-        aria-label="Resize text box top-left"
-      />
-      <div
-        className="rich-text-resize-handle-tr"
-        onMouseDown={(e) => handleMouseDown(e, 'tr')}
-        aria-label="Resize text box top-right"
-      />
-      <div
-        className="rich-text-resize-handle-bl"
-        onMouseDown={(e) => handleMouseDown(e, 'bl')}
-        aria-label="Resize text box bottom-left"
-      />
-      <div
-        className="rich-text-resize-handle-br"
-        onMouseDown={(e) => handleMouseDown(e, 'br')}
-        aria-label="Resize text box bottom-right"
-      />
+      {renderHandle('tl')}
+      {renderHandle('tr')}
+      {renderHandle('bl')}
+      {renderHandle('br')}
     </div>
   );
 }
