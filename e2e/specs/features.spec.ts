@@ -127,8 +127,14 @@ describe('v0.5 viewer features', () => {
     await openPdfViaPathModal(fixturePdf);
     await waitForPdfOpen();
     await $('[data-testid="menu-document"]').click();
-    await $('[data-testid="submenu-crop"]').moveTo();
-    await $('[data-testid="crop"]').moveTo();
+    const submenu = await $('[data-testid="submenu-crop"]');
+    await submenu.moveTo();
+    // The submenu renders through a body portal; wait for the nested action
+    // to appear before hovering it (otherwise moveTo runs before React
+    // commits the open state).
+    const cropAction = await $('[data-testid="crop"]');
+    await cropAction.waitForDisplayed({ timeout: 5_000 });
+    await cropAction.moveTo();
     await browser.waitUntil(
       async () => browser.execute(() => {
         const root = document.querySelector<HTMLElement>('.menu-bar-entry > .menu-dropdown');
@@ -175,10 +181,20 @@ describe('v0.5 viewer features', () => {
       await browser.waitUntil(
         async () => browser.execute(() => {
           const iframe = document.querySelector<HTMLIFrameElement>('[data-testid="webpage-view"]');
-          const heading = iframe?.contentDocument?.querySelector('h1');
-          return heading ? getComputedStyle(heading).color === 'rgb(12, 34, 56)' : false;
+          const doc = iframe?.contentDocument;
+          if (!doc) return false;
+          const heading = doc.querySelector('h1');
+          if (!heading) return false;
+          // Some WebKitGTK versions serialize the resolved colour as
+          // rgba(12, 34, 56, 1) instead of rgb(12, 34, 56). Compare the parsed
+          // channel values rather than the exact string.
+          const m = getComputedStyle(heading).color.match(/\d+/g);
+          return !!m && m[0] === '12' && m[1] === '34' && m[2] === '56';
         }),
-        { timeout: 10_000, timeoutMsg: 'expected sibling HTML stylesheet' },
+        {
+          timeout: 15_000,
+          timeoutMsg: 'expected sibling HTML stylesheet to apply the h1 colour',
+        },
       );
       await clickMenuAction('view', 'view-pdf');
       await waitForPdfOpen();
