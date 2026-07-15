@@ -17397,6 +17397,9 @@ fn text_documents_load_and_generate_pdf_pages() {
     let markdown = dir.join("notes.md");
     fs::write(&markdown, "# Notes\n").unwrap();
     assert_eq!(read_text_document(markdown.to_string_lossy().into_owned()).unwrap(), "# Notes\n");
+    let css = dir.join("styles.css");
+    fs::write(&css, "h1 { color: red; }\n").unwrap();
+    assert_eq!(read_text_document(css.to_string_lossy().into_owned()).unwrap(), "h1 { color: red; }\n");
 
     let mut png = Vec::new();
     image::DynamicImage::new_rgb8(8, 8).write_to(&mut std::io::Cursor::new(&mut png), image::ImageFormat::Png).unwrap();

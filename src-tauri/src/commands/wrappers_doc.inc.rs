@@ -260,9 +260,9 @@ fn read_text_document(path: String) -> Result<String, String> {
     let supported = path
         .extension()
         .and_then(|ext| ext.to_str())
-        .is_some_and(|ext| matches!(ext.to_ascii_lowercase().as_str(), "md" | "markdown" | "html" | "htm"));
+        .is_some_and(|ext| matches!(ext.to_ascii_lowercase().as_str(), "md" | "markdown" | "html" | "htm" | "css"));
     if !supported {
-        return Err("Only Markdown and HTML documents are supported".to_string());
+        return Err("Only Markdown, HTML, and CSS documents are supported".to_string());
     }
     let metadata = fs::metadata(&path).map_err(|e| e.to_string())?;
     if metadata.len() > 16 * 1024 * 1024 {

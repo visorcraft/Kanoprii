@@ -187,12 +187,7 @@ describe('v0.5 viewer features', () => {
       await openDocumentViaPathModal(fixtureHtml);
       const frame = await $('[data-testid="webpage-view"]');
       await frame.waitForDisplayed({ timeout: 30_000 });
-      // Verify the iframe loaded the HTML and resolved the sibling stylesheet
-      // link. The actual colour-applied check is gated on the asset protocol
-      // serving the sibling CSS to the iframe's browsing context, which
-      // differs between dev and packaged builds; the structural check (h1
-      // present + the link reference is in the head) is enough to confirm
-      // the HTML import + base-href rewriting pipeline ran.
+      // Verify the sibling stylesheet loaded before exercising PDF conversion.
       await browser.waitUntil(
         async () => browser.execute(() => {
           const iframe = document.querySelector<HTMLIFrameElement>('[data-testid="webpage-view"]');
@@ -200,12 +195,12 @@ describe('v0.5 viewer features', () => {
           if (!doc) return false;
           const heading = doc.querySelector('h1');
           if (!heading) return false;
-          const link = doc.querySelector('link[rel="stylesheet"][href$="import-webpage.css"]');
-          return !!link;
+          const channels = getComputedStyle(heading).color.match(/\d+/g);
+          return channels?.slice(0, 3).join(',') === '12,34,56';
         }),
         {
           timeout: 15_000,
-          timeoutMsg: 'expected iframe to load the HTML with its sibling stylesheet reference',
+          timeoutMsg: 'expected sibling HTML stylesheet to apply the h1 colour',
         },
       );
       await clickMenuAction('view', 'view-pdf');

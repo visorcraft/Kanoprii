@@ -17,10 +17,32 @@ function baseUrl(path: string): string {
   return convertFileSrc(slash < 0 ? path : path.slice(0, slash + 1));
 }
 
+function resolveLocalAssetUrls(path: string, html: string): string {
+  const slash = Math.max(path.lastIndexOf('/'), path.lastIndexOf('\\'));
+  const dir = slash < 0 ? '' : path.slice(0, slash + 1);
+  return html.replace(/\b(href|src)=(['"])([^'"]+)\2/gi, (match, attr: string, quote: string, value: string) =>
+    /^(?:[a-z][a-z\d+.-]*:|#|\/)/i.test(value) ? match : `${attr}=${quote}${convertFileSrc(dir + value)}${quote}`,
+  );
+}
+
+async function inlineLocalStylesheets(path: string, html: string): Promise<string> {
+  const doc = new DOMParser().parseFromString(html, 'text/html');
+  const slash = Math.max(path.lastIndexOf('/'), path.lastIndexOf('\\'));
+  const dir = slash < 0 ? '' : path.slice(0, slash + 1);
+  await Promise.all([...doc.querySelectorAll<HTMLLinkElement>('link[rel~="stylesheet"][href]')].map(async (link) => {
+    const href = link.getAttribute('href') ?? '';
+    if (!href || /^(?:[a-z][a-z\d+.-]*:|#|\/)/i.test(href)) return;
+    const style = doc.createElement('style');
+    style.textContent = await invoke<string>('read_text_document', { path: dir + href });
+    link.replaceWith(style);
+  }));
+  return `<!doctype html>${doc.documentElement.outerHTML}`;
+}
+
 export function documentHtml(path: string, text: string, kind: Exclude<SourceKind, 'pdf'>): string {
   const body = kind === 'markdown'
     ? `<main class="kanoprii-markdown">${marked.parse(text) as string}</main>`
-    : text;
+    : resolveLocalAssetUrls(path, text);
   const base = `<base href="${baseUrl(path)}">`;
   const defaults = `<style>
     :root { color-scheme: light; background: white; }
@@ -99,8 +121,24 @@ async function waitForImages(doc: Document): Promise<void> {
 
 type RenderState = { pages: number[][]; totalRendered: number; totalPages: number };
 
+function cloneWithComputedStyles(source: HTMLElement): HTMLElement {
+  const clone = source.cloneNode(true) as HTMLElement;
+  const sources = [source, ...source.querySelectorAll<HTMLElement>('*')];
+  const targets = [clone, ...clone.querySelectorAll<HTMLElement>('*')];
+  sources.forEach((element, index) => {
+    const computed = element.ownerDocument.defaultView?.getComputedStyle(element);
+    if (!computed) return;
+    for (let i = 0; i < computed.length; i++) {
+      const property = computed.item(i);
+      targets[index].style.setProperty(property, computed.getPropertyValue(property), computed.getPropertyPriority(property));
+    }
+  });
+  return clone;
+}
+
 async function renderFrame(srcdoc: string, state: RenderState, opts: CreateWorkingPdfOptions): Promise<void> {
   const frame = document.createElement('iframe');
+  let host: HTMLDivElement | null = null;
   frame.sandbox.add('allow-same-origin');
   frame.style.cssText = 'position:fixed;left:-10000px;top:0;width:900px;height:1100px;border:0;background:white';
   document.body.appendChild(frame);
@@ -115,7 +153,11 @@ async function renderFrame(srcdoc: string, state: RenderState, opts: CreateWorki
     if (!doc) throw new Error('Could not access rendered document');
     await within(doc.fonts.ready, 'Font load');
     await waitForImages(doc);
-    const root = doc.documentElement;
+    host = document.createElement('div');
+    host.style.cssText = 'position:fixed;left:-10000px;top:0;width:900px;border:0;background:white';
+    const root = cloneWithComputedStyles(doc.body);
+    host.appendChild(root);
+    document.body.appendChild(host);
     const fullHeight = root.scrollHeight;
     if (fullHeight <= 0) throw new Error('Document produced no pages');
     const framePageCount = Math.ceil(fullHeight / PAGE_HEIGHT);
@@ -156,6 +198,7 @@ async function renderFrame(srcdoc: string, state: RenderState, opts: CreateWorki
       }
     }
   } finally {
+    host?.remove();
     frame.remove();
   }
 }
@@ -165,7 +208,8 @@ export async function createWorkingPdf(path: string, text: string, kind: Exclude
     return within(invoke<string>('create_pdf_from_markdown_text', { text }), 'PDF creation', 60_000);
   }
   const state: RenderState = { pages: [], totalRendered: 0, totalPages: 0 };
-  await renderFrame(documentHtml(path, text, kind), state, opts);
+  const source = kind === 'html' ? await inlineLocalStylesheets(path, text) : text;
+  await renderFrame(documentHtml(path, source, kind), state, opts);
   if (state.pages.length === 0) throw new Error('Document produced no pages');
   return within(invoke<string>('create_pdf_from_document_pages', { pages: state.pages }), 'PDF creation', 60_000);
 }
