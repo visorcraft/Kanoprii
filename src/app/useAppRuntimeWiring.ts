@@ -20,6 +20,7 @@ export function useAppRuntimeWiring(bootstrap: Bootstrap) {
     security,
     panels,
     annotation,
+    pdfEdit,
     drawingGesture,
     refs,
     pageRanges,
@@ -81,6 +82,7 @@ export function useAppRuntimeWiring(bootstrap: Bootstrap) {
     security,
     panels,
     annotation,
+    pdfEdit,
     drawing: drawingGesture,
     pageRanges,
     refs: {

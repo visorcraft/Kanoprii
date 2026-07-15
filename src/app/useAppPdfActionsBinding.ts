@@ -1,5 +1,6 @@
 import { useAppPdfActions, type UseAppPdfActionsInput } from './useAppPdfActions';
 import type { AnnotationState } from './useAnnotationDraftState';
+import type { PdfEditState } from './usePdfEditState';
 import type { DocumentState } from './useAppDocumentState';
 import type { ModalState } from './useAppModalState';
 import type { PageRangesState } from './useAppPageRanges';
@@ -56,6 +57,7 @@ export type UseAppPdfActionsBindingInput = {
   security: SecurityState;
   panels: PanelsState;
   annotation: AnnotationState;
+  pdfEdit: PdfEditState;
   drawing: DrawingGestureSlice;
   pageRanges: PageRangesState;
   refs: Pick<RefsState, 'cancelDrawingRef' | 'handleSaveRef' | 'handleMarkdownViewRef' | 'imgRef'>;
@@ -64,13 +66,14 @@ export type UseAppPdfActionsBindingInput = {
 };
 
 export function useAppPdfActionsBinding(input: UseAppPdfActionsBindingInput) {
-  const { modal: m, security: s, panels: p, annotation: a, doc: d, drawing: g, pageRanges: r, refs, help, runtime } = input;
+  const { modal: m, security: s, panels: p, annotation: a, pdfEdit, doc: d, drawing: g, pageRanges: r, refs, help, runtime } = input;
 
   return useAppPdfActions({
     ...modalPdfActionFields(m),
     ...securityPdfActionFields(s),
     ...panelsPdfActionFields(p),
     ...annotationPdfActionFields(a),
+    clearPdfEdit: pdfEdit.clearDraft,
     ...documentPdfActionFields(d),
     ...drawingPdfActionFields(g),
     ...pageRangesPdfActionFields(r),
