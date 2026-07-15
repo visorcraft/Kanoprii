@@ -1,5 +1,6 @@
 use crate::pdf::content::{append_page_content, embed_jpeg_xobject, next_image_xobject_name};
 use crate::pdf::coords::viewer_rect_to_pdf;
+use crate::pdf::edit_types::{PageImageInfo, PdfRect};
 use crate::pdf::merge_split::extract_pdf_pages;
 use crate::pdf::page_tree::{flatten_pages, get_pages_kids, set_pages_kids};
 use lopdf::{Dictionary, Document, Object, Stream};
@@ -194,4 +195,58 @@ pub fn add_page_image(
 
 pub fn export_page_as_pdf(path: &Path, page_index: u32, output_path: &Path) -> Result<String, String> {
     extract_pdf_pages(path, output_path, page_index, page_index)
+}
+
+/// List image XObjects referenced by a page's /Resources /XObject dictionary.
+///
+/// Phase 1: returns the intrinsic width/height and a placeholder bbox at the
+/// origin. Computing the actual drawn bbox from the content stream is future
+/// work.
+pub fn list_page_images(doc: &Document, page_index: u32) -> Result<Vec<PageImageInfo>, String> {
+    let page_id = doc.page_iter().nth(page_index as usize).ok_or_else(|| "page index out of range".to_string())?;
+    let resources = page_resources(doc, page_id)?;
+    let xobjects = resources.get(b"XObject").map_err(|_| "missing XObject resources".to_string())?;
+    let xobjects = xobjects.as_dict().map_err(|_| "XObject not dict".to_string())?;
+
+    let mut images = Vec::new();
+    for (_name, obj) in xobjects.iter() {
+        let id = obj.as_reference().map_err(|_| "xobject not reference".to_string())?;
+        let xobj =
+            doc.get_object(id).map_err(|e| e.to_string())?.as_stream().map_err(|_| "xobject not stream".to_string())?;
+        if xobj.dict.get(b"Subtype").ok().and_then(|s| s.as_name().ok()) != Some(b"Image".as_slice()) {
+            continue;
+        }
+        // Ignore duplicate names pointing at the same object.
+        if images.iter().any(|info: &PageImageInfo| info.object_id == (id.0, id.1)) {
+            continue;
+        }
+        let width = xobj.dict.get(b"Width").and_then(|w| w.as_i64()).unwrap_or(0) as u32;
+        let height = xobj.dict.get(b"Height").and_then(|h| h.as_i64()).unwrap_or(0) as u32;
+        images.push(PageImageInfo {
+            index: images.len(),
+            object_id: (id.0, id.1),
+            bbox: PdfRect { x: 0.0, y: 0.0, width: width as f64, height: height as f64 },
+            width,
+            height,
+        });
+    }
+
+    Ok(images)
+}
+
+/// Resolve a page's /Resources dictionary, following an indirect reference if
+/// necessary.
+pub fn page_resources(doc: &Document, page_id: lopdf::ObjectId) -> Result<lopdf::Dictionary, String> {
+    let dict = doc.get_dictionary(page_id).map_err(|e| e.to_string())?;
+    let resources = dict.get(b"Resources").map_err(|_| "missing resources".to_string())?;
+    match resources {
+        Object::Reference(id) => doc
+            .get_object(*id)
+            .map_err(|e| e.to_string())?
+            .as_dict()
+            .cloned()
+            .map_err(|_| "resources not dict".to_string()),
+        Object::Dictionary(d) => Ok(d.clone()),
+        _ => Err("resources not dict".to_string()),
+    }
 }

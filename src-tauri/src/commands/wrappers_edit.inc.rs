@@ -1,4 +1,4 @@
-use crate::pdf::edit_types::{PdfRect, TextStyle};
+use crate::pdf::edit_types::{PageImageInfo, PdfRect, TextStyle};
 
 #[tauri::command]
 fn edit_text_line(
@@ -28,9 +28,10 @@ fn add_text_box(
 }
 
 #[tauri::command]
-fn list_page_images(path: String, page_index: u32) -> Result<Vec<()>, String> {
-    let _ = (path, page_index);
-    Ok(vec![])
+fn list_page_images(path: String, page_index: u32) -> Result<Vec<PageImageInfo>, String> {
+    crate::pdf::io::with_pdf(&PathBuf::from(path), |doc| {
+        crate::pdf::page_images::list_page_images(doc, page_index)
+    })
 }
 
 #[tauri::command]
@@ -40,12 +41,14 @@ fn transform_page_image(
     image_index: usize,
     new_rect: PdfRect,
 ) -> Result<(), String> {
-    let _ = (path, page_index, image_index, new_rect);
-    Ok(())
+    crate::pdf::io::mutate_pdf(&PathBuf::from(path), |doc| {
+        crate::pdf::edit_object::transform_page_image(doc, page_index, image_index, &new_rect)
+    })
 }
 
 #[tauri::command]
 fn remove_page_image(path: String, page_index: u32, image_index: usize) -> Result<(), String> {
-    let _ = (path, page_index, image_index);
-    Ok(())
+    crate::pdf::io::mutate_pdf(&PathBuf::from(path), |doc| {
+        crate::pdf::edit_object::remove_page_image(doc, page_index, image_index)
+    })
 }

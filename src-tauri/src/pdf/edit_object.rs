@@ -2,9 +2,10 @@ use crate::pdf::content::append_page_content;
 use crate::pdf::coords::{finite_f64, viewer_rect_to_pdf};
 use crate::pdf::edit_types::{PdfRect, TextStyle};
 use crate::pdf::fonts::{ensure_font_family, measure_text_width, style_supports_text};
+use crate::pdf::page_images::page_resources;
 use crate::pdf::page_text::escape_pdf_literal_string;
 use crate::pdf::text_replace::replace_text_line_styled;
-use lopdf::Document;
+use lopdf::{Document, Object};
 
 /// Edit an existing text line in a PDF document.
 ///
@@ -155,4 +156,126 @@ pub fn add_text_box(
     ops.push_str("Q\n");
     append_page_content(doc, page_id, ops.as_bytes())?;
     Ok(())
+}
+
+/// Transform the page-space rectangle of an image drawn with a simple
+/// `q ... cm Do Q` pattern.
+///
+/// Phase 1 limitation: only images whose preceding operator is `cm` can be
+/// transformed. More complex nested or scaled patterns return an error.
+pub fn transform_page_image(
+    doc: &mut Document,
+    page_index: u32,
+    image_index: usize,
+    new_rect: &PdfRect,
+) -> Result<(), String> {
+    let page_id = doc.page_iter().nth(page_index as usize).ok_or_else(|| "page index out of range".to_string())?;
+    let contents = page_contents_id(doc, page_id)?;
+    let content_obj = doc.get_object(contents).map_err(|e| e.to_string())?;
+    let mut content = content_obj
+        .as_stream()
+        .map_err(|_| "content not stream".to_string())?
+        .decode_content()
+        .map_err(|e| e.to_string())?;
+
+    let images = crate::pdf::page_images::list_page_images(doc, page_index)?;
+    let target = images.get(image_index).ok_or_else(|| "image index out of range".to_string())?;
+    let target_name = find_xobject_name(doc, page_index, target.object_id)?;
+
+    let mut found = false;
+    for (i, op) in content.operations.iter().enumerate() {
+        if op.operator == "Do"
+            && op.operands.first().and_then(|o| o.as_name().ok()) == Some(target_name.as_bytes())
+            && i > 0
+            && content.operations[i - 1].operator == "cm"
+        {
+            content.operations[i - 1].operands = vec![
+                Object::Real(new_rect.width as f32),
+                Object::Real(0.0),
+                Object::Real(0.0),
+                Object::Real(new_rect.height as f32),
+                Object::Real(new_rect.x as f32),
+                Object::Real(new_rect.y as f32),
+            ];
+            found = true;
+            break;
+        }
+    }
+
+    if !found {
+        return Err("image transform not supported for this content pattern".to_string());
+    }
+
+    let encoded = content.encode().map_err(|e| e.to_string())?;
+    doc.set_object(contents, Object::Stream(lopdf::Stream::new(lopdf::Dictionary::new(), encoded)));
+    Ok(())
+}
+
+/// Remove an image drawn with a simple `q ... cm Do Q` pattern.
+///
+/// Phase 1: removes the `cm Do` pair and, when present, the surrounding
+/// `q ... Q` wrapper. Complex nested patterns return an error.
+pub fn remove_page_image(doc: &mut Document, page_index: u32, image_index: usize) -> Result<(), String> {
+    let page_id = doc.page_iter().nth(page_index as usize).ok_or_else(|| "page index out of range".to_string())?;
+    let contents = page_contents_id(doc, page_id)?;
+    let content_obj = doc.get_object(contents).map_err(|e| e.to_string())?;
+    let mut content = content_obj
+        .as_stream()
+        .map_err(|_| "content not stream".to_string())?
+        .decode_content()
+        .map_err(|e| e.to_string())?;
+
+    let images = crate::pdf::page_images::list_page_images(doc, page_index)?;
+    let target = images.get(image_index).ok_or_else(|| "image index out of range".to_string())?;
+    let target_name = find_xobject_name(doc, page_index, target.object_id)?;
+
+    let do_idx = content
+        .operations
+        .iter()
+        .position(|op| {
+            op.operator == "Do" && op.operands.first().and_then(|o| o.as_name().ok()) == Some(target_name.as_bytes())
+        })
+        .ok_or_else(|| "image Do operator not found".to_string())?;
+
+    // Determine the range to remove. Phase 1 supports q <cm> Do Q.
+    let mut start = do_idx;
+    let mut end = do_idx;
+    if do_idx > 0 && content.operations[do_idx - 1].operator == "cm" {
+        start = do_idx - 1;
+        if do_idx > 1 && content.operations[do_idx - 2].operator == "q" {
+            start = do_idx - 2;
+        }
+        if do_idx + 1 < content.operations.len() && content.operations[do_idx + 1].operator == "Q" {
+            end = do_idx + 1;
+        }
+    }
+
+    content.operations.drain(start..=end);
+
+    let encoded = content.encode().map_err(|e| e.to_string())?;
+    doc.set_object(contents, Object::Stream(lopdf::Stream::new(lopdf::Dictionary::new(), encoded)));
+    Ok(())
+}
+
+fn page_contents_id(doc: &Document, page_id: lopdf::ObjectId) -> Result<lopdf::ObjectId, String> {
+    let dict = doc.get_dictionary(page_id).map_err(|e| e.to_string())?;
+    let obj = dict.get(b"Contents").map_err(|_| "page has no content stream".to_string())?;
+    match obj {
+        Object::Reference(id) => Ok(*id),
+        Object::Array(_) => Err("page content array not supported for image editing".to_string()),
+        _ => Err("page has no content stream".to_string()),
+    }
+}
+
+fn find_xobject_name(doc: &Document, page_index: u32, object_id: (u32, u16)) -> Result<String, String> {
+    let page_id = doc.page_iter().nth(page_index as usize).ok_or_else(|| "page index out of range".to_string())?;
+    let resources = page_resources(doc, page_id)?;
+    let xobjects = resources.get(b"XObject").map_err(|_| "missing XObject resources".to_string())?;
+    let xobjects = xobjects.as_dict().map_err(|_| "XObject not dict".to_string())?;
+    for (name, obj) in xobjects.iter() {
+        if obj.as_reference().map(|id| id == object_id).unwrap_or(false) {
+            return String::from_utf8(name.clone()).map_err(|_| "invalid xobject name".to_string());
+        }
+    }
+    Err("image xobject name not found".to_string())
 }

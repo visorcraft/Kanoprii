@@ -19799,3 +19799,96 @@ fn add_text_box_rejects_box_too_short() {
 
     std::fs::remove_file(&path).ok();
 }
+
+/// Build a one-page PDF with a small inline RGB image XObject drawn by a simple
+/// `q cm Do Q` content stream.
+fn build_pdf_with_image() -> Document {
+    let mut doc = build_pdf(1);
+    let page_id = *doc.get_pages().get(&1).unwrap();
+
+    let mut image_dict = Dictionary::new();
+    image_dict.set("Type", Object::Name(b"XObject".to_vec()));
+    image_dict.set("Subtype", Object::Name(b"Image".to_vec()));
+    image_dict.set("Width", Object::Integer(2));
+    image_dict.set("Height", Object::Integer(2));
+    image_dict.set("ColorSpace", Object::Name(b"DeviceRGB".to_vec()));
+    image_dict.set("BitsPerComponent", Object::Integer(8));
+    let image_data = vec![255, 0, 0, 0, 255, 0, 0, 0, 255, 255, 255, 255];
+    let image_id = doc.add_object(Object::Stream(Stream::new(image_dict, image_data)));
+
+    let mut xobjects = Dictionary::new();
+    xobjects.set(b"Im1", Object::Reference(image_id));
+    let resources = Dictionary::from_iter(vec![(b"XObject".to_vec(), Object::Dictionary(xobjects))]);
+    doc.get_dictionary_mut(page_id).unwrap().set(b"Resources", Object::Dictionary(resources));
+
+    let content = b"q 100 0 0 100 50 50 cm /Im1 Do Q\n".to_vec();
+    let content_id = doc.add_object(Object::Stream(Stream::new(Dictionary::new(), content)));
+    doc.get_dictionary_mut(page_id).unwrap().set(b"Contents", Object::Reference(content_id));
+
+    doc
+}
+
+#[test]
+fn list_page_images_finds_inline_image_xobject() {
+    let path = save(&mut build_pdf_with_image(), "list_images");
+    let images = pdf::page_images::list_page_images(&Document::load(&path).unwrap(), 0).unwrap();
+    assert_eq!(images.len(), 1);
+    assert_eq!(images[0].index, 0);
+    assert_eq!(images[0].width, 2);
+    assert_eq!(images[0].height, 2);
+    assert_eq!(images[0].bbox.width, 2.0);
+    assert_eq!(images[0].bbox.height, 2.0);
+    std::fs::remove_file(&path).ok();
+}
+
+#[test]
+fn transform_page_image_rewrites_cm_matrix() {
+    let path = save(&mut build_pdf_with_image(), "transform_image");
+    let new_rect = PdfRect { x: 10.0, y: 20.0, width: 30.0, height: 40.0 };
+    let mut doc = Document::load(&path).unwrap();
+    pdf::edit_object::transform_page_image(&mut doc, 0, 0, &new_rect).unwrap();
+    doc.save(&path).unwrap();
+
+    let doc = Document::load(&path).unwrap();
+    let page_id = *doc.get_pages().get(&1).unwrap();
+    let bytes = read_page_content(&doc, page_id).unwrap();
+    let content = String::from_utf8_lossy(&bytes);
+    assert!(content.contains("30 0 0 40 10 20 cm"), "expected rewritten cm matrix, got {content}");
+    std::fs::remove_file(&path).ok();
+}
+
+#[test]
+fn remove_page_image_removes_do_operator() {
+    let path = save(&mut build_pdf_with_image(), "remove_image");
+    let mut doc = Document::load(&path).unwrap();
+    pdf::edit_object::remove_page_image(&mut doc, 0, 0).unwrap();
+    doc.save(&path).unwrap();
+
+    let doc = Document::load(&path).unwrap();
+    let page_id = *doc.get_pages().get(&1).unwrap();
+    let bytes = read_page_content(&doc, page_id).unwrap();
+    let content = String::from_utf8_lossy(&bytes);
+    assert!(!content.contains("/Im1 Do"), "image Do operator should be removed, got {content}");
+    std::fs::remove_file(&path).ok();
+}
+
+/// Build a one-page PDF whose image is invoked without a preceding `cm`, so
+/// transform/remove must reject the unsupported pattern.
+fn build_pdf_with_unsupported_image() -> Document {
+    let mut doc = build_pdf_with_image();
+    let page_id = *doc.get_pages().get(&1).unwrap();
+    let content = b"q /Im1 Do Q\n".to_vec();
+    let content_id = doc.add_object(Object::Stream(Stream::new(Dictionary::new(), content)));
+    doc.get_dictionary_mut(page_id).unwrap().set(b"Contents", Object::Reference(content_id));
+    doc
+}
+
+#[test]
+fn transform_page_image_rejects_unsupported_pattern() {
+    let path = save(&mut build_pdf_with_unsupported_image(), "transform_unsupported");
+    let new_rect = PdfRect { x: 10.0, y: 20.0, width: 30.0, height: 40.0 };
+    let mut doc = Document::load(&path).unwrap();
+    let err = pdf::edit_object::transform_page_image(&mut doc, 0, 0, &new_rect).unwrap_err();
+    assert!(err.contains("not supported"), "expected unsupported pattern error, got {err}");
+    std::fs::remove_file(&path).ok();
+}

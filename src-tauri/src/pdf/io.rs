@@ -7,6 +7,16 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, OnceLock};
 use tauri::Manager;
 
+/// Load a PDF read-only and return `f`'s result without modifying the file.
+pub fn with_pdf<T, F>(path: &Path, f: F) -> Result<T, String>
+where
+    F: FnOnce(&Document) -> Result<T, String>,
+{
+    let bytes = std::fs::read(path).map_err(|e| e.to_string())?;
+    let doc = Document::load_mem(&bytes).map_err(|e| e.to_string())?;
+    f(&doc)
+}
+
 /// Load a PDF, run `f`, save back to the same path, and return `f`'s result.
 pub fn mutate_pdf<T, F>(path: &Path, f: F) -> Result<T, String>
 where
