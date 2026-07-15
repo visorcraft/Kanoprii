@@ -3,6 +3,9 @@ import { ModeToolbarExtras } from './ModeToolbarExtras';
 
 export type BuildModeToolbarExtrasInput = {
   filePath: string;
+  editMode: boolean;
+  onToggleEditMode: () => void;
+  onInsertEditImage?: () => void;
   imageInsertMode: boolean;
   imageSourcePath: string;
   onOpenImageInsertModal: () => void;
@@ -20,6 +23,9 @@ export function buildModeToolbarExtras(input: BuildModeToolbarExtrasInput) {
   if (!input.filePath) return null;
   return (
     <ModeToolbarExtras
+      editMode={input.editMode}
+      onToggleEditMode={input.onToggleEditMode}
+      onInsertEditImage={input.onInsertEditImage}
       imageInsertMode={input.imageInsertMode}
       imageSourcePath={input.imageSourcePath}
       onOpenImageInsertModal={input.onOpenImageInsertModal}

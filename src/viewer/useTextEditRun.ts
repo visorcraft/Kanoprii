@@ -9,6 +9,7 @@ export type TextLineInfo = {
   y: number;
   w: number;
   h: number;
+  index: number;
 };
 
 type ActiveEditTarget =
@@ -75,7 +76,7 @@ export function useTextEditRun(opts: UseTextEditRunOptions) {
       for (let i = lines.length - 1; i >= 0; i -= 1) {
         const line = lines[i]!;
         if (x >= line.x && x <= line.x + line.w && y >= line.y && y <= line.y + line.h) {
-          return line;
+          return { ...line, index: i };
         }
       }
       return null;
@@ -97,7 +98,7 @@ export function useTextEditRun(opts: UseTextEditRunOptions) {
   );
 
   const openLineEditor = useCallback((index: number, line: TextLineInfo) => {
-    setActiveTarget({ kind: 'line', index, data: line });
+    setActiveTarget({ kind: 'line', index, data: { ...line, index } });
     setDraft(line.text);
   }, []);
 

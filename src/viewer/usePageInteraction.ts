@@ -1,5 +1,7 @@
 import type { FormFieldKind } from '../modals/AddFormFieldModal';
 import type { ShapeKind, StampKind } from '../app/constants';
+import type { DocumentSessionData } from '../app/documentSessionTypes';
+import type { PdfEditState } from '../app/usePdfEditState';
 import type { createStructuralEditRunner } from '../pdf/runStructuralEdit';
 import { usePageInteractionAnnot } from './usePageInteractionAnnot';
 import { usePageInteractionHandlers } from './usePageInteractionHandlers';
@@ -39,6 +41,25 @@ type UsePageInteractionOptions = {
   newFormRadioGroup: string;
   newFormRadioOption: string;
   newFormCheckboxChecked: boolean;
+  pdfEdit: PdfEditState;
+  session: DocumentSessionData | null;
+  handleEditPageClick?: (
+    pageIndex: number,
+    point: { x: number; y: number },
+    session: DocumentSessionData,
+    hitTestImage?: (pageIndex: number, x: number, y: number) => Promise<{
+      index: number;
+      viewerRect: { x: number; y: number; w: number; h: number };
+      width?: number;
+      height?: number;
+    } | null>,
+  ) => void | Promise<void>;
+  hitTestImage?: (pageIndex: number, x: number, y: number) => Promise<{
+    index: number;
+    viewerRect: { x: number; y: number; w: number; h: number };
+    width?: number;
+    height?: number;
+  } | null>;
   cancelDrawing: () => void;
   setHighlightStart: (pos: { x: number; y: number } | null) => void;
   setHighlightRect: (rect: { x: number; y: number; w: number; h: number } | null) => void;

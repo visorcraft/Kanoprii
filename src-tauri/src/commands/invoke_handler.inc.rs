@@ -2058,5 +2058,16 @@ tauri::generate_handler![
             list_printers,
             print_document,
             print_to_pdf,
-            render_print_preview
+            render_print_preview,
+            edit_text_line,
+            delete_text_line,
+            add_text_box,
+            edit_paragraph,
+            delete_paragraph,
+            list_page_images,
+            transform_page_image,
+            remove_page_image,
+            find_paragraph,
+            viewer_rect_to_pdf,
+            pdf_rect_to_viewer_px,
 ]

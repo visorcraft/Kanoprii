@@ -4,6 +4,7 @@ import { useAppModalState } from './useAppModalState';
 import { useSecurityFormState } from './useSecurityFormState';
 import { useDocumentPanelsState } from './useDocumentPanelsState';
 import { useAnnotationDraftState } from './useAnnotationDraftState';
+import { usePdfEditState } from './usePdfEditState';
 import { useHelpChromeState } from './useHelpChromeState';
 import { useAppRefs } from './useAppRefs';
 import { useDrawingGesture } from '../viewer/useDrawingGesture';
@@ -28,6 +29,7 @@ export function useAppStateBootstrap() {
   const panels = useDocumentPanelsState();
   const help = useHelpChromeState();
   const annotation = useAnnotationDraftState();
+  const pdfEdit = usePdfEditState();
   const drawingGesture = useDrawingGesture();
   const refs = useAppRefs();
   const { showToast, dismissToast, withLoading } = useAppLoading({ setToast: doc.setToast, setLoading: doc.setLoading });
@@ -120,6 +122,7 @@ export function useAppStateBootstrap() {
     panels,
     help,
     annotation,
+    pdfEdit,
     drawingGesture,
     refs,
     pageRanges,

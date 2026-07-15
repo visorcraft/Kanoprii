@@ -59,6 +59,7 @@ export function useAppKeyboard(
         if (a.imageInsertMode && a.hasOpenPdf) { a.exitImageInsertMode(); return; }
         if (a.textEditMode && a.hasOpenPdf) { a.exitTextEditMode(); return; }
         if (a.vectorEditMode && a.hasOpenPdf) { a.exitVectorEditMode(); return; }
+        if (a.editMode && a.hasOpenPdf) { a.exitEditMode(); return; }
         if (a.formAddMode && a.hasOpenPdf) { a.exitFormAddMode(); return; }
         if (a.highlightMode && a.hasOpenPdf) { a.exitHighlightMode(); return; }
         if (a.anyModalOpen) { a.dismissModals(); return; }

@@ -1,5 +1,8 @@
 use super::*;
-use lopdf::{Dictionary, Stream};
+use lopdf::{Dictionary, Document, Stream};
+use pdf::coords::pdf_rect_to_viewer_px;
+use pdf::edit_object::{add_text_box, edit_text_line};
+use pdf::edit_types::{PdfRect, RgbColor, TextStyle};
 use pdf::markdown_heuristic::{
     apply_links_to_text, format_markdown_lines, is_symbol_glyph_candidate, map_symbol_glyph, merge_wrapped_line_pair,
     sort_lines_reading_order, strip_header_footer_lines, MarkdownPageLink, MarkdownTextCell, MarkdownTextLine,
@@ -11,6 +14,8 @@ use pdf::markdown_images::{
 };
 use pdf::markdown_tagged::tagged_markdown_by_page;
 use pdf::ocr::{ocr_language, resolve_tesseract};
+use pdf::page_text::read_page_content;
+use pdf::text_lines::decode_page_text_lines;
 use std::collections::BTreeSet;
 use std::path::PathBuf;
 
@@ -17605,6 +17610,53 @@ fn snapshot_undo_restore_reverts_working_copy() {
     let _ = fs::remove_file(&path);
 }
 
+fn build_paragraph_pdf() -> Document {
+    let mut doc = Document::with_version("1.5");
+    let pages_id = doc.new_object_id();
+
+    let mut page = Dictionary::new();
+    page.set("Type", Object::Name(b"Page".to_vec()));
+    page.set("Parent", Object::Reference(pages_id));
+    page.set(
+        "Resources",
+        Object::Dictionary(Dictionary::from_iter(vec![(
+            "Font",
+            Object::Dictionary(Dictionary::from_iter(vec![(
+                "F1",
+                Object::Dictionary(Dictionary::from_iter(vec![
+                    ("Type", Object::Name(b"Font".to_vec())),
+                    ("Subtype", Object::Name(b"Type1".to_vec())),
+                    ("BaseFont", Object::Name(b"Helvetica".to_vec())),
+                ])),
+            )])),
+        )])),
+    );
+    page.set(
+        "MediaBox",
+        Object::Array(vec![Object::Integer(0), Object::Integer(0), Object::Integer(612), Object::Integer(792)]),
+    );
+
+    let content = b"BT /F1 12 Tf 72 700 Td (First line of paragraph) Tj ET\nBT /F1 12 Tf 72 686 Td (Second line of paragraph) Tj ET".to_vec();
+    let stream_id = doc.add_object(Stream::new(Dictionary::new(), content));
+    page.set("Contents", Object::Reference(stream_id));
+
+    let page_id = doc.add_object(Object::Dictionary(page));
+
+    let mut pages = Dictionary::new();
+    pages.set("Type", Object::Name(b"Pages".to_vec()));
+    pages.set("Count", Object::Integer(1));
+    pages.set("Kids", Object::Array(vec![Object::Reference(page_id)]));
+    doc.objects.insert(pages_id, Object::Dictionary(pages));
+
+    let mut catalog = Dictionary::new();
+    catalog.set("Type", Object::Name(b"Catalog".to_vec()));
+    catalog.set("Pages", Object::Reference(pages_id));
+    let catalog_id = doc.add_object(Object::Dictionary(catalog));
+
+    doc.trailer.set("Root", Object::Reference(catalog_id));
+    doc
+}
+
 fn write_e2e_fixtures() {
     let fixtures_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../e2e/fixtures");
     fs::create_dir_all(&fixtures_dir).unwrap();
@@ -17616,6 +17668,12 @@ fn write_e2e_fixtures() {
         let _ = fs::remove_file(source);
         eprintln!("wrote {}", dest.display());
     }
+
+    let source = save(&mut build_paragraph_pdf(), "e2e_sample_paragraph");
+    let dest = fixtures_dir.join("sample-paragraph.pdf");
+    fs::copy(&source, &dest).unwrap();
+    let _ = fs::remove_file(source);
+    eprintln!("wrote {}", dest.display());
 }
 
 /// Writes `e2e/fixtures/*.pdf` for the WebdriverIO suite.
@@ -19581,4 +19639,309 @@ fn resolve_rename_target_rejects_separators_and_empty() {
     assert!(resolve_rename_target(&original, "a/b").is_err());
     assert!(resolve_rename_target(&original, "a\\b").is_err());
     assert!(resolve_rename_target(&original, "   ").is_err());
+}
+
+#[test]
+fn edit_text_line_styled_replaces_text_without_panic() {
+    let path = {
+        let mut doc = build_pdf(1);
+        save(&mut doc, "edit_text_line_styled")
+    };
+
+    let doc_loaded = Document::load(&path).unwrap();
+    let page_id = *doc_loaded.get_pages().get(&1).unwrap();
+    let lines = decode_page_text_lines(&doc_loaded, page_id).unwrap();
+    assert!(!lines.is_empty(), "fixture PDF should contain at least one text line");
+
+    let bbox = lines[0].bbox;
+    let v = pdf_rect_to_viewer_px(bbox[0], bbox[1], bbox[2], bbox[3], 612.0, 792.0);
+    let box_rect = PdfRect { x: v[0], y: v[1], width: (v[2] - v[0]).max(1.0), height: (v[3] - v[1]).max(1.0) };
+
+    let style = TextStyle {
+        font_family: "Helvetica".to_string(),
+        font_size: 12.0,
+        bold: false,
+        italic: false,
+        underline: false,
+        color: RgbColor { r: 0.0, g: 0.0, b: 0.0 },
+        align: "left".to_string(),
+    };
+
+    let mut doc = Document::load(&path).unwrap();
+    edit_text_line(&mut doc, 0, 0, "World", &style, &box_rect).unwrap();
+
+    let content = String::from_utf8_lossy(&read_page_content(&doc, page_id).unwrap()).into_owned();
+    assert!(content.contains("World"), "replacement text should appear in the content stream");
+
+    std::fs::remove_file(&path).ok();
+}
+
+#[test]
+fn add_text_box_wraps_text_and_appends_to_page() {
+    let path = save(&mut build_pdf(1), "add_text_box");
+    let mut doc = Document::load(&path).unwrap();
+    let style = TextStyle {
+        font_family: "Helvetica".to_string(),
+        font_size: 12.0,
+        bold: false,
+        italic: false,
+        underline: false,
+        color: RgbColor { r: 0.0, g: 0.0, b: 0.0 },
+        align: "left".to_string(),
+    };
+    let box_rect = PdfRect { x: 72.0, y: 72.0, width: 100.0, height: 200.0 };
+    add_text_box(&mut doc, 0, "Hello world wide text", &style, &box_rect).unwrap();
+
+    let page_id = *doc.get_pages().get(&1).unwrap();
+    let content = String::from_utf8_lossy(&read_page_content(&doc, page_id).unwrap()).into_owned();
+    assert!(content.contains("Hello world"), "first wrapped line should appear");
+    assert!(content.contains("wide text"), "second wrapped line should appear");
+
+    std::fs::remove_file(&path).ok();
+}
+
+fn text_box_style() -> TextStyle {
+    TextStyle {
+        font_family: "Helvetica".to_string(),
+        font_size: 12.0,
+        bold: false,
+        italic: false,
+        underline: false,
+        color: RgbColor { r: 0.1, g: 0.2, b: 0.3 },
+        align: "left".to_string(),
+    }
+}
+
+fn tm_x_values(content: &str) -> Vec<f64> {
+    content
+        .split("Tm")
+        .filter_map(|s| {
+            let tokens: Vec<&str> = s.split_whitespace().collect();
+            if tokens.len() >= 2 {
+                tokens[tokens.len() - 2].parse().ok()
+            } else {
+                None
+            }
+        })
+        .collect()
+}
+
+#[test]
+fn add_text_box_emits_color_operators() {
+    let path = save(&mut build_pdf(1), "add_text_box_color");
+    let mut doc = Document::load(&path).unwrap();
+    add_text_box(&mut doc, 0, "Hello", &text_box_style(), &PdfRect { x: 72.0, y: 72.0, width: 200.0, height: 100.0 })
+        .unwrap();
+
+    let page_id = *doc.get_pages().get(&1).unwrap();
+    let content = String::from_utf8_lossy(&read_page_content(&doc, page_id).unwrap()).into_owned();
+    assert!(content.contains("rg"), "fill color operator missing");
+    assert!(content.contains("RG"), "stroke color operator missing");
+
+    std::fs::remove_file(&path).ok();
+}
+
+#[test]
+fn add_text_box_bold_draws_twice() {
+    let path = save(&mut build_pdf(1), "add_text_box_bold");
+    let mut doc = Document::load(&path).unwrap();
+    let mut style = text_box_style();
+    style.bold = true;
+    add_text_box(&mut doc, 0, "Hello", &style, &PdfRect { x: 72.0, y: 72.0, width: 200.0, height: 100.0 }).unwrap();
+
+    let page_id = *doc.get_pages().get(&1).unwrap();
+    let content = String::from_utf8_lossy(&read_page_content(&doc, page_id).unwrap()).into_owned();
+    assert_eq!(content.matches("Tj").count(), 3, "bold should emit two new text show operators plus the original one");
+
+    std::fs::remove_file(&path).ok();
+}
+
+#[test]
+fn add_text_box_italic_uses_shear_matrix() {
+    let path = save(&mut build_pdf(1), "add_text_box_italic");
+    let mut doc = Document::load(&path).unwrap();
+    let mut style = text_box_style();
+    style.italic = true;
+    add_text_box(&mut doc, 0, "Hello", &style, &PdfRect { x: 72.0, y: 72.0, width: 200.0, height: 100.0 }).unwrap();
+
+    let page_id = *doc.get_pages().get(&1).unwrap();
+    let content = String::from_utf8_lossy(&read_page_content(&doc, page_id).unwrap()).into_owned();
+    assert!(content.contains("1 0 0.25 1"), "italic should use a shear matrix");
+
+    std::fs::remove_file(&path).ok();
+}
+
+#[test]
+fn add_text_box_underline_emits_stroke() {
+    let path = save(&mut build_pdf(1), "add_text_box_underline");
+    let mut doc = Document::load(&path).unwrap();
+    let mut style = text_box_style();
+    style.underline = true;
+    add_text_box(&mut doc, 0, "Hello", &style, &PdfRect { x: 72.0, y: 72.0, width: 200.0, height: 100.0 }).unwrap();
+
+    let page_id = *doc.get_pages().get(&1).unwrap();
+    let content = String::from_utf8_lossy(&read_page_content(&doc, page_id).unwrap()).into_owned();
+    assert!(content.contains(" m "), "underline should contain a moveto");
+    assert!(content.contains(" l "), "underline should contain a lineto");
+    assert!(content.contains(" S"), "underline should contain a stroke operator");
+
+    std::fs::remove_file(&path).ok();
+}
+
+#[test]
+fn add_text_box_alignment_offsets_differ() {
+    let path_left = save(&mut build_pdf(1), "add_text_box_align_left");
+    let path_center = save(&mut build_pdf(1), "add_text_box_align_center");
+    let path_right = save(&mut build_pdf(1), "add_text_box_align_right");
+
+    let box_rect = PdfRect { x: 72.0, y: 72.0, width: 200.0, height: 100.0 };
+
+    let left_x = {
+        let mut doc = Document::load(&path_left).unwrap();
+        add_text_box(&mut doc, 0, "Hello", &text_box_style(), &box_rect).unwrap();
+        let page_id = *doc.get_pages().get(&1).unwrap();
+        let content = String::from_utf8_lossy(&read_page_content(&doc, page_id).unwrap()).into_owned();
+        tm_x_values(&content)[0]
+    };
+    let center_x = {
+        let mut doc = Document::load(&path_center).unwrap();
+        let mut style = text_box_style();
+        style.align = "center".to_string();
+        add_text_box(&mut doc, 0, "Hello", &style, &box_rect).unwrap();
+        let page_id = *doc.get_pages().get(&1).unwrap();
+        let content = String::from_utf8_lossy(&read_page_content(&doc, page_id).unwrap()).into_owned();
+        tm_x_values(&content)[0]
+    };
+    let right_x = {
+        let mut doc = Document::load(&path_right).unwrap();
+        let mut style = text_box_style();
+        style.align = "right".to_string();
+        add_text_box(&mut doc, 0, "Hello", &style, &box_rect).unwrap();
+        let page_id = *doc.get_pages().get(&1).unwrap();
+        let content = String::from_utf8_lossy(&read_page_content(&doc, page_id).unwrap()).into_owned();
+        tm_x_values(&content)[0]
+    };
+
+    assert!(left_x < center_x, "center should shift text right: left={left_x} center={center_x}");
+    assert!(center_x < right_x, "right should shift text further right: center={center_x} right={right_x}");
+
+    std::fs::remove_file(&path_left).ok();
+    std::fs::remove_file(&path_center).ok();
+    std::fs::remove_file(&path_right).ok();
+}
+
+#[test]
+fn add_text_box_rejects_non_positive_box() {
+    let path = save(&mut build_pdf(1), "add_text_box_bad_box");
+    let mut doc = Document::load(&path).unwrap();
+    let mut box_rect = PdfRect { x: 72.0, y: 72.0, width: 200.0, height: 100.0 };
+    box_rect.width = 0.0;
+    let err = add_text_box(&mut doc, 0, "Hello", &text_box_style(), &box_rect).unwrap_err();
+    assert!(err.contains("positive width"), "got: {err}");
+
+    std::fs::remove_file(&path).ok();
+}
+
+#[test]
+fn add_text_box_rejects_box_too_short() {
+    let path = save(&mut build_pdf(1), "add_text_box_short");
+    let mut doc = Document::load(&path).unwrap();
+    let box_rect = PdfRect { x: 72.0, y: 72.0, width: 1000.0, height: 1.0 };
+    let err = add_text_box(&mut doc, 0, "Hello", &text_box_style(), &box_rect).unwrap_err();
+    assert!(err.contains("too short"), "got: {err}");
+
+    std::fs::remove_file(&path).ok();
+}
+
+/// Build a one-page PDF with a small inline RGB image XObject drawn by a simple
+/// `q cm Do Q` content stream.
+fn build_pdf_with_image() -> Document {
+    let mut doc = build_pdf(1);
+    let page_id = *doc.get_pages().get(&1).unwrap();
+
+    let mut image_dict = Dictionary::new();
+    image_dict.set("Type", Object::Name(b"XObject".to_vec()));
+    image_dict.set("Subtype", Object::Name(b"Image".to_vec()));
+    image_dict.set("Width", Object::Integer(2));
+    image_dict.set("Height", Object::Integer(2));
+    image_dict.set("ColorSpace", Object::Name(b"DeviceRGB".to_vec()));
+    image_dict.set("BitsPerComponent", Object::Integer(8));
+    let image_data = vec![255, 0, 0, 0, 255, 0, 0, 0, 255, 255, 255, 255];
+    let image_id = doc.add_object(Object::Stream(Stream::new(image_dict, image_data)));
+
+    let mut xobjects = Dictionary::new();
+    xobjects.set(b"Im1", Object::Reference(image_id));
+    let resources = Dictionary::from_iter(vec![(b"XObject".to_vec(), Object::Dictionary(xobjects))]);
+    doc.get_dictionary_mut(page_id).unwrap().set(b"Resources", Object::Dictionary(resources));
+
+    let content = b"q 100 0 0 100 50 50 cm /Im1 Do Q\n".to_vec();
+    let content_id = doc.add_object(Object::Stream(Stream::new(Dictionary::new(), content)));
+    doc.get_dictionary_mut(page_id).unwrap().set(b"Contents", Object::Reference(content_id));
+
+    doc
+}
+
+#[test]
+fn list_page_images_finds_inline_image_xobject() {
+    let path = save(&mut build_pdf_with_image(), "list_images");
+    let images = pdf::page_images::list_page_images(&Document::load(&path).unwrap(), 0).unwrap();
+    assert_eq!(images.len(), 1);
+    assert_eq!(images[0].index, 0);
+    assert_eq!(images[0].width, 2);
+    assert_eq!(images[0].height, 2);
+    assert_eq!(images[0].bbox.width, 2.0);
+    assert_eq!(images[0].bbox.height, 2.0);
+    std::fs::remove_file(&path).ok();
+}
+
+#[test]
+fn transform_page_image_rewrites_cm_matrix() {
+    let path = save(&mut build_pdf_with_image(), "transform_image");
+    let new_rect = PdfRect { x: 10.0, y: 20.0, width: 30.0, height: 40.0 };
+    let mut doc = Document::load(&path).unwrap();
+    pdf::edit_object::transform_page_image(&mut doc, 0, 0, &new_rect, 0.0).unwrap();
+    doc.save(&path).unwrap();
+
+    let doc = Document::load(&path).unwrap();
+    let page_id = *doc.get_pages().get(&1).unwrap();
+    let bytes = read_page_content(&doc, page_id).unwrap();
+    let content = String::from_utf8_lossy(&bytes);
+    assert!(content.contains("30 0 0 40 10 20 cm"), "expected rewritten cm matrix, got {content}");
+    std::fs::remove_file(&path).ok();
+}
+
+#[test]
+fn remove_page_image_removes_do_operator() {
+    let path = save(&mut build_pdf_with_image(), "remove_image");
+    let mut doc = Document::load(&path).unwrap();
+    pdf::edit_object::remove_page_image(&mut doc, 0, 0).unwrap();
+    doc.save(&path).unwrap();
+
+    let doc = Document::load(&path).unwrap();
+    let page_id = *doc.get_pages().get(&1).unwrap();
+    let bytes = read_page_content(&doc, page_id).unwrap();
+    let content = String::from_utf8_lossy(&bytes);
+    assert!(!content.contains("/Im1 Do"), "image Do operator should be removed, got {content}");
+    std::fs::remove_file(&path).ok();
+}
+
+/// Build a one-page PDF whose image is invoked without a preceding `cm`, so
+/// transform/remove must reject the unsupported pattern.
+fn build_pdf_with_unsupported_image() -> Document {
+    let mut doc = build_pdf_with_image();
+    let page_id = *doc.get_pages().get(&1).unwrap();
+    let content = b"q /Im1 Do Q\n".to_vec();
+    let content_id = doc.add_object(Object::Stream(Stream::new(Dictionary::new(), content)));
+    doc.get_dictionary_mut(page_id).unwrap().set(b"Contents", Object::Reference(content_id));
+    doc
+}
+
+#[test]
+fn transform_page_image_rejects_unsupported_pattern() {
+    let path = save(&mut build_pdf_with_unsupported_image(), "transform_unsupported");
+    let new_rect = PdfRect { x: 10.0, y: 20.0, width: 30.0, height: 40.0 };
+    let mut doc = Document::load(&path).unwrap();
+    let err = pdf::edit_object::transform_page_image(&mut doc, 0, 0, &new_rect, 0.0).unwrap_err();
+    assert!(err.contains("not supported"), "expected unsupported pattern error, got {err}");
+    std::fs::remove_file(&path).ok();
 }

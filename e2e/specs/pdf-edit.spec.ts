@@ -1,12 +1,35 @@
-import { browser } from '@wdio/globals';
+import { browser, expect } from '@wdio/globals';
 import {
+  clickMenuAction,
   fixturePdf,
+  fixturePdfImage,
+  fixturePdfParagraph,
   openPdfViaPathModal,
   resetToWelcome,
   waitForPageRendered,
   waitForPdfOpen,
   waitForShell,
 } from '../support/helpers';
+
+async function enterPdfEditMode() {
+  const toolbarBtn = await $('[aria-label="Edit mode"]');
+  if (await toolbarBtn.isDisplayed().catch(() => false)) {
+    await toolbarBtn.click();
+    return;
+  }
+  await clickMenuAction('annotate', 'pdf-edit');
+}
+
+async function getCenterOfTextSpan(text: string): Promise<{ cx: number; cy: number }> {
+  return browser.execute((t) => {
+    const span = Array.from(document.querySelectorAll('.text-layer span')).find((el) =>
+      el.textContent?.includes(t),
+    ) as HTMLElement | null;
+    if (!span) throw new Error(`missing text layer span containing "${t}"`);
+    const rect = span.getBoundingClientRect();
+    return { cx: Math.round(rect.left + rect.width / 2), cy: Math.round(rect.top + rect.height / 2) };
+  }, text);
+}
 
 describe('PDF Edit Mode', () => {
   before(async () => {
@@ -17,62 +40,308 @@ describe('PDF Edit Mode', () => {
     await resetToWelcome();
   });
 
-  it('enters edit text mode, edits an existing text line, and applies', async () => {
+  it('enters edit mode, resizes the rich-text edit box, and applies', async () => {
     await openPdfViaPathModal(fixturePdf);
     await waitForPdfOpen();
     await waitForPageRendered();
 
-    // Enter "Edit text" mode via the Annotate menu.
-    const annotateTrigger = await $('[data-testid="menu-annotate"]');
-    await annotateTrigger.click();
-    const editAction = await $('[data-testid="edit-text"]');
-    await editAction.waitForDisplayed({ timeout: 5_000 });
-    await editAction.click();
+    await enterPdfEditMode();
+    const editBtn = await $('[aria-label="Edit mode"]');
+    await editBtn.waitForDisplayed({ timeout: 10_000 });
 
-    // Wait for the page container to show the edit cursor.
-    const pageContainer = await $('[data-testid="page-container"]');
-    await browser.waitUntil(
-      async () => (await pageContainer.getAttribute('class')).includes('text-edit-cursor'),
-      { timeout: 5_000, timeoutMsg: 'expected page container to enter text-edit-cursor mode' },
-    );
+    const { cx, cy } = await getCenterOfTextSpan('Hello');
 
-    // Click on an existing text line. The text layer is pointer-events:none in
-    // edit mode, so dispatch the click on the page container at the span's
-    // screen location so the hit-test finds the line.
-    await browser.execute(() => {
-      const container = document.querySelector('[data-testid="page-container"]') as HTMLElement | null;
-      const span = Array.from(document.querySelectorAll('.text-layer span')).find((el) =>
-        el.textContent?.includes('Hello'),
-      ) as HTMLElement | null;
-      const img = document.querySelector('.page-image') as HTMLElement | null;
-      if (!container || !span || !img) throw new Error('missing page container, text span, or page image');
+    await browser
+      .action('pointer')
+      .move({ x: cx, y: cy })
+      .down({ button: 0 })
+      .up({ button: 0 })
+      .perform();
 
-      const rect = span.getBoundingClientRect();
-      const cx = rect.left + rect.width / 2;
-      const cy = rect.top + rect.height / 2;
+    const textarea = await $('.rich-text-edit-textarea');
+    await textarea.waitForDisplayed({ timeout: 10_000 });
 
-      container.dispatchEvent(
-        new MouseEvent('click', {
-          bubbles: true,
-          cancelable: true,
-          clientX: cx,
-          clientY: cy,
-          button: 0,
-        }),
-      );
+    const handle = await $('.rich-text-resize-handle-br');
+    await handle.waitForDisplayed({ timeout: 10_000 });
+
+    const before = await browser.execute(() => {
+      const el = document.querySelector('.rich-text-edit-overlay') as HTMLElement | null;
+      if (!el) throw new Error('missing overlay');
+      const rect = el.getBoundingClientRect();
+      return { width: rect.width, height: rect.height };
     });
 
-    // The overlay should appear.
-    const input = await $('.text-edit-overlay-input');
-    await input.waitForDisplayed({ timeout: 10_000 });
+    const { hx, hy } = await browser.execute(() => {
+      const el = document.querySelector('.rich-text-resize-handle-br') as HTMLElement | null;
+      if (!el) throw new Error('missing resize handle');
+      const rect = el.getBoundingClientRect();
+      return { hx: Math.round(rect.left + rect.width / 2), hy: Math.round(rect.top + rect.height / 2) };
+    });
 
-    // Replace the text and apply (the overlay commits on Enter).
-    await input.setValue('Hello edit');
+    await browser
+      .action('pointer')
+      .move({ x: hx, y: hy })
+      .down({ button: 0 })
+      .move({ x: hx + 60, y: hy + 40 })
+      .up({ button: 0 })
+      .perform();
+
+    const after = await browser.execute(() => {
+      const el = document.querySelector('.rich-text-edit-overlay') as HTMLElement | null;
+      if (!el) throw new Error('missing overlay');
+      const rect = el.getBoundingClientRect();
+      return { width: rect.width, height: rect.height };
+    });
+
+    expect(after.width).toBeGreaterThan(before.width);
+    expect(after.height).toBeGreaterThan(before.height);
+
+    const applyBtn = await $('.edit-toolbar-apply');
+    await applyBtn.click();
+
+    await browser.waitUntil(
+      async () => !(await $('.rich-text-edit-textarea').isDisplayed().catch(() => false)),
+      { timeout: 15_000, timeoutMsg: 'expected rich-text edit overlay to disappear after resize apply' },
+    );
+  });
+
+  it('enters edit mode, drags the rich-text edit box by the move handle, and applies', async () => {
+    await openPdfViaPathModal(fixturePdf);
+    await waitForPdfOpen();
+    await waitForPageRendered();
+
+    await enterPdfEditMode();
+    const editBtn = await $('[aria-label="Edit mode"]');
+    await editBtn.waitForDisplayed({ timeout: 10_000 });
+
+    const { cx, cy } = await getCenterOfTextSpan('Hello');
+
+    await browser
+      .action('pointer')
+      .move({ x: cx, y: cy })
+      .down({ button: 0 })
+      .up({ button: 0 })
+      .perform();
+
+    const textarea = await $('.rich-text-edit-textarea');
+    await textarea.waitForDisplayed({ timeout: 10_000 });
+
+    const moveHandle = await $('.rich-text-move-handle');
+    await moveHandle.waitForDisplayed({ timeout: 10_000 });
+
+    const before = await browser.execute(() => {
+      const el = document.querySelector('.rich-text-edit-overlay') as HTMLElement | null;
+      if (!el) throw new Error('missing overlay');
+      const rect = el.getBoundingClientRect();
+      return { x: rect.left, y: rect.top };
+    });
+
+    const { hx, hy } = await browser.execute(() => {
+      const el = document.querySelector('.rich-text-move-handle') as HTMLElement | null;
+      if (!el) throw new Error('missing move handle');
+      const rect = el.getBoundingClientRect();
+      return { hx: Math.round(rect.left + rect.width / 2), hy: Math.round(rect.top + rect.height / 2) };
+    });
+
+    await browser
+      .action('pointer')
+      .move({ x: hx, y: hy })
+      .down({ button: 0 })
+      .move({ x: hx + 80, y: hy + 60 })
+      .up({ button: 0 })
+      .perform();
+
+    const after = await browser.execute(() => {
+      const el = document.querySelector('.rich-text-edit-overlay') as HTMLElement | null;
+      if (!el) throw new Error('missing overlay');
+      const rect = el.getBoundingClientRect();
+      return { x: rect.left, y: rect.top };
+    });
+
+    expect(Math.round(after.x - before.x)).toBeGreaterThanOrEqual(50);
+    expect(Math.round(after.y - before.y)).toBeGreaterThanOrEqual(30);
+
+    const applyBtn = await $('.edit-toolbar-apply');
+    await applyBtn.click();
+
+    await browser.waitUntil(
+      async () => !(await $('.rich-text-edit-textarea').isDisplayed().catch(() => false)),
+      { timeout: 15_000, timeoutMsg: 'expected rich-text edit overlay to disappear after move apply' },
+    );
+  });
+
+  it('enters edit mode, edits an existing text line, and applies', async () => {
+    await openPdfViaPathModal(fixturePdf);
+    await waitForPdfOpen();
+    await waitForPageRendered();
+
+    await enterPdfEditMode();
+    const editBtn = await $('[aria-label="Edit mode"]');
+    await editBtn.waitForDisplayed({ timeout: 10_000 });
+    await expect(editBtn).toHaveAttribute('aria-pressed', 'true');
+
+    const { cx, cy } = await getCenterOfTextSpan('Hello');
+
+    await browser
+      .action('pointer')
+      .move({ x: cx, y: cy })
+      .down({ button: 0 })
+      .up({ button: 0 })
+      .perform();
+
+    const textarea = await $('.rich-text-edit-textarea');
+    await textarea.waitForDisplayed({ timeout: 10_000 });
+
+    await textarea.setValue('Hello edit');
+    const applyBtn = await $('.edit-toolbar-apply');
+    await applyBtn.click();
+
+    await browser.waitUntil(
+      async () => !(await $('.rich-text-edit-textarea').isDisplayed().catch(() => false)),
+      { timeout: 15_000, timeoutMsg: 'expected rich-text edit overlay to disappear after apply' },
+    );
+  });
+
+  it('enters edit mode, deletes an existing text line, and the overlay disappears', async () => {
+    await openPdfViaPathModal(fixturePdf);
+    await waitForPdfOpen();
+    await waitForPageRendered();
+
+    await enterPdfEditMode();
+    const editBtn = await $('[aria-label="Edit mode"]');
+    await editBtn.waitForDisplayed({ timeout: 10_000 });
+
+    const { cx, cy } = await getCenterOfTextSpan('Hello');
+
+    await browser
+      .action('pointer')
+      .move({ x: cx, y: cy })
+      .down({ button: 0 })
+      .up({ button: 0 })
+      .perform();
+
+    const textarea = await $('.rich-text-edit-textarea');
+    await textarea.waitForDisplayed({ timeout: 10_000 });
+
+    const deleteBtn = await $('.edit-toolbar-delete');
+    await deleteBtn.waitForDisplayed({ timeout: 10_000 });
+    await deleteBtn.click();
+
+    await browser.waitUntil(
+      async () => !(await $('.rich-text-edit-textarea').isDisplayed().catch(() => false)),
+      { timeout: 15_000, timeoutMsg: 'expected rich-text edit overlay to disappear after delete' },
+    );
+  });
+
+  it('enters edit mode, edits a multi-line paragraph, and applies', async () => {
+    await openPdfViaPathModal(fixturePdfParagraph);
+    await waitForPdfOpen();
+    await waitForPageRendered();
+
+    await enterPdfEditMode();
+    const editBtn = await $('[aria-label="Edit mode"]');
+    await editBtn.waitForDisplayed({ timeout: 10_000 });
+
+    const { cx, cy } = await getCenterOfTextSpan('First line');
+
+    await browser
+      .action('pointer')
+      .move({ x: cx, y: cy })
+      .down({ button: 0 })
+      .up({ button: 0 })
+      .perform();
+
+    const selectionOverlay = await $('.paragraph-selection-overlay');
+    await selectionOverlay.waitForDisplayed({ timeout: 10_000 });
+
+    await selectionOverlay.click();
+    await browser.keys('Enter');
+
+    const textarea = await $('.rich-text-edit-textarea');
+    await textarea.waitForDisplayed({ timeout: 10_000 });
+
+    // Verify the textarea contains the paragraph text (both lines joined by newline).
+    const value = await textarea.getValue();
+    expect(value).toContain('First line of paragraph');
+    expect(value).toContain('Second line of paragraph');
+
+    await textarea.setValue('Edited paragraph text');
+
+    const applyBtn = await $('.edit-toolbar-apply');
+    await applyBtn.click();
+
+    await browser.waitUntil(
+      async () => !(await $('.rich-text-edit-textarea').isDisplayed().catch(() => false)),
+      { timeout: 15_000, timeoutMsg: 'expected rich-text edit overlay to disappear after paragraph apply' },
+    );
+  });
+
+  it('enters edit mode, selects an image, rotates it, and applies', async () => {
+    await openPdfViaPathModal(fixturePdfImage);
+    await waitForPdfOpen();
+    await waitForPageRendered();
+
+    await enterPdfEditMode();
+    const editBtn = await $('[aria-label="Edit mode"]');
+    await editBtn.waitForDisplayed({ timeout: 10_000 });
+
+    // Click near the center of the page to select the full-page image.
+    const { cx, cy } = await browser.execute(() => {
+      const img = document.querySelector('.page-image') as HTMLImageElement | null;
+      if (!img) throw new Error('missing page image');
+      const rect = img.getBoundingClientRect();
+      return { cx: Math.round(rect.left + rect.width / 2), cy: Math.round(rect.top + rect.height / 2) };
+    });
+
+    await browser
+      .action('pointer')
+      .move({ x: cx, y: cy })
+      .down({ button: 0 })
+      .up({ button: 0 })
+      .perform();
+
+    const overlay = await $('.image-selection-overlay');
+    await overlay.waitForDisplayed({ timeout: 10_000 });
+
+    const rotator = await $('.image-selection-handle-rotate');
+    await rotator.waitForDisplayed({ timeout: 10_000 });
+
+    // Drag the rotation handle from the top-center of the overlay to the right.
+    const { rx, ry } = await browser.execute(() => {
+      const el = document.querySelector('.image-selection-overlay') as HTMLElement | null;
+      if (!el) throw new Error('missing image selection overlay');
+      const rect = el.getBoundingClientRect();
+      return { rx: Math.round(rect.left + rect.width / 2), ry: Math.round(rect.top) - 12 };
+    });
+
+    await browser
+      .action('pointer')
+      .move({ x: rx, y: ry })
+      .down({ button: 0 })
+      .move({ x: rx + 120, y: ry })
+      .up({ button: 0 })
+      .perform();
+
+    // Apply the image rotation with Enter (the overlay keeps focus during drag).
     await browser.keys('Enter');
 
     await browser.waitUntil(
-      async () => !(await $('.text-edit-overlay-input').isDisplayed().catch(() => false)),
-      { timeout: 15_000, timeoutMsg: 'expected text edit overlay to disappear after apply' },
+      async () => !(await $('.image-selection-overlay').isDisplayed().catch(() => false)),
+      { timeout: 15_000, timeoutMsg: 'expected image selection overlay to disappear after rotate apply' },
     );
+
+    const errorToast = await $('[role="alert"]');
+    expect(await errorToast.isDisplayed().catch(() => false)).toBe(false);
+  });
+
+  it('shows an Insert Image button when edit mode is active', async () => {
+    await openPdfViaPathModal(fixturePdf);
+    await waitForPdfOpen();
+    await waitForPageRendered();
+
+    await enterPdfEditMode();
+    const insertBtn = await $('[aria-label="Insert image"]');
+    await insertBtn.waitForDisplayed({ timeout: 10_000 });
+    expect(await insertBtn.isClickable()).toBe(true);
   });
 });

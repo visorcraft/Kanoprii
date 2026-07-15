@@ -2,6 +2,7 @@ import type { BuildAppKeyboardActionsInput } from './buildAppKeyboardActions';
 import type { AppPdfActions } from './useAppPdfActions';
 import type { DocumentState } from './useAppDocumentState';
 import type { AnnotationState } from './useAnnotationDraftState';
+import type { PdfEditState } from './usePdfEditState';
 
 export type BuildAppKeyboardSourceArgs = {
   doc: Pick<DocumentState, 'isDirty' | 'filePath' | 'pageCount' | 'currentPage' | 'viewMode' | 'cycleTab' | 'jumpToTab'>;
@@ -24,6 +25,7 @@ export type BuildAppKeyboardSourceArgs = {
   };
   zoom: { zoomIn: () => void; zoomOut: () => void; resetZoom: () => void };
   pdfActions: AppPdfActions;
+  pdfEdit: Pick<PdfEditState, 'editMode'>;
 };
 
 export function buildAppKeyboardSource(args: BuildAppKeyboardSourceArgs): BuildAppKeyboardActionsInput {
@@ -40,6 +42,7 @@ export function buildAppKeyboardSource(args: BuildAppKeyboardSourceArgs): BuildA
     imageInsertMode: args.annotation.imageInsertMode,
     textEditMode: args.annotation.textEditMode,
     vectorEditMode: args.annotation.vectorEditMode,
+    editMode: args.pdfEdit.editMode,
     formAddMode: args.annotation.formAddMode,
     highlightMode: args.annotation.highlightMode,
     anyModalOpen: args.chrome.anyModalOpen,
@@ -73,6 +76,7 @@ export function buildAppKeyboardSource(args: BuildAppKeyboardSourceArgs): BuildA
     exitStampMode: args.pdfActions.exitStampMode,
     exitTextEditMode: args.pdfActions.exitTextEditMode,
     exitVectorEditMode: args.pdfActions.exitVectorEditMode,
+    exitEditMode: args.pdfActions.exitEditMode,
     handleAddBlankPage: args.pdfActions.handleAddBlankPage,
     handleDuplicatePage: args.pdfActions.handleDuplicatePage,
     handleOptimizePdf: args.pdfActions.handleOptimizePdf,
@@ -99,5 +103,6 @@ export function buildAppKeyboardSource(args: BuildAppKeyboardSourceArgs): BuildA
     toggleStampMode: args.pdfActions.toggleStampMode,
     toggleTextEditMode: args.pdfActions.toggleTextEditMode,
     toggleVectorEditMode: args.pdfActions.toggleVectorEditMode,
+    toggleEditMode: args.pdfActions.toggleEditMode,
   };
 }

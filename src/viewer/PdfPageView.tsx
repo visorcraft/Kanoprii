@@ -1,12 +1,21 @@
 import { memo } from 'react';
 import type React from 'react';
 import type { ShapeKind } from '../app/constants';
-import type { AnnotationData, FormFieldData, PageTextEdit, PageVectorEdit } from '../app/types';
+import type {
+  AnnotationData,
+  FormFieldData,
+  PageTextEdit,
+  PageVectorEdit,
+} from '../app/types';
 import type { PageTextRun } from '../pdf/useTextLayerLoader';
 import type { TextLineInfo } from './useTextEditRun';
 import { PdfPageOverlays } from './PdfPageOverlays';
 import { TextLayer } from './TextLayer';
 import { TextEditOverlay } from './TextEditOverlay';
+import { RichTextEditOverlay } from './RichTextEditOverlay';
+import { ImageSelectionOverlay } from './ImageSelectionOverlay';
+import { ParagraphSelectionOverlay } from './ParagraphSelectionOverlay';
+import type { PdfEditState } from '../app/usePdfEditState';
 
 type PdfPageViewProps = {
   zoom: number;
@@ -56,6 +65,7 @@ type PdfPageViewProps = {
   onTextEditDraftChange?: (value: string) => void;
   onApplyTextEdit?: () => void;
   onCancelTextEdit?: () => void;
+  pdfEdit?: PdfEditState | null;
 };
 
 function PdfPageViewInner({
@@ -106,6 +116,7 @@ function PdfPageViewInner({
   onTextEditDraftChange,
   onApplyTextEdit,
   onCancelTextEdit,
+  pdfEdit,
 }: PdfPageViewProps) {
   const cursorClass = [
     highlightMode ? 'highlight-cursor' : '',
@@ -120,7 +131,9 @@ function PdfPageViewInner({
     textEditActiveRun ? 'text-edit-cursor' : '',
     vectorEditMode ? 'vector-edit-cursor' : '',
     formAddMode ? 'form-add-cursor' : '',
-  ].filter(Boolean).join(' ');
+  ]
+    .filter(Boolean)
+    .join(' ');
 
   return (
     <div
@@ -133,20 +146,83 @@ function PdfPageViewInner({
       onMouseLeave={onMouseUp}
     >
       {imageSrc ? (
-        <div className="page-scale" style={{ transform: `scale(${zoom})`, transformOrigin: 'top center' }}>
-          <div ref={pageContainerRef} style={{ position: 'relative', display: 'inline-block' }}>
-            <img ref={imgRef} src={imageSrc} alt="PDF Page" className="page-image" draggable={false} onLoad={onImageLoad} />
+        <div
+          className="page-scale"
+          style={{ transform: `scale(${zoom})`, transformOrigin: 'top center' }}
+        >
+          <div
+            ref={pageContainerRef}
+            style={{ position: 'relative', display: 'inline-block' }}
+          >
+            <img
+              ref={imgRef}
+              src={imageSrc}
+              alt="PDF Page"
+              className="page-image"
+              draggable={false}
+              onLoad={onImageLoad}
+            />
             <TextLayer runs={textRuns} interactive={textLayerInteractive} />
-            {(textEditActiveRun || textEditActiveLine) && onTextEditDraftChange && onApplyTextEdit && onCancelTextEdit && (
-              <TextEditOverlay
-                target={textEditActiveLine ?? textEditActiveRun!}
-                zoom={zoom}
-                draft={textEditDraft}
-                onDraftChange={onTextEditDraftChange}
-                onApply={onApplyTextEdit}
-                onCancel={onCancelTextEdit}
-              />
-            )}
+            {(textEditActiveRun || textEditActiveLine) &&
+              onTextEditDraftChange &&
+              onApplyTextEdit &&
+              onCancelTextEdit && (
+                <TextEditOverlay
+                  target={textEditActiveLine ?? textEditActiveRun!}
+                  zoom={zoom}
+                  draft={textEditDraft}
+                  onDraftChange={onTextEditDraftChange}
+                  onApply={onApplyTextEdit}
+                  onCancel={onCancelTextEdit}
+                />
+              )}
+            {pdfEdit?.textDraft &&
+              pdfEdit.textDraft.pageIndex === currentPage && (
+                <RichTextEditOverlay
+                  draft={pdfEdit.textDraft}
+                  zoom={zoom}
+                  onUpdate={pdfEdit.onUpdate}
+                  onApply={pdfEdit.onApply}
+                  onCancel={pdfEdit.onCancel}
+                  onDelete={pdfEdit.onDeleteText}
+                />
+              )}
+            {pdfEdit?.paragraphDraft &&
+              pdfEdit.paragraphDraft.pageIndex === currentPage &&
+              !pdfEdit.paragraphEditing && (
+                <ParagraphSelectionOverlay
+                  draft={pdfEdit.paragraphDraft}
+                  onUpdate={pdfEdit.onUpdateParagraph}
+                  onEnterEdit={pdfEdit.enterParagraphTextEdit}
+                  onDelete={pdfEdit.onDeleteParagraph}
+                />
+              )}
+            {pdfEdit?.paragraphDraft &&
+              pdfEdit.paragraphDraft.pageIndex === currentPage &&
+              pdfEdit.paragraphEditing && (
+                <RichTextEditOverlay
+                  draft={pdfEdit.paragraphDraft}
+                  zoom={zoom}
+                  onUpdate={pdfEdit.onUpdateParagraph}
+                  onApply={pdfEdit.onApply}
+                  onCancel={pdfEdit.onCancel}
+                  onDelete={pdfEdit.onDeleteParagraph}
+                />
+              )}
+            {pdfEdit?.imageDraft &&
+              pdfEdit.imageDraft.pageIndex === currentPage && (
+                <ImageSelectionOverlay
+                  draft={pdfEdit.imageDraft}
+                  zoom={zoom}
+                  onUpdate={({ rect, rotation }) => {
+                    pdfEdit.onUpdateImageRect(rect);
+                    pdfEdit.onUpdateImageRotation(rotation);
+                  }}
+                  onApply={pdfEdit.onApply}
+                  onDelete={pdfEdit.onDeleteImage}
+                  onCancel={pdfEdit.onCancel}
+                />
+              )}
             <PdfPageOverlays
               activeSearchRect={activeSearchRect}
               annotations={annotations}

@@ -6,6 +6,8 @@ const fixturesDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '
 export const fixturePdf = path.join(fixturesDir, 'sample.pdf');
 export const fixturePdf3p = path.join(fixturesDir, 'sample-3p.pdf');
 export const fixturePdfB = path.join(fixturesDir, 'sample-b.pdf');
+export const fixturePdfParagraph = path.join(fixturesDir, 'sample-paragraph.pdf');
+export const fixturePdfImage = path.join(fixturesDir, 'sample-image.pdf');
 export const fixtureMarkdown = path.join(fixturesDir, 'import-markdown.md');
 export const fixtureHtml = path.join(fixturesDir, 'import-webpage.html');
 

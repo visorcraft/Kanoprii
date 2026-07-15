@@ -16,6 +16,7 @@ import type { HelpState } from './useHelpChromeState';
 import type { SecurityState } from './useSecurityFormState';
 import type { ShortcutBindings } from './useShortcutBindingsState';
 import type { WorkspaceViewMode } from './types';
+import type { PdfEditState } from './usePdfEditState';
 
 export type UseAppChromeBindingsInput = {
   doc: DocumentState;
@@ -23,6 +24,7 @@ export type UseAppChromeBindingsInput = {
   security: SecurityState;
   panels: PanelsState;
   annotation: AnnotationState;
+  pdfEdit: PdfEditState;
   help: HelpState;
   refs: Pick<RefsState, 'keyboardActionsRef'>;
   surface: { activeSurface: import('./useAppSurfaceState').AppSurface; openSettings: (focus?: import('./useAppSurfaceState').SettingsFocusSection) => void };
@@ -102,11 +104,13 @@ export function useAppChromeBindings(input: UseAppChromeBindingsInput) {
       },
       zoom: input.zoom,
       pdfActions: input.pdfActions,
+      pdfEdit: input.pdfEdit,
     }),
   );
   useAppKeyboard(input.refs.keyboardActionsRef, input.shortcutBindings, input.surface.activeSurface);
 
   const appMenus = buildAppMenuInput({
+    pdfEdit: input.pdfEdit,
     doc: {
       filePath: input.doc.filePath,
       originalPath: input.doc.originalPath,
@@ -174,6 +178,9 @@ export function useAppChromeBindings(input: UseAppChromeBindingsInput) {
 
   const modeToolbarExtras = buildModeToolbarExtras({
     filePath: input.doc.filePath,
+    editMode: input.pdfEdit.editMode,
+    onToggleEditMode: input.pdfActions.toggleEditMode,
+    onInsertEditImage: input.pdfActions.insertEditImage,
     imageInsertMode: input.annotation.imageInsertMode,
     imageSourcePath: input.annotation.imageSourcePath,
     onOpenImageInsertModal: input.pdfActions.openImageInsertModal,

@@ -5,9 +5,14 @@ export const MAX_ZOOM = 4;
 export const ZOOM_STEP = 0.25;
 export const WHEEL_NAV_COOLDOWN = 350;
 
+/** Natural viewer page dimensions used for rendering and edit overlays. */
+export const VIEWER_PAGE_W = 800;
+export const VIEWER_PAGE_H = 1132;
+
 export const RECENT_PDFS_KEY = 'kanoprii:recent-pdfs';
 export const LAST_BROWSER_DIR_KEY = 'kanoprii:last-browser-dir';
-export const TESSERACT_REMIND_DISMISSED_KEY = 'kanoprii:tesseract-remind-dismissed';
+export const TESSERACT_REMIND_DISMISSED_KEY =
+  'kanoprii:tesseract-remind-dismissed';
 export const RECENT_PDF_LIMIT = 8;
 
 export type ShapeKind = 'square' | 'circle' | 'line';
@@ -21,16 +26,26 @@ export const STAMP_PRESETS = [
 ] as const;
 
 export const PDF_DIALOG_FILTER = [{ name: 'PDF', extensions: ['pdf'] }];
-export const DOCUMENT_DIALOG_FILTER = [{ name: 'Documents', extensions: ['pdf', 'md', 'markdown', 'html', 'htm'] }];
+export const DOCUMENT_DIALOG_FILTER = [
+  { name: 'Documents', extensions: ['pdf', 'md', 'markdown', 'html', 'htm'] },
+];
 export const PNG_DIALOG_FILTER = [{ name: 'PNG', extensions: ['png'] }];
-export const JPEG_DIALOG_FILTER = [{ name: 'JPEG', extensions: ['jpg', 'jpeg'] }];
+export const JPEG_DIALOG_FILTER = [
+  { name: 'JPEG', extensions: ['jpg', 'jpeg'] },
+];
 export const WEBP_DIALOG_FILTER = [{ name: 'WebP', extensions: ['webp'] }];
 export const BMP_DIALOG_FILTER = [{ name: 'BMP', extensions: ['bmp'] }];
-export const TIFF_DIALOG_FILTER = [{ name: 'TIFF', extensions: ['tiff', 'tif'] }];
+export const TIFF_DIALOG_FILTER = [
+  { name: 'TIFF', extensions: ['tiff', 'tif'] },
+];
 export const GIF_DIALOG_FILTER = [{ name: 'GIF', extensions: ['gif'] }];
 export const PPM_DIALOG_FILTER = [{ name: 'PPM', extensions: ['ppm', 'pnm'] }];
-export const MARKDOWN_DIALOG_FILTER = [{ name: 'Markdown', extensions: ['md', 'markdown'] }];
-export const CERT_DIALOG_FILTER = [{ name: 'PKCS#12', extensions: ['p12', 'pfx'] }];
+export const MARKDOWN_DIALOG_FILTER = [
+  { name: 'Markdown', extensions: ['md', 'markdown'] },
+];
+export const CERT_DIALOG_FILTER = [
+  { name: 'PKCS#12', extensions: ['p12', 'pfx'] },
+];
 
 export const DEFAULT_TESSERACT_GUIDE: TesseractInstallGuide = {
   platform: 'unknown',
@@ -42,5 +57,6 @@ export const DEFAULT_TESSERACT_GUIDE: TesseractInstallGuide = {
   ],
   installCommand: null,
   downloadUrl: 'https://github.com/tesseract-ocr/tesseract',
-  licenseNote: 'Tesseract is free, open-source software. You do not need to pay for it.',
+  licenseNote:
+    'Tesseract is free, open-source software. You do not need to pay for it.',
 };

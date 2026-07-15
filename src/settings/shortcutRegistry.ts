@@ -31,6 +31,7 @@ export type ShortcutCommandId =
   | 'toggle-redact'
   | 'toggle-text-edit'
   | 'toggle-vector-edit'
+  | 'toggle-pdf-edit'
   | 'toggle-image-insert'
   | 'toggle-forms'
   | 'previous-page'
@@ -109,6 +110,7 @@ export const SHORTCUT_REGISTRY: ShortcutBinding[] = [
   { commandId: 'toggle-redact', category: 'Annotation', label: 'Redact', defaultShortcuts: ['X'] },
   { commandId: 'toggle-text-edit', category: 'Annotation', label: 'Page text', defaultShortcuts: ['E'] },
   { commandId: 'toggle-vector-edit', category: 'Annotation', label: 'Vector edit', defaultShortcuts: ['G'] },
+  { commandId: 'toggle-pdf-edit', category: 'Annotation', label: 'PDF edit', defaultShortcuts: ['P'] },
   { commandId: 'toggle-image-insert', category: 'Annotation', label: 'Insert image', defaultShortcuts: ['I'] },
   { commandId: 'toggle-forms', category: 'Annotation', label: 'Forms', defaultShortcuts: ['F'] },
 

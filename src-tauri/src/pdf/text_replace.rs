@@ -1,6 +1,10 @@
 use crate::pdf::content::append_page_content;
 use crate::pdf::coords::viewer_rect_to_pdf;
-use crate::pdf::fonts::{ensure_full_font, font_has_glyphs_for};
+use crate::pdf::edit_object::validate_style_inputs;
+use crate::pdf::edit_types::{PdfRect, TextStyle};
+use crate::pdf::fonts::{
+    ensure_font_family, ensure_full_font, font_has_glyphs_for, measure_text_width, style_supports_text,
+};
 use crate::pdf::io::mutate_pdf;
 use crate::pdf::page_text::ensure_helvetica_font;
 use crate::pdf::page_text::escape_pdf_literal_string;
@@ -99,6 +103,99 @@ pub fn replace_text_line(path: &Path, page_index: u32, line_index: usize, new_te
     })
 }
 
+/// Replace a decoded text line with styled text (Phase 1 full editing).
+///
+/// 1. Validate glyph coverage for the requested style.
+/// 2. Ensure the page has the requested font family.
+/// 3. White-out the original line bbox.
+/// 4. Draw the replacement text inside `box_rect` with the style's font,
+///    size, color, and optional synthetic bold/italic/underline.
+pub fn replace_text_line_styled(
+    doc: &mut lopdf::Document,
+    page_index: u32,
+    line_index: usize,
+    new_text: &str,
+    style: &TextStyle,
+    box_rect: &PdfRect,
+) -> Result<(), String> {
+    let trimmed = new_text.trim();
+    if trimmed.is_empty() {
+        return Err("Text cannot be empty".to_string());
+    }
+    if !(6.0..=72.0).contains(&style.font_size) {
+        return Err("Font size must be between 6 and 72".to_string());
+    }
+
+    validate_style_inputs(style, box_rect)?;
+    style_supports_text(style, trimmed)?;
+
+    let page_id = *doc.get_pages().get(&(page_index + 1)).ok_or_else(|| "Page not found".to_string())?;
+    let font_name = ensure_font_family(doc, style, page_id)?;
+
+    let lines = decode_page_text_lines(doc, page_id)?;
+    let line = lines.get(line_index).ok_or_else(|| "Line not found".to_string())?;
+
+    // White-out the original line box.
+    let [x1, y1, x2, y2] = line.bbox;
+    let w = (x2 - x1).max(1.0);
+    let h = (y2 - y1).max(1.0);
+    let whiteout = format!("q 1 1 1 rg {x1} {y1} {w} {h} re f Q\n");
+    append_page_content(doc, page_id, whiteout.as_bytes())?;
+
+    // Convert the viewer-pixel box to PDF user space.
+    let (px, py, pw, ph) = viewer_rect_to_pdf(doc, page_id, box_rect.x, box_rect.y, box_rect.width, box_rect.height)?;
+
+    // Measure rendered width and compute horizontal alignment offset.
+    let est_width = measure_text_width(trimmed, &style.font_family, style.font_size);
+    let align = style.align.to_lowercase();
+    let tx = match align.as_str() {
+        "center" => (px + (pw - est_width) / 2.0).max(px),
+        "right" => (px + pw - est_width).max(px),
+        _ => px,
+    };
+    let baseline = py + style.font_size * 0.2;
+    if baseline > py + ph {
+        return Err("Box rect is too short for the requested font size".to_string());
+    }
+
+    let escaped = escape_pdf_literal_string(trimmed);
+    let mut ops =
+        format!("q {r} {g} {b} rg {r} {g} {b} RG\n", r = style.color.r, g = style.color.g, b = style.color.b,);
+
+    let text_matrix =
+        if style.italic { format!("1 0 0.25 1 {tx} {baseline}") } else { format!("1 0 0 1 {tx} {baseline}") };
+    ops.push_str(&format!(
+        "BT /{font_name} {font_size} Tf {text_matrix} Tm ({escaped}) Tj ET\n",
+        font_name = font_name,
+        font_size = style.font_size,
+    ));
+
+    if style.bold {
+        let bold_tx = tx + 0.5;
+        let bold_matrix = if style.italic {
+            format!("1 0 0.25 1 {bold_tx} {baseline}")
+        } else {
+            format!("1 0 0 1 {bold_tx} {baseline}")
+        };
+        ops.push_str(&format!(
+            "BT /{font_name} {font_size} Tf {bold_matrix} Tm ({escaped}) Tj ET\n",
+            font_name = font_name,
+            font_size = style.font_size,
+        ));
+    }
+
+    if style.underline {
+        let uy = baseline - style.font_size * 0.15;
+        let line_width = style.font_size * 0.05;
+        let x_end = tx + est_width;
+        ops.push_str(&format!("{tx} {uy} m {x_end} {uy} l {line_width} w S\n"));
+    }
+
+    ops.push_str("Q\n");
+    append_page_content(doc, page_id, ops.as_bytes())?;
+    Ok(())
+}
+
 /// Read page content as UTF-8 lossy string (test helper).
 #[cfg(test)]
 pub fn page_content_string(path: &Path, page_index: u32) -> Result<String, String> {
@@ -110,6 +207,7 @@ pub fn page_content_string(path: &Path, page_index: u32) -> Result<String, Strin
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::pdf::edit_types::RgbColor;
     use lopdf::{Dictionary, Object, Stream};
     use std::path::PathBuf;
 
@@ -184,6 +282,93 @@ mod tests {
         path
     }
 
+    fn build_doc_with_text(content_ops: &str) -> (lopdf::Document, lopdf::ObjectId) {
+        let mut doc = lopdf::Document::with_version("1.4");
+        let pages_id = doc.new_object_id();
+        let page_id = doc.new_object_id();
+        let content_id = doc.new_object_id();
+
+        let content_bytes = content_ops.as_bytes().to_vec();
+        doc.set_object(content_id, Object::Stream(Stream::new(Dictionary::new(), content_bytes)));
+
+        doc.set_object(
+            page_id,
+            Object::Dictionary(Dictionary::from_iter(vec![
+                (b"Type".to_vec(), Object::Name(b"Page".to_vec())),
+                (b"Parent".to_vec(), Object::Reference(pages_id)),
+                (
+                    b"MediaBox".to_vec(),
+                    Object::Array(vec![
+                        Object::Integer(0),
+                        Object::Integer(0),
+                        Object::Integer(612),
+                        Object::Integer(792),
+                    ]),
+                ),
+                (b"Contents".to_vec(), Object::Reference(content_id)),
+                (
+                    b"Resources".to_vec(),
+                    Object::Dictionary(Dictionary::from_iter(vec![(
+                        b"Font".to_vec(),
+                        Object::Dictionary(Dictionary::from_iter(vec![(
+                            b"F1".to_vec(),
+                            Object::Dictionary(Dictionary::from_iter(vec![
+                                (b"Type".to_vec(), Object::Name(b"Font".to_vec())),
+                                (b"Subtype".to_vec(), Object::Name(b"Type1".to_vec())),
+                                (b"BaseFont".to_vec(), Object::Name(b"Helvetica".to_vec())),
+                            ])),
+                        )])),
+                    )])),
+                ),
+            ])),
+        );
+
+        doc.set_object(
+            pages_id,
+            Object::Dictionary(Dictionary::from_iter(vec![
+                (b"Type".to_vec(), Object::Name(b"Pages".to_vec())),
+                (b"Kids".to_vec(), Object::Array(vec![Object::Reference(page_id)])),
+                (b"Count".to_vec(), Object::Integer(1)),
+            ])),
+        );
+
+        let catalog_id = doc.new_object_id();
+        doc.set_object(
+            catalog_id,
+            Object::Dictionary(Dictionary::from_iter(vec![
+                (b"Type".to_vec(), Object::Name(b"Catalog".to_vec())),
+                (b"Pages".to_vec(), Object::Reference(pages_id)),
+            ])),
+        );
+        doc.trailer.set(b"Root", Object::Reference(catalog_id));
+        (doc, page_id)
+    }
+
+    fn full_page_box() -> PdfRect {
+        PdfRect { x: 0.0, y: 0.0, width: 800.0, height: 1132.0 }
+    }
+
+    fn style_with_align(align: &str) -> TextStyle {
+        TextStyle {
+            font_family: "Helvetica".to_string(),
+            font_size: 12.0,
+            bold: false,
+            italic: false,
+            underline: false,
+            color: RgbColor { r: 0.1, g: 0.2, b: 0.3 },
+            align: align.to_string(),
+        }
+    }
+
+    fn last_tm_x(content: &str) -> Option<f64> {
+        let before = content.rsplit("Tm").nth(1)?;
+        let tokens: Vec<&str> = before.split_whitespace().collect();
+        if tokens.len() < 6 {
+            return None;
+        }
+        tokens[tokens.len() - 2].parse().ok()
+    }
+
     #[test]
     fn replace_text_line_replaces_and_preserves_transform() {
         let ops = "BT /F1 12 Tf 1 0 0 1 100 700 Tm (Hello) Tj ET";
@@ -215,5 +400,111 @@ mod tests {
         let result = replace_text_line(&path, 0, 0, "   ");
         assert!(result.is_err());
         std::fs::remove_file(&path).ok();
+    }
+
+    #[test]
+    fn replace_text_line_styled_alignment_offsets_differ() {
+        let ops = "BT /F1 12 Tf 1 0 0 1 100 700 Tm (Hello) Tj ET";
+
+        let left = {
+            let (mut doc, page_id) = build_doc_with_text(ops);
+            replace_text_line_styled(&mut doc, 0, 0, "World", &style_with_align("left"), &full_page_box()).unwrap();
+            last_tm_x(&String::from_utf8_lossy(&read_page_content(&doc, page_id).unwrap())).unwrap()
+        };
+        let center = {
+            let (mut doc, page_id) = build_doc_with_text(ops);
+            replace_text_line_styled(&mut doc, 0, 0, "World", &style_with_align("center"), &full_page_box()).unwrap();
+            last_tm_x(&String::from_utf8_lossy(&read_page_content(&doc, page_id).unwrap())).unwrap()
+        };
+        let right = {
+            let (mut doc, page_id) = build_doc_with_text(ops);
+            replace_text_line_styled(&mut doc, 0, 0, "World", &style_with_align("right"), &full_page_box()).unwrap();
+            last_tm_x(&String::from_utf8_lossy(&read_page_content(&doc, page_id).unwrap())).unwrap()
+        };
+
+        assert!(left < center, "center should shift text right: left={left} center={center}");
+        assert!(center < right, "right should shift text further right: center={center} right={right}");
+    }
+
+    #[test]
+    fn replace_text_line_styled_emits_color_operators() {
+        let (mut doc, page_id) = build_doc_with_text("BT /F1 12 Tf 1 0 0 1 100 700 Tm (Hello) Tj ET");
+        replace_text_line_styled(&mut doc, 0, 0, "World", &style_with_align("left"), &full_page_box()).unwrap();
+        let content = String::from_utf8_lossy(&read_page_content(&doc, page_id).unwrap()).into_owned();
+        assert!(content.contains("rg"), "fill color operator missing");
+        assert!(content.contains("RG"), "stroke color operator missing");
+    }
+
+    #[test]
+    fn replace_text_line_styled_bold_draws_twice() {
+        let (mut doc, page_id) = build_doc_with_text("BT /F1 12 Tf 1 0 0 1 100 700 Tm (Hello) Tj ET");
+        let mut style = style_with_align("left");
+        style.bold = true;
+        replace_text_line_styled(&mut doc, 0, 0, "World", &style, &full_page_box()).unwrap();
+        let content = String::from_utf8_lossy(&read_page_content(&doc, page_id).unwrap()).into_owned();
+        assert_eq!(
+            content.matches("Tj").count(),
+            3,
+            "bold should emit two new text show operators plus the original one"
+        );
+    }
+
+    #[test]
+    fn replace_text_line_styled_italic_uses_shear_matrix() {
+        let (mut doc, page_id) = build_doc_with_text("BT /F1 12 Tf 1 0 0 1 100 700 Tm (Hello) Tj ET");
+        let mut style = style_with_align("left");
+        style.italic = true;
+        replace_text_line_styled(&mut doc, 0, 0, "World", &style, &full_page_box()).unwrap();
+        let content = String::from_utf8_lossy(&read_page_content(&doc, page_id).unwrap()).into_owned();
+        assert!(content.contains("1 0 0.25 1"), "italic should use a shear matrix");
+    }
+
+    #[test]
+    fn replace_text_line_styled_underline_emits_stroke() {
+        let (mut doc, page_id) = build_doc_with_text("BT /F1 12 Tf 1 0 0 1 100 700 Tm (Hello) Tj ET");
+        let mut style = style_with_align("left");
+        style.underline = true;
+        replace_text_line_styled(&mut doc, 0, 0, "World", &style, &full_page_box()).unwrap();
+        let content = String::from_utf8_lossy(&read_page_content(&doc, page_id).unwrap()).into_owned();
+        assert!(content.contains(" m "), "underline should contain a moveto");
+        assert!(content.contains(" l "), "underline should contain a lineto");
+        assert!(content.contains(" S"), "underline should contain a stroke operator");
+    }
+
+    #[test]
+    fn replace_text_line_styled_empty_text_fails() {
+        let (mut doc, _) = build_doc_with_text("BT /F1 12 Tf 1 0 0 1 100 700 Tm (Hello) Tj ET");
+        let result = replace_text_line_styled(&mut doc, 0, 0, "   ", &style_with_align("left"), &full_page_box());
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn replace_text_line_styled_missing_glyph_fails_for_liberation_sans() {
+        let (mut doc, _) = build_doc_with_text("BT /F1 12 Tf 1 0 0 1 100 700 Tm (Hello) Tj ET");
+        let mut style = style_with_align("left");
+        style.font_family = "LiberationSans".to_string();
+        let result = replace_text_line_styled(&mut doc, 0, 0, "こんにちは", &style, &full_page_box());
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("not supported"));
+    }
+
+    #[test]
+    fn replace_text_line_styled_rejects_invalid_color() {
+        let (mut doc, _) = build_doc_with_text("BT /F1 12 Tf 1 0 0 1 100 700 Tm (Hello) Tj ET");
+        let mut style = style_with_align("left");
+        style.color = RgbColor { r: 1.5, g: 0.0, b: 0.0 };
+        let result = replace_text_line_styled(&mut doc, 0, 0, "World", &style, &full_page_box());
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("Color components"));
+    }
+
+    #[test]
+    fn replace_text_line_styled_rejects_non_positive_box() {
+        let (mut doc, _) = build_doc_with_text("BT /F1 12 Tf 1 0 0 1 100 700 Tm (Hello) Tj ET");
+        let mut bad_box = full_page_box();
+        bad_box.width = 0.0;
+        let result = replace_text_line_styled(&mut doc, 0, 0, "World", &style_with_align("left"), &bad_box);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("positive width"));
     }
 }

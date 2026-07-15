@@ -17,6 +17,7 @@ import type { ShortcutBindingsState } from './useShortcutBindingsState';
 import type { AppearanceKey } from '../settings/appearancePalettes';
 import type { WorkspaceViewMode } from './types';
 import type { BirdsEyeWorkspace } from './useBirdsEyeWorkspace';
+import type { PdfEditState } from './usePdfEditState';
 
 type DrawingState = ReturnType<typeof useDrawingGesture>;
 type ViewerWorkflow = ReturnType<typeof useAppViewerWorkflow>;
@@ -40,13 +41,24 @@ export type UseAppShellBindingInput = {
   modalCtx: AppModalsRuntime;
   slices: Slices;
   viewerWorkflow: ViewerWorkflow;
-  surface: { activeSurface: AppSurface; settingsFocus: SettingsFocusSection; closeSettings: () => void };
-  workspace: { workspaceView: WorkspaceViewMode; setWorkspaceView: (mode: WorkspaceViewMode) => void };
+  surface: {
+    activeSurface: AppSurface;
+    settingsFocus: SettingsFocusSection;
+    closeSettings: () => void;
+  };
+  workspace: {
+    workspaceView: WorkspaceViewMode;
+    setWorkspaceView: (mode: WorkspaceViewMode) => void;
+  };
   birdsEye: BirdsEyeWorkspace;
   shortcuts: ShortcutBindingsState;
   showToast: (message: string, type?: 'success' | 'error') => void;
   dismissToast: () => void;
-  appearance: { appearance: AppearanceKey; setAppearance: (key: AppearanceKey) => void };
+  appearance: {
+    appearance: AppearanceKey;
+    setAppearance: (key: AppearanceKey) => void;
+  };
+  pdfEdit: PdfEditState;
 };
 
 export function useAppShellBinding(input: UseAppShellBindingInput) {
@@ -79,6 +91,7 @@ export function useAppShellBinding(input: UseAppShellBindingInput) {
     showToast: input.showToast,
     dismissToast: input.dismissToast,
     appearance: input.appearance,
+    pdfEdit: input.pdfEdit,
     viewer: {
       thumbnails: viewer.thumbnails,
       imageSrc: viewer.imageSrc,

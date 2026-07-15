@@ -169,6 +169,11 @@ export const SHORTCUT_HANDLERS: Record<ShortcutCommandId, ShortcutHandler> = {
     enabled: (a) => a.hasOpenPdf && a.viewMode === 'pdf',
     run: (a) => a.toggleVectorEditMode(),
   },
+  'toggle-pdf-edit': {
+    id: 'toggle-pdf-edit',
+    enabled: (a) => a.hasOpenPdf && a.viewMode === 'pdf',
+    run: (a) => a.toggleEditMode(),
+  },
   'toggle-image-insert': {
     id: 'toggle-image-insert',
     enabled: (a) => a.hasOpenPdf && a.viewMode === 'pdf',

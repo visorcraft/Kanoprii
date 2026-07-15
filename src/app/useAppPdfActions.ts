@@ -1,3 +1,6 @@
+import { useMemo, useCallback } from 'react';
+import { invoke } from '@tauri-apps/api/core';
+import { open as openNativeDialog } from '@tauri-apps/plugin-dialog';
 import { useStructuralEdit } from '../pdf/useStructuralEdit';
 import { useImageExportActions } from '../pdf/useImageExportActions';
 import { usePdfModalOpeners } from '../pdf/usePdfModalOpeners';
@@ -33,6 +36,35 @@ import {
   useDocumentEnhancementActions,
   type UseDocumentEnhancementActionsOptions,
 } from '../pdf/useDocumentEnhancementActions';
+import { usePageInteractionEdit } from '../viewer/usePageInteractionEdit';
+import {
+  BMP_DIALOG_FILTER,
+  GIF_DIALOG_FILTER,
+  JPEG_DIALOG_FILTER,
+  PNG_DIALOG_FILTER,
+  TIFF_DIALOG_FILTER,
+  VIEWER_PAGE_H,
+  VIEWER_PAGE_W,
+  WEBP_DIALOG_FILTER,
+} from './constants';
+import type { DocumentSessionData } from './documentSessionTypes';
+import type { PdfEditState, Rect } from './usePdfEditState';
+
+const IMAGE_DIALOG_FILTERS = [
+  ...PNG_DIALOG_FILTER,
+  ...JPEG_DIALOG_FILTER,
+  ...WEBP_DIALOG_FILTER,
+  ...BMP_DIALOG_FILTER,
+  ...TIFF_DIALOG_FILTER,
+  ...GIF_DIALOG_FILTER,
+];
+
+type PdfRect = {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+};
 
 type HookOpts<H extends (...args: never) => unknown> = Parameters<H>[0];
 
@@ -75,6 +107,10 @@ export type UseAppPdfActionsInput = Omit<
   | 'saveAsViaNativeDialog'
   | 'exitNoteMode'
   | 'refreshAnnotations'
+  | 'pdfEdit'
+  | 'session'
+  | 'handleEditPageClick'
+  | 'hitTestImage'
 > &
   Pick<
     UseDocumentEnhancementActionsOptions,
@@ -96,6 +132,9 @@ export type UseAppPdfActionsInput = Omit<
     handleSaveRef: { current: () => void | Promise<void> };
     handleMarkdownViewRef: { current: () => void | Promise<void> };
     openTesseractGuide: () => void;
+    pdfEdit: PdfEditState;
+    sessions: DocumentSessionData[];
+    activeId: string | null;
   };
 
 function call<H extends (opts: never) => unknown>(
@@ -153,10 +192,95 @@ export function useAppPdfActions(input: UseAppPdfActionsInput) {
       input.textEditMode ||
       input.editTextRunMode ||
       input.vectorEditMode ||
-      input.formAddMode,
+      input.formAddMode ||
+      input.pdfEdit.editMode,
   });
+  const activeSession = useMemo(
+    () => input.sessions.find((s) => s.id === input.activeId) ?? null,
+    [input.sessions, input.activeId],
+  );
+
+  const insertEditImage = useCallback(async () => {
+    const filePath = input.filePath;
+    if (!filePath) return;
+    const pageIndex = input.currentPage;
+
+    const imagePath = input.nativeDialogs
+      ? await (async () => {
+          const selected = await openNativeDialog({
+            multiple: false,
+            directory: false,
+            filters: IMAGE_DIALOG_FILTERS,
+          });
+          if (selected === null) return '';
+          return typeof selected === 'string' ? selected : selected[0] ?? '';
+        })()
+      : window.prompt('Image path')?.trim() ?? '';
+    if (!imagePath) return;
+
+    let dimensions: [number, number];
+    try {
+      dimensions = await invoke<[number, number]>('get_image_dimensions', { path: imagePath });
+    } catch (err) {
+      input.showToast(String(err), 'error');
+      return;
+    }
+
+    const [imgWidth, imgHeight] = dimensions;
+    if (imgWidth === 0) {
+      input.showToast('Could not read image dimensions', 'error');
+      return;
+    }
+
+    let defaultWidth = 200;
+    let defaultHeight = (imgHeight / imgWidth) * defaultWidth;
+    const scale = Math.min(1, VIEWER_PAGE_H / defaultHeight, VIEWER_PAGE_W / defaultWidth);
+    defaultWidth *= scale;
+    defaultHeight *= scale;
+
+    const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
+    const x = clamp((VIEWER_PAGE_W - defaultWidth) / 2, 0, VIEWER_PAGE_W - defaultWidth);
+    const y = clamp((VIEWER_PAGE_H - defaultHeight) / 2, 0, VIEWER_PAGE_H - defaultHeight);
+
+    const viewerRect: Rect = { x, y, w: defaultWidth, h: defaultHeight };
+    const pdfRect = await invoke<PdfRect>('viewer_rect_to_pdf', {
+      path: filePath,
+      pageIndex,
+      rect: { x: viewerRect.x, y: viewerRect.y, width: viewerRect.w, height: viewerRect.h },
+    });
+
+    await runEdit({
+      command: 'add_page_image',
+      args: {
+        pageIndex,
+        x: pdfRect.x,
+        y: pdfRect.y,
+        width: pdfRect.width,
+        height: pdfRect.height,
+        imagePath,
+      },
+      reloadAt: pageIndex,
+      toast: 'Image inserted',
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional: stable option object / destructured deps
+  }, [input.filePath, input.currentPage, input.nativeDialogs, input.showToast, runEdit]);
+
+  const editInteraction = usePageInteractionEdit({
+    pdfEdit: input.pdfEdit,
+    filePath: input.filePath,
+    currentPage: input.currentPage,
+    withLoading: input.withLoading,
+    markPdfEdited: input.markPdfEdited,
+    reloadOpenPdf: input.reloadOpenPdf,
+    showToast: input.showToast,
+  });
+
   const pageInteraction = call(usePageInteraction, {
     ...withRunEdit,
+    pdfEdit: input.pdfEdit,
+    session: activeSession,
+    handleEditPageClick: editInteraction.handlePageClick,
+    hitTestImage: editInteraction.hitTestImage,
     editTextRunMode: input.editTextRunMode ?? false,
     handleEditTextRunClick: textLayerFlow.handleEditTextRunClick,
   });
@@ -225,6 +349,13 @@ export function useAppPdfActions(input: UseAppPdfActionsInput) {
     applyFormField: formField.applyFormField,
     ...pageInteraction,
     ...textLayerFlow,
+    pdfEditApplyText: editInteraction.applyTextEdit,
+    pdfEditApplyParagraph: editInteraction.applyParagraphEdit,
+    pdfEditDeleteText: editInteraction.deleteText,
+    pdfEditDeleteParagraph: editInteraction.deleteParagraph,
+    pdfEditApplyImage: editInteraction.applyImageEdit,
+    pdfEditDeleteImage: editInteraction.deleteImage,
+    insertEditImage,
     ...annotationModes,
     ...pageTextEdits,
     ...notePassword,

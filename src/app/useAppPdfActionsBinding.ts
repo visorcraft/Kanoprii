@@ -1,5 +1,10 @@
-import { useAppPdfActions, type UseAppPdfActionsInput } from './useAppPdfActions';
+import { useCallback, useEffect } from 'react';
+import {
+  useAppPdfActions,
+  type UseAppPdfActionsInput,
+} from './useAppPdfActions';
 import type { AnnotationState } from './useAnnotationDraftState';
+import type { PdfEditState } from './usePdfEditState';
 import type { DocumentState } from './useAppDocumentState';
 import type { ModalState } from './useAppModalState';
 import type { PageRangesState } from './useAppPageRanges';
@@ -45,8 +50,11 @@ type AppPdfActionsRuntimeExtras = {
   openTesseractGuide: () => void;
 };
 
-export type AppPdfActionsRuntimeSlice = Omit<AppPdfActionsRuntime, 'setShowTesseractModal' | 'setTesseractReminderSource'>
-  & AppPdfActionsRuntimeExtras;
+export type AppPdfActionsRuntimeSlice = Omit<
+  AppPdfActionsRuntime,
+  'setShowTesseractModal' | 'setTesseractReminderSource'
+> &
+  AppPdfActionsRuntimeExtras;
 
 export type { DrawingGestureSlice };
 
@@ -56,21 +64,39 @@ export type UseAppPdfActionsBindingInput = {
   security: SecurityState;
   panels: PanelsState;
   annotation: AnnotationState;
+  pdfEdit: PdfEditState;
   drawing: DrawingGestureSlice;
   pageRanges: PageRangesState;
-  refs: Pick<RefsState, 'cancelDrawingRef' | 'handleSaveRef' | 'handleMarkdownViewRef' | 'imgRef'>;
+  refs: Pick<
+    RefsState,
+    'cancelDrawingRef' | 'handleSaveRef' | 'handleMarkdownViewRef' | 'imgRef'
+  >;
   help: Pick<HelpState, 'setShowTesseractModal' | 'setTesseractReminderSource'>;
   runtime: AppPdfActionsRuntimeSlice;
 };
 
 export function useAppPdfActionsBinding(input: UseAppPdfActionsBindingInput) {
-  const { modal: m, security: s, panels: p, annotation: a, doc: d, drawing: g, pageRanges: r, refs, help, runtime } = input;
+  const {
+    modal: m,
+    security: s,
+    panels: p,
+    annotation: a,
+    pdfEdit,
+    doc: d,
+    drawing: g,
+    pageRanges: r,
+    refs,
+    help,
+    runtime,
+  } = input;
 
-  return useAppPdfActions({
+  const pdfActions = useAppPdfActions({
     ...modalPdfActionFields(m),
     ...securityPdfActionFields(s),
     ...panelsPdfActionFields(p),
     ...annotationPdfActionFields(a),
+    clearEditMode: pdfEdit.clearEditMode,
+    setEditMode: pdfEdit.setEditMode,
     ...documentPdfActionFields(d),
     ...drawingPdfActionFields(g),
     ...pageRangesPdfActionFields(r),
@@ -85,5 +111,47 @@ export function useAppPdfActionsBinding(input: UseAppPdfActionsBindingInput) {
     setShowTesseractModal: help.setShowTesseractModal,
     setTesseractReminderSource: help.setTesseractReminderSource,
     openTesseractGuide: runtime.openTesseractGuide,
+    pdfEdit,
+    sessions: d.sessions,
+    activeId: d.activeId,
   });
+
+  const activeSession = d.sessions.find((s) => s.id === d.activeId);
+  const { pdfEditApplyText, pdfEditApplyParagraph, pdfEditDeleteText, pdfEditDeleteParagraph, pdfEditApplyImage, pdfEditDeleteImage } = pdfActions;
+
+  const onApplyText = useCallback(() => {
+    if (!activeSession) return Promise.resolve();
+    return pdfEditApplyText(activeSession);
+  }, [activeSession, pdfEditApplyText]);
+
+  const onApplyParagraph = useCallback(() => {
+    if (!activeSession) return Promise.resolve();
+    return pdfEditApplyParagraph(activeSession);
+  }, [activeSession, pdfEditApplyParagraph]);
+
+  const onApplyImage = useCallback(() => {
+    if (!activeSession) return Promise.resolve();
+    return pdfEditApplyImage(activeSession);
+  }, [activeSession, pdfEditApplyImage]);
+
+  const onDeleteText = useCallback(() => {
+    if (!activeSession) return Promise.resolve();
+    return pdfEditDeleteText(activeSession);
+  }, [activeSession, pdfEditDeleteText]);
+
+  const onDeleteParagraph = useCallback(() => {
+    if (!activeSession) return Promise.resolve();
+    return pdfEditDeleteParagraph(activeSession);
+  }, [activeSession, pdfEditDeleteParagraph]);
+
+  const onDeleteImage = useCallback(() => {
+    if (!activeSession) return Promise.resolve();
+    return pdfEditDeleteImage(activeSession);
+  }, [activeSession, pdfEditDeleteImage]);
+
+  useEffect(() => {
+    pdfEdit.bindEditCallbacks({ onApplyText, onApplyParagraph, onDeleteText, onDeleteParagraph, onApplyImage, onDeleteImage });
+  }, [pdfEdit, onApplyText, onApplyParagraph, onDeleteText, onDeleteParagraph, onApplyImage, onDeleteImage]);
+
+  return pdfActions;
 }
