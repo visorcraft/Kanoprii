@@ -17610,6 +17610,53 @@ fn snapshot_undo_restore_reverts_working_copy() {
     let _ = fs::remove_file(&path);
 }
 
+fn build_paragraph_pdf() -> Document {
+    let mut doc = Document::with_version("1.5");
+    let pages_id = doc.new_object_id();
+
+    let mut page = Dictionary::new();
+    page.set("Type", Object::Name(b"Page".to_vec()));
+    page.set("Parent", Object::Reference(pages_id));
+    page.set(
+        "Resources",
+        Object::Dictionary(Dictionary::from_iter(vec![(
+            "Font",
+            Object::Dictionary(Dictionary::from_iter(vec![(
+                "F1",
+                Object::Dictionary(Dictionary::from_iter(vec![
+                    ("Type", Object::Name(b"Font".to_vec())),
+                    ("Subtype", Object::Name(b"Type1".to_vec())),
+                    ("BaseFont", Object::Name(b"Helvetica".to_vec())),
+                ])),
+            )])),
+        )])),
+    );
+    page.set(
+        "MediaBox",
+        Object::Array(vec![Object::Integer(0), Object::Integer(0), Object::Integer(612), Object::Integer(792)]),
+    );
+
+    let content = b"BT /F1 12 Tf 72 700 Td (First line of paragraph) Tj ET\nBT /F1 12 Tf 72 686 Td (Second line of paragraph) Tj ET".to_vec();
+    let stream_id = doc.add_object(Stream::new(Dictionary::new(), content));
+    page.set("Contents", Object::Reference(stream_id));
+
+    let page_id = doc.add_object(Object::Dictionary(page));
+
+    let mut pages = Dictionary::new();
+    pages.set("Type", Object::Name(b"Pages".to_vec()));
+    pages.set("Count", Object::Integer(1));
+    pages.set("Kids", Object::Array(vec![Object::Reference(page_id)]));
+    doc.objects.insert(pages_id, Object::Dictionary(pages));
+
+    let mut catalog = Dictionary::new();
+    catalog.set("Type", Object::Name(b"Catalog".to_vec()));
+    catalog.set("Pages", Object::Reference(pages_id));
+    let catalog_id = doc.add_object(Object::Dictionary(catalog));
+
+    doc.trailer.set("Root", Object::Reference(catalog_id));
+    doc
+}
+
 fn write_e2e_fixtures() {
     let fixtures_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../e2e/fixtures");
     fs::create_dir_all(&fixtures_dir).unwrap();
@@ -17621,6 +17668,12 @@ fn write_e2e_fixtures() {
         let _ = fs::remove_file(source);
         eprintln!("wrote {}", dest.display());
     }
+
+    let source = save(&mut build_paragraph_pdf(), "e2e_sample_paragraph");
+    let dest = fixtures_dir.join("sample-paragraph.pdf");
+    fs::copy(&source, &dest).unwrap();
+    let _ = fs::remove_file(source);
+    eprintln!("wrote {}", dest.display());
 }
 
 /// Writes `e2e/fixtures/*.pdf` for the WebdriverIO suite.

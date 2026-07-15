@@ -91,6 +91,16 @@ struct TextLineInfo {
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
+struct ParagraphInfo {
+    line_indices: Vec<usize>,
+    x: f64,
+    y: f64,
+    w: f64,
+    h: f64,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct PdfUaReport {
     pub tagged: bool,
     pub has_title: bool,

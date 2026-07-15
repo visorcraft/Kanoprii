@@ -33,6 +33,7 @@ pub mod page_range;
 pub mod page_sizes;
 pub mod page_text;
 pub mod page_tree;
+pub mod paragraphs;
 pub mod parity_helpers;
 pub mod pdfium_bind;
 pub mod print;

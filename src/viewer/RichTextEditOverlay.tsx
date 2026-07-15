@@ -1,11 +1,11 @@
 import { useEffect, useRef } from 'react';
-import type { TextEditDraft } from '../app/usePdfEditState';
+import type { ParagraphEditDraft, Rect, TextEditDraft, TextStyle } from '../app/usePdfEditState';
 import { EditToolbar } from './EditToolbar';
 import './RichTextEditOverlay.css';
 
 type RichTextEditOverlayProps = {
-  draft: TextEditDraft;
-  onUpdate: (patch: Partial<TextEditDraft>) => void;
+  draft: TextEditDraft | ParagraphEditDraft;
+  onUpdate: (patch: { text?: string; style?: TextStyle; pageRect?: Rect }) => void;
   onApply: () => void;
   onCancel: () => void;
 };

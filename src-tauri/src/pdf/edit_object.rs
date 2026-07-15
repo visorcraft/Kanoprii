@@ -4,6 +4,7 @@ use crate::pdf::edit_types::{PdfRect, TextStyle};
 use crate::pdf::fonts::{ensure_font_family, measure_text_width, style_supports_text};
 use crate::pdf::page_images::page_resources;
 use crate::pdf::page_text::escape_pdf_literal_string;
+use crate::pdf::text_lines::decode_page_text_lines;
 use crate::pdf::text_replace::replace_text_line_styled;
 use lopdf::{Document, Object};
 
@@ -103,6 +104,26 @@ pub fn add_text_box(
     let font_name = ensure_font_family(doc, style, page_id)?;
 
     let (px, py, pw, ph) = viewer_rect_to_pdf(doc, page_id, box_rect.x, box_rect.y, box_rect.width, box_rect.height)?;
+    let ops = render_wrapped_text_box(trimmed, style, &font_name, px, py, pw, ph)?;
+    append_page_content(doc, page_id, ops.as_bytes())?;
+    Ok(())
+}
+
+/// Render wrapped text inside a PDF rectangle and return the content-stream
+/// operator string. Caller must append the returned ops to the page.
+pub fn render_wrapped_text_box(
+    text: &str,
+    style: &TextStyle,
+    font_name: &str,
+    px: f64,
+    py: f64,
+    pw: f64,
+    ph: f64,
+) -> Result<String, String> {
+    let trimmed = text.trim();
+    if trimmed.is_empty() {
+        return Err("Text cannot be empty".to_string());
+    }
 
     let lines = wrap_text_to_width(trimmed, &style.font_family, style.font_size, pw);
     let line_height = style.font_size * 1.2;
@@ -159,7 +180,85 @@ pub fn add_text_box(
     }
 
     ops.push_str("Q\n");
+    Ok(ops)
+}
+
+/// Edit a paragraph of existing text by whiteing-out the original lines and
+/// rendering wrapped replacement text inside `box_rect`.
+pub fn edit_paragraph(
+    doc: &mut Document,
+    page_index: u32,
+    line_indices: &[usize],
+    new_text: &str,
+    style: &TextStyle,
+    box_rect: &PdfRect,
+) -> Result<(), String> {
+    let trimmed = new_text.trim();
+    if trimmed.is_empty() {
+        return Err("Text cannot be empty".to_string());
+    }
+    if !(6.0..=72.0).contains(&style.font_size) {
+        return Err("Font size must be between 6 and 72".to_string());
+    }
+    validate_style_inputs(style, box_rect)?;
+    style_supports_text(style, trimmed)?;
+
+    let page_id = *doc.get_pages().get(&(page_index + 1)).ok_or_else(|| "Page not found".to_string())?;
+    let font_name = ensure_font_family(doc, style, page_id)?;
+
+    let lines = decode_page_text_lines(doc, page_id)?;
+    let mut sorted_indices: Vec<usize> = line_indices.to_vec();
+    sorted_indices.sort();
+    for &idx in &sorted_indices {
+        if idx >= lines.len() {
+            return Err("Line index out of range".to_string());
+        }
+    }
+
+    whiteout_paragraph_lines(doc, page_id, &lines, &sorted_indices)?;
+
+    let (px, py, pw, ph) = viewer_rect_to_pdf(doc, page_id, box_rect.x, box_rect.y, box_rect.width, box_rect.height)?;
+    let ops = render_wrapped_text_box(trimmed, style, &font_name, px, py, pw, ph)?;
     append_page_content(doc, page_id, ops.as_bytes())?;
+    Ok(())
+}
+
+fn whiteout_paragraph_lines(
+    doc: &mut Document,
+    page_id: lopdf::ObjectId,
+    lines: &[crate::pdf::text_lines::TextLine],
+    sorted_indices: &[usize],
+) -> Result<(), String> {
+    let mut left = f64::MAX;
+    let mut bottom = f64::MAX;
+    let mut right = f64::MIN;
+    let mut top = f64::MIN;
+    for &idx in sorted_indices {
+        let [l, b, r, t] = lines[idx].bbox;
+        left = left.min(l);
+        bottom = bottom.min(b);
+        right = right.max(r);
+        top = top.max(t);
+    }
+    let w = (right - left).max(1.0);
+    let h = (top - bottom).max(1.0);
+    let whiteout = format!("q 1 1 1 rg {left} {bottom} {w} {h} re f Q\n");
+    append_page_content(doc, page_id, whiteout.as_bytes())?;
+    Ok(())
+}
+
+/// Remove a paragraph's text by whiteing-out the union bbox of its lines.
+pub fn delete_paragraph(doc: &mut Document, page_index: u32, line_indices: &[usize]) -> Result<(), String> {
+    let page_id = *doc.get_pages().get(&(page_index + 1)).ok_or_else(|| "Page not found".to_string())?;
+    let lines = decode_page_text_lines(doc, page_id)?;
+    let mut sorted_indices: Vec<usize> = line_indices.to_vec();
+    sorted_indices.sort();
+    for &idx in &sorted_indices {
+        if idx >= lines.len() {
+            return Err("Line index out of range".to_string());
+        }
+    }
+    whiteout_paragraph_lines(doc, page_id, &lines, &sorted_indices)?;
     Ok(())
 }
 
@@ -289,6 +388,7 @@ fn find_xobject_name(doc: &Document, page_index: u32, object_id: (u32, u16)) -> 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::pdf::edit_types::RgbColor;
 
     #[test]
     fn validate_rect_finite_accepts_positive_box() {
@@ -313,5 +413,110 @@ mod tests {
         let err = validate_rect_finite(&PdfRect { x: 0.0, y: f64::INFINITY, width: 100.0, height: 50.0 }, "rect")
             .unwrap_err();
         assert!(err.contains("must be a finite number"));
+    }
+
+    fn build_doc_with_text(content_ops: &str) -> (lopdf::Document, lopdf::ObjectId) {
+        let mut doc = lopdf::Document::with_version("1.4");
+        let pages_id = doc.new_object_id();
+        let page_id = doc.new_object_id();
+        let content_id = doc.new_object_id();
+
+        let content_bytes = content_ops.as_bytes().to_vec();
+        doc.set_object(content_id, lopdf::Object::Stream(lopdf::Stream::new(lopdf::Dictionary::new(), content_bytes)));
+
+        doc.set_object(
+            page_id,
+            lopdf::Object::Dictionary(lopdf::Dictionary::from_iter(vec![
+                (b"Type".to_vec(), lopdf::Object::Name(b"Page".to_vec())),
+                (b"Parent".to_vec(), lopdf::Object::Reference(pages_id)),
+                (
+                    b"MediaBox".to_vec(),
+                    lopdf::Object::Array(vec![
+                        lopdf::Object::Integer(0),
+                        lopdf::Object::Integer(0),
+                        lopdf::Object::Integer(612),
+                        lopdf::Object::Integer(792),
+                    ]),
+                ),
+                (b"Contents".to_vec(), lopdf::Object::Reference(content_id)),
+                (
+                    b"Resources".to_vec(),
+                    lopdf::Object::Dictionary(lopdf::Dictionary::from_iter(vec![(
+                        b"Font".to_vec(),
+                        lopdf::Object::Dictionary(lopdf::Dictionary::from_iter(vec![(
+                            b"F1".to_vec(),
+                            lopdf::Object::Dictionary(lopdf::Dictionary::from_iter(vec![
+                                (b"Type".to_vec(), lopdf::Object::Name(b"Font".to_vec())),
+                                (b"Subtype".to_vec(), lopdf::Object::Name(b"Type1".to_vec())),
+                                (b"BaseFont".to_vec(), lopdf::Object::Name(b"Helvetica".to_vec())),
+                            ])),
+                        )])),
+                    )])),
+                ),
+            ])),
+        );
+
+        doc.set_object(
+            pages_id,
+            lopdf::Object::Dictionary(lopdf::Dictionary::from_iter(vec![
+                (b"Type".to_vec(), lopdf::Object::Name(b"Pages".to_vec())),
+                (b"Kids".to_vec(), lopdf::Object::Array(vec![lopdf::Object::Reference(page_id)])),
+                (b"Count".to_vec(), lopdf::Object::Integer(1)),
+            ])),
+        );
+
+        let catalog_id = doc.new_object_id();
+        doc.set_object(
+            catalog_id,
+            lopdf::Object::Dictionary(lopdf::Dictionary::from_iter(vec![
+                (b"Type".to_vec(), lopdf::Object::Name(b"Catalog".to_vec())),
+                (b"Pages".to_vec(), lopdf::Object::Reference(pages_id)),
+            ])),
+        );
+        doc.trailer.set(b"Root", lopdf::Object::Reference(catalog_id));
+        (doc, page_id)
+    }
+
+    fn full_page_box() -> PdfRect {
+        PdfRect { x: 0.0, y: 0.0, width: 800.0, height: 1132.0 }
+    }
+
+    fn style_with_align(align: &str) -> TextStyle {
+        TextStyle {
+            font_family: "Helvetica".to_string(),
+            font_size: 12.0,
+            bold: false,
+            italic: false,
+            underline: false,
+            color: RgbColor { r: 0.1, g: 0.2, b: 0.3 },
+            align: align.to_string(),
+        }
+    }
+
+    #[test]
+    fn edit_paragraph_replaces_two_lines() {
+        let ops =
+            "BT /F1 12 Tf 1 0 0 1 100 700 Tm (Hello world) Tj ET\nBT /F1 12 Tf 1 0 0 1 100 686 Tm (Second line) Tj ET";
+        let (mut doc, page_id) = build_doc_with_text(ops);
+        let style = style_with_align("left");
+        edit_paragraph(&mut doc, 0, &[0, 1], "Replaced paragraph", &style, &full_page_box()).unwrap();
+        let content =
+            String::from_utf8_lossy(&crate::pdf::page_text::read_page_content(&doc, page_id).unwrap()).into_owned();
+        assert!(content.contains("Replaced"));
+        assert!(content.contains("q 1 1 1 rg"));
+    }
+
+    #[test]
+    fn edit_paragraph_empty_text_fails() {
+        let (mut doc, _) = build_doc_with_text("BT /F1 12 Tf 1 0 0 1 100 700 Tm (Hello) Tj ET");
+        let result = edit_paragraph(&mut doc, 0, &[0], "   ", &style_with_align("left"), &full_page_box());
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn edit_paragraph_out_of_range_line_fails() {
+        let (mut doc, _) = build_doc_with_text("BT /F1 12 Tf 1 0 0 1 100 700 Tm (Hello) Tj ET");
+        let result = edit_paragraph(&mut doc, 0, &[0, 5], "Text", &style_with_align("left"), &full_page_box());
+        assert!(result.is_err());
     }
 }

@@ -14,6 +14,7 @@ import { TextLayer } from './TextLayer';
 import { TextEditOverlay } from './TextEditOverlay';
 import { RichTextEditOverlay } from './RichTextEditOverlay';
 import { ImageSelectionOverlay } from './ImageSelectionOverlay';
+import { ParagraphSelectionOverlay } from './ParagraphSelectionOverlay';
 import type { PdfEditState } from '../app/usePdfEditState';
 
 type PdfPageViewProps = {
@@ -177,6 +178,26 @@ function PdfPageViewInner({
                 <RichTextEditOverlay
                   draft={pdfEdit.textDraft}
                   onUpdate={pdfEdit.onUpdate}
+                  onApply={pdfEdit.onApply}
+                  onCancel={pdfEdit.onCancel}
+                />
+              )}
+            {pdfEdit?.paragraphDraft &&
+              pdfEdit.paragraphDraft.pageIndex === currentPage &&
+              !pdfEdit.paragraphEditing && (
+                <ParagraphSelectionOverlay
+                  draft={pdfEdit.paragraphDraft}
+                  onUpdate={pdfEdit.onUpdateParagraph}
+                  onEnterEdit={pdfEdit.enterParagraphTextEdit}
+                  onDelete={pdfEdit.onDeleteParagraph}
+                />
+              )}
+            {pdfEdit?.paragraphDraft &&
+              pdfEdit.paragraphDraft.pageIndex === currentPage &&
+              pdfEdit.paragraphEditing && (
+                <RichTextEditOverlay
+                  draft={pdfEdit.paragraphDraft}
+                  onUpdate={pdfEdit.onUpdateParagraph}
                   onApply={pdfEdit.onApply}
                   onCancel={pdfEdit.onCancel}
                 />

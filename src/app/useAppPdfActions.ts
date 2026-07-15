@@ -257,6 +257,8 @@ export function useAppPdfActions(input: UseAppPdfActionsInput) {
     ...pageInteraction,
     ...textLayerFlow,
     pdfEditApplyText: editInteraction.applyTextEdit,
+    pdfEditApplyParagraph: editInteraction.applyParagraphEdit,
+    pdfEditDeleteParagraph: editInteraction.deleteParagraph,
     pdfEditApplyImage: editInteraction.applyImageEdit,
     pdfEditDeleteImage: editInteraction.deleteImage,
     ...annotationModes,

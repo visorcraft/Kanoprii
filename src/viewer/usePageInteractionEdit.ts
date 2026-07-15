@@ -128,7 +128,7 @@ export function usePageInteractionEdit(deps: UsePageInteractionEditOptions) {
     ) => {
       if (!session?.filePath) return;
 
-      if (pdfEdit.mode === 'text' || pdfEdit.mode === 'idle') {
+      if (pdfEdit.mode === 'text' || pdfEdit.mode === 'paragraph' || pdfEdit.mode === 'idle') {
         const lines = await loadPageTextLines(session, pageIndex);
         let hitLine: TextLine | null = null;
         for (let i = lines.length - 1; i >= 0; i -= 1) {
@@ -144,15 +144,37 @@ export function usePageInteractionEdit(deps: UsePageInteractionEditOptions) {
           }
         }
         if (hitLine) {
-          pdfEdit.startEditingText({
-            pageIndex,
-            point,
-            text: hitLine.text,
-            pageRect: hitLine.bbox,
-            style: pdfEdit.style,
-            lineIndex: hitLine.lineIndex,
-          });
-        } else if (pdfEdit.mode === 'text') {
+          // Try to detect a multi-line paragraph first.
+          const paragraph = await invoke<{ lineIndices: number[]; x: number; y: number; w: number; h: number } | null>(
+            'find_paragraph',
+            {
+              path: session.filePath,
+              pageIndex,
+              lineIndex: hitLine.lineIndex,
+            },
+          );
+          if (paragraph) {
+            const text = paragraph.lineIndices
+              .map((idx) => lines[idx]?.text ?? '')
+              .join('\n');
+            pdfEdit.startEditingParagraph({
+              pageIndex,
+              lineIndices: paragraph.lineIndices,
+              text,
+              pageRect: { x: paragraph.x, y: paragraph.y, w: paragraph.w, h: paragraph.h },
+              style: pdfEdit.style,
+            });
+          } else {
+            pdfEdit.startEditingText({
+              pageIndex,
+              point,
+              text: hitLine.text,
+              pageRect: hitLine.bbox,
+              style: pdfEdit.style,
+              lineIndex: hitLine.lineIndex,
+            });
+          }
+        } else if (pdfEdit.mode === 'text' || pdfEdit.mode === 'paragraph') {
           pdfEdit.startInsertingText(pageIndex, point, {
             x: point.x - 50,
             y: point.y - 10,
@@ -239,6 +261,49 @@ export function usePageInteractionEdit(deps: UsePageInteractionEditOptions) {
     [deps, pdfEdit],
   );
 
+  const applyParagraphEdit = useCallback(
+    async (session: DocumentSessionData) => {
+      if (!session?.filePath || !pdfEdit.paragraphDraft) return;
+      const draft = pdfEdit.paragraphDraft;
+      const boxRect = rectToPdfRect(draft.pageRect);
+      const style = toBackendStyle(draft.style);
+      await runStructuralEdit(deps, {
+        command: 'edit_paragraph',
+        args: {
+          path: session.filePath,
+          pageIndex: draft.pageIndex,
+          lineIndices: draft.lineIndices,
+          newText: draft.text,
+          style,
+          boxRect,
+        },
+        reloadAt: draft.pageIndex,
+        toast: 'Paragraph updated',
+      });
+      pdfEdit.onCancel();
+    },
+    [deps, pdfEdit],
+  );
+
+  const deleteParagraph = useCallback(
+    async (session: DocumentSessionData) => {
+      if (!session?.filePath || !pdfEdit.paragraphDraft) return;
+      const draft = pdfEdit.paragraphDraft;
+      await runStructuralEdit(deps, {
+        command: 'delete_paragraph',
+        args: {
+          path: session.filePath,
+          pageIndex: draft.pageIndex,
+          lineIndices: draft.lineIndices,
+        },
+        reloadAt: draft.pageIndex,
+        toast: 'Paragraph removed',
+      });
+      pdfEdit.onCancel();
+    },
+    [deps, pdfEdit],
+  );
+
   const applyImageEdit = useCallback(
     async (session: DocumentSessionData) => {
       if (!session?.filePath || !pdfEdit.imageDraft) return;
@@ -282,6 +347,8 @@ export function usePageInteractionEdit(deps: UsePageInteractionEditOptions) {
   return {
     handlePageClick,
     applyTextEdit,
+    applyParagraphEdit,
+    deleteParagraph,
     applyImageEdit,
     deleteImage,
     hitTestImage,

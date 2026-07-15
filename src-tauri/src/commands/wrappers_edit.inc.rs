@@ -55,6 +55,56 @@ fn remove_page_image(path: String, page_index: u32, image_index: usize) -> Resul
 }
 
 #[tauri::command]
+fn edit_paragraph(
+    path: String,
+    page_index: u32,
+    line_indices: Vec<usize>,
+    new_text: String,
+    style: TextStyle,
+    box_rect: PdfRect,
+) -> Result<(), String> {
+    crate::pdf::io::mutate_pdf(&PathBuf::from(path), |doc| {
+        crate::pdf::edit_object::edit_paragraph(doc, page_index, &line_indices, &new_text, &style, &box_rect)
+    })
+}
+
+#[tauri::command]
+fn delete_paragraph(path: String, page_index: u32, line_indices: Vec<usize>) -> Result<(), String> {
+    crate::pdf::io::mutate_pdf(&PathBuf::from(path), |doc| {
+        crate::pdf::edit_object::delete_paragraph(doc, page_index, &line_indices)
+    })
+}
+
+#[tauri::command]
+fn find_paragraph(path: String, page_index: u32, line_index: usize) -> Result<Option<ParagraphInfo>, String> {
+    crate::pdf::io::with_pdf(&PathBuf::from(path), |doc| {
+        let page_id = doc
+            .page_iter()
+            .nth(page_index as usize)
+            .ok_or_else(|| "page index out of range".to_string())?;
+        let lines = crate::pdf::text_lines::decode_page_text_lines(doc, page_id)?;
+        let paragraph = crate::pdf::paragraphs::find_paragraph_for_line(&lines, line_index);
+        match paragraph {
+            Some(p) if p.line_indices.len() > 1 => {
+                let media = crate::pdf::coords::page_media_box(doc, page_id)?;
+                let page_w = (media[2] - media[0]).max(1.0) as f32;
+                let page_h = (media[3] - media[1]).max(1.0) as f32;
+                let [left, bottom, right, top] = p.bbox;
+                let viewer = crate::pdf::coords::pdf_rect_to_viewer_px(left, bottom, right, top, page_w, page_h);
+                Ok(Some(ParagraphInfo {
+                    line_indices: p.line_indices,
+                    x: viewer[0],
+                    y: viewer[1],
+                    w: (viewer[2] - viewer[0]).max(1.0),
+                    h: (viewer[3] - viewer[1]).max(1.0),
+                }))
+            }
+            _ => Ok(None),
+        }
+    })
+}
+
+#[tauri::command]
 fn viewer_rect_to_pdf(path: String, page_index: u32, rect: PdfRect) -> Result<PdfRect, String> {
     validate_rect_finite(&rect, "rect")?;
     crate::pdf::io::with_pdf(&PathBuf::from(path), |doc| {

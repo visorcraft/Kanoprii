@@ -1,11 +1,13 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
 
-export type EditMode = 'idle' | 'text' | 'image';
+export type EditMode = 'idle' | 'text' | 'image' | 'paragraph';
 
 export type TextAlignment = 'left' | 'center' | 'right';
 
 export type PdfEditCallbacks = {
   onApplyText?: () => void | Promise<void>;
+  onApplyParagraph?: () => void | Promise<void>;
+  onDeleteParagraph?: () => void | Promise<void>;
   onApplyImage?: () => void | Promise<void>;
   onDeleteImage?: () => void | Promise<void>;
 };
@@ -65,6 +67,16 @@ export interface ImageEditDraft {
   pageRect: Rect;
 }
 
+export interface ParagraphEditDraft {
+  pageIndex: number;
+  /** Indices of decoded text lines that form this paragraph. */
+  lineIndices: number[];
+  text: string;
+  /** Rectangle in natural page coordinates (800x1132 viewer space) for the paragraph edit box. */
+  pageRect: Rect;
+  style: TextStyle;
+}
+
 export const DEFAULT_TEXT_STYLE: TextStyle = {
   fontFamily: 'Helvetica',
   fontSize: 12,
@@ -79,6 +91,9 @@ export function usePdfEditState() {
   const [mode, setMode] = useState<EditMode>('idle');
   const [textDraft, setTextDraft] = useState<TextEditDraft | null>(null);
   const [imageDraft, setImageDraft] = useState<ImageEditDraft | null>(null);
+  const [paragraphDraft, setParagraphDraft] = useState<ParagraphEditDraft | null>(null);
+  /** Whether the paragraph draft is in text-edit mode (textarea) vs selection/move/resize mode. */
+  const [paragraphEditing, setParagraphEditing] = useState(false);
   /** Default style applied to newly created text edits. */
   const [style, setStyle] = useState<TextStyle>(DEFAULT_TEXT_STYLE);
   /** Whether the PDF edit tool is selected. Active independently of any current draft. */
@@ -87,6 +102,7 @@ export function usePdfEditState() {
   const startEditingText = useCallback((draft: TextEditDraft) => {
     setTextDraft(draft);
     setImageDraft(null);
+    setParagraphDraft(null);
     setMode('text');
   }, []);
 
@@ -94,6 +110,7 @@ export function usePdfEditState() {
     (pageIndex: number, point: Point, pageRect: Rect) => {
       setTextDraft({ pageIndex, point, text: '', pageRect, style });
       setImageDraft(null);
+      setParagraphDraft(null);
       setMode('text');
     },
     [style]
@@ -102,17 +119,36 @@ export function usePdfEditState() {
   const startEditingImage = useCallback((draft: ImageEditDraft) => {
     setImageDraft(draft);
     setTextDraft(null);
+    setParagraphDraft(null);
     setMode('image');
+  }, []);
+
+  const startEditingParagraph = useCallback((draft: ParagraphEditDraft) => {
+    setParagraphDraft(draft);
+    setParagraphEditing(false);
+    setTextDraft(null);
+    setImageDraft(null);
+    setMode('paragraph');
+  }, []);
+
+  const enterParagraphTextEdit = useCallback(() => {
+    setParagraphEditing(true);
   }, []);
 
   const onUpdate = useCallback((patch: Partial<TextEditDraft>) => {
     setTextDraft((prev) => (prev ? { ...prev, ...patch } : null));
   }, []);
 
+  const onUpdateParagraph = useCallback((patch: Partial<ParagraphEditDraft>) => {
+    setParagraphDraft((prev) => (prev ? { ...prev, ...patch } : null));
+  }, []);
+
   const onCancel = useCallback(() => {
     setMode('idle');
     setTextDraft(null);
     setImageDraft(null);
+    setParagraphDraft(null);
+    setParagraphEditing(false);
     setStyle(DEFAULT_TEXT_STYLE);
   }, []);
 
@@ -130,6 +166,8 @@ export function usePdfEditState() {
   const onApply = useCallback(async () => {
     if (mode === 'text' && callbacksRef.current.onApplyText) {
       await callbacksRef.current.onApplyText();
+    } else if (mode === 'paragraph' && callbacksRef.current.onApplyParagraph) {
+      await callbacksRef.current.onApplyParagraph();
     } else if (mode === 'image' && callbacksRef.current.onApplyImage) {
       await callbacksRef.current.onApplyImage();
     } else {
@@ -140,6 +178,14 @@ export function usePdfEditState() {
   const onUpdateImageRect = useCallback((rect: Rect) => {
     setImageDraft((prev) => (prev ? { ...prev, pageRect: rect } : null));
   }, []);
+
+  const onDeleteParagraph = useCallback(async () => {
+    if (callbacksRef.current.onDeleteParagraph) {
+      await callbacksRef.current.onDeleteParagraph();
+    } else {
+      onCancel();
+    }
+  }, [onCancel]);
 
   const onDeleteImage = useCallback(async () => {
     if (callbacksRef.current.onDeleteImage) {
@@ -159,17 +205,23 @@ export function usePdfEditState() {
       editMode,
       textDraft,
       imageDraft,
+      paragraphDraft,
+      paragraphEditing,
       style,
       startEditingText,
       startInsertingText,
+      startEditingParagraph,
+      enterParagraphTextEdit,
       startEditingImage,
       updateStyle,
       onUpdate,
+      onUpdateParagraph,
       onApply,
       onCancel,
       setEditMode,
       clearEditMode,
       onUpdateImageRect,
+      onDeleteParagraph,
       onDeleteImage,
       bindEditCallbacks,
     }),
@@ -178,17 +230,23 @@ export function usePdfEditState() {
       editMode,
       textDraft,
       imageDraft,
+      paragraphDraft,
+      paragraphEditing,
       style,
       startEditingText,
       startInsertingText,
+      startEditingParagraph,
+      enterParagraphTextEdit,
       startEditingImage,
       updateStyle,
       onUpdate,
+      onUpdateParagraph,
       onApply,
       onCancel,
       setEditMode,
       clearEditMode,
       onUpdateImageRect,
+      onDeleteParagraph,
       onDeleteImage,
       bindEditCallbacks,
     ]

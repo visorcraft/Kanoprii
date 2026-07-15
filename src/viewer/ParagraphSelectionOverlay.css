@@ -1,0 +1,67 @@
+.paragraph-selection-overlay {
+  position: absolute;
+  cursor: move;
+  z-index: 10;
+}
+
+.paragraph-selection-frame {
+  position: absolute;
+  inset: 0;
+  border: 2px dashed var(--pp-accent, #0066cc);
+  pointer-events: none;
+}
+
+.paragraph-handle {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  background: var(--pp-accent, #0066cc);
+  border: 1px solid var(--pp-surface, #fff);
+  border-radius: 50%;
+  z-index: 11;
+}
+
+.paragraph-handle-nw {
+  top: -5px;
+  left: -5px;
+  cursor: nw-resize;
+}
+.paragraph-handle-n {
+  top: -5px;
+  left: 50%;
+  margin-left: -5px;
+  cursor: n-resize;
+}
+.paragraph-handle-ne {
+  top: -5px;
+  right: -5px;
+  cursor: ne-resize;
+}
+.paragraph-handle-w {
+  top: 50%;
+  margin-top: -5px;
+  left: -5px;
+  cursor: w-resize;
+}
+.paragraph-handle-e {
+  top: 50%;
+  margin-top: -5px;
+  right: -5px;
+  cursor: e-resize;
+}
+.paragraph-handle-sw {
+  bottom: -5px;
+  left: -5px;
+  cursor: sw-resize;
+}
+.paragraph-handle-s {
+  bottom: -5px;
+  left: 50%;
+  margin-left: -5px;
+  cursor: s-resize;
+}
+.paragraph-handle-se {
+  bottom: -5px;
+  right: -5px;
+  cursor: se-resize;
+}
