@@ -333,4 +333,15 @@ describe('PDF Edit Mode', () => {
     const errorToast = await $('[role="alert"]');
     expect(await errorToast.isDisplayed().catch(() => false)).toBe(false);
   });
+
+  it('shows an Insert Image button when edit mode is active', async () => {
+    await openPdfViaPathModal(fixturePdf);
+    await waitForPdfOpen();
+    await waitForPageRendered();
+
+    await enterPdfEditMode();
+    const insertBtn = await $('[aria-label="Insert image"]');
+    await insertBtn.waitForDisplayed({ timeout: 10_000 });
+    expect(await insertBtn.isClickable()).toBe(true);
+  });
 });

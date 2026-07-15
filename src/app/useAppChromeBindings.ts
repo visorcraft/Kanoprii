@@ -180,6 +180,7 @@ export function useAppChromeBindings(input: UseAppChromeBindingsInput) {
     filePath: input.doc.filePath,
     editMode: input.pdfEdit.editMode,
     onToggleEditMode: input.pdfActions.toggleEditMode,
+    onInsertEditImage: input.pdfActions.insertEditImage,
     imageInsertMode: input.annotation.imageInsertMode,
     imageSourcePath: input.annotation.imageSourcePath,
     onOpenImageInsertModal: input.pdfActions.openImageInsertModal,

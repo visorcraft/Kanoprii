@@ -4,6 +4,7 @@ import { fileNameFromPath } from '../app/utils';
 type ModeToolbarExtrasProps = {
   editMode: boolean;
   onToggleEditMode: () => void;
+  onInsertEditImage?: () => void;
   imageInsertMode: boolean;
   imageSourcePath: string;
   onOpenImageInsertModal: () => void;
@@ -20,6 +21,7 @@ type ModeToolbarExtrasProps = {
 export function ModeToolbarExtras({
   editMode,
   onToggleEditMode,
+  onInsertEditImage,
   imageInsertMode,
   imageSourcePath,
   onOpenImageInsertModal,
@@ -44,6 +46,17 @@ export function ModeToolbarExtras({
       >
         Edit
       </button>
+      {editMode && onInsertEditImage && (
+        <button
+          type="button"
+          className="btn"
+          aria-label="Insert image"
+          title="Insert image"
+          onClick={onInsertEditImage}
+        >
+          Insert Image
+        </button>
+      )}
       {imageInsertMode && imageSourcePath && (
         <button
           type="button"
