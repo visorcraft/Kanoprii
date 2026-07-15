@@ -201,17 +201,21 @@ export function useAppPdfActions(input: UseAppPdfActionsInput) {
   );
 
   const insertEditImage = useCallback(async () => {
-    const filePath = activeSession?.filePath ?? input.filePath;
+    const filePath = input.filePath;
     if (!filePath) return;
     const pageIndex = input.currentPage;
 
-    const selected = await openNativeDialog({
-      multiple: false,
-      directory: false,
-      filters: IMAGE_DIALOG_FILTERS,
-    });
-    if (selected === null) return;
-    const imagePath = typeof selected === 'string' ? selected : selected[0] ?? '';
+    const imagePath = input.nativeDialogs
+      ? await (async () => {
+          const selected = await openNativeDialog({
+            multiple: false,
+            directory: false,
+            filters: IMAGE_DIALOG_FILTERS,
+          });
+          if (selected === null) return '';
+          return typeof selected === 'string' ? selected : selected[0] ?? '';
+        })()
+      : window.prompt('Image path')?.trim() ?? '';
     if (!imagePath) return;
 
     let dimensions: [number, number];
@@ -228,10 +232,15 @@ export function useAppPdfActions(input: UseAppPdfActionsInput) {
       return;
     }
 
-    const defaultWidth = 200;
-    const defaultHeight = (imgHeight / imgWidth) * defaultWidth;
-    const x = (VIEWER_PAGE_W - defaultWidth) / 2;
-    const y = (VIEWER_PAGE_H - defaultHeight) / 2;
+    let defaultWidth = 200;
+    let defaultHeight = (imgHeight / imgWidth) * defaultWidth;
+    const scale = Math.min(1, VIEWER_PAGE_H / defaultHeight, VIEWER_PAGE_W / defaultWidth);
+    defaultWidth *= scale;
+    defaultHeight *= scale;
+
+    const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
+    const x = clamp((VIEWER_PAGE_W - defaultWidth) / 2, 0, VIEWER_PAGE_W - defaultWidth);
+    const y = clamp((VIEWER_PAGE_H - defaultHeight) / 2, 0, VIEWER_PAGE_H - defaultHeight);
 
     const viewerRect: Rect = { x, y, w: defaultWidth, h: defaultHeight };
     const pdfRect = await invoke<PdfRect>('viewer_rect_to_pdf', {
@@ -254,7 +263,7 @@ export function useAppPdfActions(input: UseAppPdfActionsInput) {
       toast: 'Image inserted',
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional: stable option object / destructured deps
-  }, [activeSession, input.filePath, input.currentPage, input.showToast, runEdit]);
+  }, [input.filePath, input.currentPage, input.nativeDialogs, input.showToast, runEdit]);
 
   const editInteraction = usePageInteractionEdit({
     pdfEdit: input.pdfEdit,
