@@ -158,8 +158,8 @@ describe('PDF Edit Mode', () => {
       return { x: rect.left, y: rect.top };
     });
 
-    expect(Math.round(after.x)).not.toEqual(Math.round(before.x));
-    expect(Math.round(after.y)).not.toEqual(Math.round(before.y));
+    expect(Math.round(after.x - before.x)).toBeGreaterThanOrEqual(50);
+    expect(Math.round(after.y - before.y)).toBeGreaterThanOrEqual(30);
 
     const applyBtn = await $('.edit-toolbar-apply');
     await applyBtn.click();

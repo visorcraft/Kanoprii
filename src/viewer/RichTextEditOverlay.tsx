@@ -112,6 +112,34 @@ export function RichTextEditOverlay({
     dragStartRectRef.current = rectRef.current;
   }, []);
 
+  const handleMoveKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      if (!['ArrowRight', 'ArrowLeft', 'ArrowUp', 'ArrowDown'].includes(e.key)) return;
+      e.preventDefault();
+      e.stopPropagation();
+      const current = rectRef.current;
+      let { x, y } = current;
+      switch (e.key) {
+        case 'ArrowLeft':
+          x -= 5;
+          break;
+        case 'ArrowRight':
+          x += 5;
+          break;
+        case 'ArrowUp':
+          y -= 5;
+          break;
+        case 'ArrowDown':
+          y += 5;
+          break;
+      }
+      const clamped = clampMove({ ...current, x, y });
+      updateRect(clamped);
+      onUpdate({ pageRect: clamped });
+    },
+    [onUpdate, updateRect],
+  );
+
   const handleHandleKeyDown = useCallback(
     (e: React.KeyboardEvent, kind: ResizeHandleKind) => {
       if (!['ArrowRight', 'ArrowLeft', 'ArrowUp', 'ArrowDown'].includes(e.key)) return;
@@ -259,7 +287,7 @@ export function RichTextEditOverlay({
 
   return (
     <div
-      className={`rich-text-edit-overlay ${dragging === 'move' ? 'moving' : ''}`}
+      className={`rich-text-edit-overlay${dragging === 'move' ? ' moving' : ''}`}
       style={{
         position: 'absolute',
         left: rect.x,
@@ -307,6 +335,7 @@ export function RichTextEditOverlay({
         tabIndex={0}
         aria-label="Move text box"
         onMouseDown={(e) => handleMouseDown(e, 'move')}
+        onKeyDown={handleMoveKeyDown}
       />
       {renderHandle('tl')}
       {renderHandle('tr')}
