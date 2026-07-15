@@ -38,6 +38,11 @@ export function useAppLifecycleOpen({ input, loaders }: UseAppLifecycleDocumentI
     setShowPasswordModal,
   } = security;
 
+  // Cold-start gate: suppress md/html -> PDF generation until session restore +
+  // launch-path drain have completed (see useAppRuntimeWiring). Prevents the
+  // slow materialize/render async from racing a concurrent cold-start PDF open.
+  const coldStartReady = input.doc.coldStartReady;
+
   const { rememberOpenedPdf } = usePdfRecents({ rememberBrowserDirectory: loaders.rememberBrowserDirectory, setRecentPdfs });
   const { loadFormFields } = loaders;
 
@@ -136,6 +141,7 @@ export function useAppLifecycleOpen({ input, loaders }: UseAppLifecycleDocumentI
 
   const generatedViewRef = useRef('');
   useEffect(() => {
+    if (!coldStartReady) return;
     if (viewMode !== 'pdf' || sourceKind === 'pdf' || !sourceKind || !sourcePath || !activeId) return;
     const sourceDigest = `${sourceText.length}:${sourceText.slice(0, 64)}`;
     const key = `${activeId}:${sourcePath}:${sourceDigest}`;
@@ -150,15 +156,15 @@ export function useAppLifecycleOpen({ input, loaders }: UseAppLifecycleDocumentI
       if (!filePath) {
         await resetHistoryForOpen(working, sessionId);
       }
-      let generatedPath = originalPath;
-      if (originalPath === sourcePath || !filePath) {
-        generatedPath = await invoke<string>('materialize_document_pdf', { working, source: sourcePath });
-        showToast(`Generated ${generatedPath}`);
-      }
+      // Materialize the generated PDF next to the source so "Save" writes to a
+      // real .pdf sibling (not the .md source), but keep the sibling identity in
+      // `generatedPdfPath` so `originalPath`/`sourcePath` stays the user's source
+      // and tab/title/dedup semantics are not confused with the auto-generated
+      // artifact. The sibling is cleaned up on window close via the same field.
       if (!filePath) {
-        updateSession(sessionId, { filePath: working, originalPath: generatedPath });
-      } else if (generatedPath !== originalPath) {
-        updateSession(sessionId, { originalPath: generatedPath });
+        const generatedPath = await invoke<string>('materialize_document_pdf', { working, source: sourcePath });
+        showToast(`Generated ${generatedPath}`);
+        updateSession(sessionId, { filePath: working, generatedPdfPath: generatedPath });
       }
       const count = await invoke<number>('get_pdf_page_count', { path: working });
       updateSession(sessionId, { pageCount: count, currentPage: 0, pageInput: '1' });
@@ -171,7 +177,7 @@ export function useAppLifecycleOpen({ input, loaders }: UseAppLifecycleDocumentI
       generatedViewRef.current = '';
       setViewMode(sourceKind === 'markdown' ? 'markdown' : 'webpage');
     });
-  }, [activeId, filePath, loadFormFields, loadThumbnails, originalPath, renderPage, resetHistoryForOpen, setViewMode, showToast, sourceKind, sourcePath, sourceText, updateSession, viewMode, withLoading]);
+  }, [activeId, coldStartReady, filePath, loadFormFields, loadThumbnails, originalPath, renderPage, resetHistoryForOpen, setViewMode, showToast, sourceKind, sourcePath, sourceText, updateSession, viewMode, withLoading]);
 
   return {
     imageSrc,

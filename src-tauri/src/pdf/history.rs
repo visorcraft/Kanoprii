@@ -48,6 +48,45 @@ pub fn discard_working_copy(working: String) -> Result<(), String> {
     Ok(())
 }
 
+/// Best-effort removal of an auto-materialized sibling PDF (markdown/HTML ->
+/// PDF view) on window close. Unlike `discard_working_copy`, the sibling lives
+/// next to the user's source (not in temp_dir), so the safety check is a strict
+/// filename-pattern + same-directory match against `source`.
+///
+/// Accepts only siblings `materialize_document_pdf` itself could have produced:
+///   `<stem>.pdf`, `<stem>_converted.pdf`, `<stem>_converted_<n>.pdf`
+/// in the same directory as `source`. Any other path is rejected.
+pub fn discard_document_pdf(generated: String, source: String) -> Result<(), String> {
+    let generated = PathBuf::from(&generated);
+    if !generated.exists() {
+        return Ok(());
+    }
+    if generated.extension().and_then(|e| e.to_str()) != Some("pdf") {
+        return Err("generated path must be a .pdf sibling".to_string());
+    }
+    let source = PathBuf::from(&source);
+    let source_dir = source.parent().ok_or_else(|| "source has no parent dir".to_string())?;
+    let Some(source_stem) = source.file_stem().and_then(|s| s.to_str()) else {
+        return Err("source has no file stem".to_string());
+    };
+    let gen_dir = generated.parent().ok_or_else(|| "generated has no parent dir".to_string())?;
+    let gen_name =
+        generated.file_name().and_then(|s| s.to_str()).ok_or_else(|| "generated has no file name".to_string())?;
+    if !path_resides_in_dir(gen_dir, source_dir) {
+        return Err("generated pdf must live alongside its source".to_string());
+    }
+    let acceptable = [format!("{source_stem}.pdf"), format!("{source_stem}_converted.pdf")];
+    let is_converted_n = gen_name
+        .strip_prefix(&format!("{source_stem}_converted_"))
+        .and_then(|rest| rest.strip_suffix(".pdf"))
+        .is_some_and(|digits| !digits.is_empty() && digits.bytes().all(|b| b.is_ascii_digit()));
+    if !acceptable.contains(&gen_name.to_string()) && !is_converted_n {
+        return Err("generated pdf name does not match the materialize pattern".to_string());
+    }
+    fs::remove_file(&generated).map_err(|e| e.to_string())?;
+    Ok(())
+}
+
 fn path_resides_in_dir(path: &Path, dir: &Path) -> bool {
     // Canonicalise both so `..`, symlinks, and relative segments don't bypass
     // the check. Returns false on any error (missing file, non-UTF8, etc).

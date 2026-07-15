@@ -170,6 +170,7 @@ export function documentPdfActionFields(d: DocumentState) {
     markdownRevision: d.markdownRevision,
     markdownText: d.markdownText,
     originalPath: d.originalPath,
+    generatedPdfPath: d.generatedPdfPath,
     pageCount: d.pageCount,
     pageInput: d.pageInput,
     pdfRevision: d.pdfRevision,

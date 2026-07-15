@@ -1972,6 +1972,7 @@ tauri::generate_handler![
             create_pdf_from_document_pages,
             create_pdf_from_markdown_text,
             materialize_document_pdf,
+            discard_document_pdf,
             save_pdf_markdown,
             summarize_pdf,
             save_pdf_summary,

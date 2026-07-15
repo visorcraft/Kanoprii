@@ -14,7 +14,7 @@ import type { RefsState } from './useAppRefs';
 export type UseAppLifecycleLoadersInput = {
   doc: Pick<
     DocumentState,
-    'filePath' | 'isDirty' | 'setIsDirty' | 'isDirtyRef' | 'anyDirtyRef' | 'dirtySessions' | 'setActiveSession'
+    'sessions' | 'filePath' | 'isDirty' | 'setIsDirty' | 'isDirtyRef' | 'anyDirtyRef' | 'dirtySessions' | 'setActiveSession'
   >;
   modal: Pick<ModalState, 'setPageSizes' | 'setLastBrowserDir'>;
   panels: Pick<
@@ -71,6 +71,7 @@ export function useAppLifecycleLoaders(input: UseAppLifecycleLoadersInput) {
   });
 
   useWindowCloseGuard({
+    sessions: input.doc.sessions,
     dirtySessions: input.doc.dirtySessions,
     anyDirtyRef: input.doc.anyDirtyRef,
     pendingNavRef: unsaved.pendingNavRef,
