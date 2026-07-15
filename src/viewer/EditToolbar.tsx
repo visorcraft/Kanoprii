@@ -6,6 +6,7 @@ export interface EditToolbarProps {
   onChange: (patch: Partial<TextStyle>) => void;
   onApply: () => void;
   onCancel: () => void;
+  onDelete?: () => void;
 }
 
 function rgbToHex(color: TextStyle['color']): string {
@@ -37,6 +38,7 @@ export function EditToolbar({
   onChange,
   onApply,
   onCancel,
+  onDelete,
 }: EditToolbarProps) {
   return (
     <div className="edit-toolbar" aria-label="Text editing toolbar">
@@ -145,6 +147,18 @@ export function EditToolbar({
           Right
         </button>
       </div>
+
+      {onDelete && (
+        <button
+          type="button"
+          className="edit-toolbar-delete"
+          onClick={onDelete}
+          aria-label="Delete"
+          title="Delete"
+        >
+          Delete
+        </button>
+      )}
 
       <div
         className="edit-toolbar-group edit-toolbar-actions"

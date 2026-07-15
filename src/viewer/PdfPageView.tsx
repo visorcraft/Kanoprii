@@ -181,6 +181,7 @@ function PdfPageViewInner({
                   onUpdate={pdfEdit.onUpdate}
                   onApply={pdfEdit.onApply}
                   onCancel={pdfEdit.onCancel}
+                  onDelete={pdfEdit.onDeleteText}
                 />
               )}
             {pdfEdit?.paragraphDraft &&
@@ -202,6 +203,7 @@ function PdfPageViewInner({
                   onUpdate={pdfEdit.onUpdateParagraph}
                   onApply={pdfEdit.onApply}
                   onCancel={pdfEdit.onCancel}
+                  onDelete={pdfEdit.onDeleteParagraph}
                 />
               )}
             {pdfEdit?.imageDraft &&

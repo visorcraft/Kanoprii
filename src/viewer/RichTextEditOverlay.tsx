@@ -13,6 +13,7 @@ type RichTextEditOverlayProps = {
   onUpdate: (patch: { text?: string; style?: TextStyle; pageRect?: Rect }) => void;
   onApply: () => void;
   onCancel: () => void;
+  onDelete?: () => void;
 };
 
 const MIN_W = 40;
@@ -82,6 +83,7 @@ export function RichTextEditOverlay({
   onUpdate,
   onApply,
   onCancel,
+  onDelete,
 }: RichTextEditOverlayProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [rect, setRect] = useState<Rect>(draft.pageRect);
@@ -301,6 +303,7 @@ export function RichTextEditOverlay({
         onChange={(patch) => onUpdate({ style: { ...style, ...patch } })}
         onApply={onApply}
         onCancel={onCancel}
+        onDelete={onDelete}
       />
       <textarea
         ref={textareaRef}

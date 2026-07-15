@@ -262,6 +262,21 @@ pub fn delete_paragraph(doc: &mut Document, page_index: u32, line_indices: &[usi
     Ok(())
 }
 
+/// Remove a single existing text line by whiteing-out its bbox.
+pub fn delete_text_line(doc: &mut Document, page_index: u32, line_index: usize) -> Result<(), String> {
+    let page_id = *doc.get_pages().get(&(page_index + 1)).ok_or_else(|| "Page not found".to_string())?;
+    let lines = decode_page_text_lines(doc, page_id)?;
+    if line_index >= lines.len() {
+        return Err("Line index out of range".to_string());
+    }
+    let [left, bottom, right, top] = lines[line_index].bbox;
+    let w = (right - left).max(1.0);
+    let h = (top - bottom).max(1.0);
+    let whiteout = format!("q 1 1 1 rg {left} {bottom} {w} {h} re f Q\n");
+    append_page_content(doc, page_id, whiteout.as_bytes())?;
+    Ok(())
+}
+
 /// Transform the page-space rectangle of an image drawn with a simple
 /// `q ... cm Do Q` pattern.
 ///
@@ -621,6 +636,24 @@ mod tests {
     fn edit_paragraph_out_of_range_line_fails() {
         let (mut doc, _) = build_doc_with_text("BT /F1 12 Tf 1 0 0 1 100 700 Tm (Hello) Tj ET");
         let result = edit_paragraph(&mut doc, 0, &[0, 5], "Text", &style_with_align("left"), &full_page_box());
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn delete_text_line_whiteouts_existing_line() {
+        let ops = "BT /F1 12 Tf 1 0 0 1 100 700 Tm (Hello world) Tj ET";
+        let (mut doc, page_id) = build_doc_with_text(ops);
+        delete_text_line(&mut doc, 0, 0).unwrap();
+        let content =
+            String::from_utf8_lossy(&crate::pdf::page_text::read_page_content(&doc, page_id).unwrap()).into_owned();
+        assert!(content.contains("q 1 1 1 rg"));
+        assert!(content.contains("re f Q"));
+    }
+
+    #[test]
+    fn delete_text_line_out_of_range_fails() {
+        let (mut doc, _) = build_doc_with_text("BT /F1 12 Tf 1 0 0 1 100 700 Tm (Hello) Tj ET");
+        let result = delete_text_line(&mut doc, 0, 5);
         assert!(result.is_err());
     }
 

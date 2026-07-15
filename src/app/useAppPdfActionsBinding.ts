@@ -117,7 +117,7 @@ export function useAppPdfActionsBinding(input: UseAppPdfActionsBindingInput) {
   });
 
   const activeSession = d.sessions.find((s) => s.id === d.activeId);
-  const { pdfEditApplyText, pdfEditApplyParagraph, pdfEditDeleteParagraph, pdfEditApplyImage, pdfEditDeleteImage } = pdfActions;
+  const { pdfEditApplyText, pdfEditApplyParagraph, pdfEditDeleteText, pdfEditDeleteParagraph, pdfEditApplyImage, pdfEditDeleteImage } = pdfActions;
 
   const onApplyText = useCallback(() => {
     if (!activeSession) return Promise.resolve();
@@ -134,6 +134,11 @@ export function useAppPdfActionsBinding(input: UseAppPdfActionsBindingInput) {
     return pdfEditApplyImage(activeSession);
   }, [activeSession, pdfEditApplyImage]);
 
+  const onDeleteText = useCallback(() => {
+    if (!activeSession) return Promise.resolve();
+    return pdfEditDeleteText(activeSession);
+  }, [activeSession, pdfEditDeleteText]);
+
   const onDeleteParagraph = useCallback(() => {
     if (!activeSession) return Promise.resolve();
     return pdfEditDeleteParagraph(activeSession);
@@ -145,8 +150,8 @@ export function useAppPdfActionsBinding(input: UseAppPdfActionsBindingInput) {
   }, [activeSession, pdfEditDeleteImage]);
 
   useEffect(() => {
-    pdfEdit.bindEditCallbacks({ onApplyText, onApplyParagraph, onDeleteParagraph, onApplyImage, onDeleteImage });
-  }, [pdfEdit, onApplyText, onApplyParagraph, onDeleteParagraph, onApplyImage, onDeleteImage]);
+    pdfEdit.bindEditCallbacks({ onApplyText, onApplyParagraph, onDeleteText, onDeleteParagraph, onApplyImage, onDeleteImage });
+  }, [pdfEdit, onApplyText, onApplyParagraph, onDeleteText, onDeleteParagraph, onApplyImage, onDeleteImage]);
 
   return pdfActions;
 }

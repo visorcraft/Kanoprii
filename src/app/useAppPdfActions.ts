@@ -258,6 +258,7 @@ export function useAppPdfActions(input: UseAppPdfActionsInput) {
     ...textLayerFlow,
     pdfEditApplyText: editInteraction.applyTextEdit,
     pdfEditApplyParagraph: editInteraction.applyParagraphEdit,
+    pdfEditDeleteText: editInteraction.deleteText,
     pdfEditDeleteParagraph: editInteraction.deleteParagraph,
     pdfEditApplyImage: editInteraction.applyImageEdit,
     pdfEditDeleteImage: editInteraction.deleteImage,

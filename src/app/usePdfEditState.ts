@@ -7,6 +7,7 @@ export type TextAlignment = 'left' | 'center' | 'right';
 export type PdfEditCallbacks = {
   onApplyText?: () => void | Promise<void>;
   onApplyParagraph?: () => void | Promise<void>;
+  onDeleteText?: () => void | Promise<void>;
   onDeleteParagraph?: () => void | Promise<void>;
   onApplyImage?: () => void | Promise<void>;
   onDeleteImage?: () => void | Promise<void>;
@@ -193,6 +194,14 @@ export function usePdfEditState() {
     }
   }, [onCancel]);
 
+  const onDeleteText = useCallback(async () => {
+    if (callbacksRef.current.onDeleteText) {
+      await callbacksRef.current.onDeleteText();
+    } else {
+      onCancel();
+    }
+  }, [onCancel]);
+
   const onDeleteImage = useCallback(async () => {
     if (callbacksRef.current.onDeleteImage) {
       await callbacksRef.current.onDeleteImage();
@@ -228,6 +237,7 @@ export function usePdfEditState() {
       clearEditMode,
       onUpdateImageRect,
       onUpdateImageRotation,
+      onDeleteText,
       onDeleteParagraph,
       onDeleteImage,
       bindEditCallbacks,
@@ -254,6 +264,7 @@ export function usePdfEditState() {
       clearEditMode,
       onUpdateImageRect,
       onUpdateImageRotation,
+      onDeleteText,
       onDeleteParagraph,
       onDeleteImage,
       bindEditCallbacks,

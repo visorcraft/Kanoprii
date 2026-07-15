@@ -2060,6 +2060,7 @@ tauri::generate_handler![
             print_to_pdf,
             render_print_preview,
             edit_text_line,
+            delete_text_line,
             add_text_box,
             edit_paragraph,
             delete_paragraph,

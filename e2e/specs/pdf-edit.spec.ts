@@ -202,6 +202,37 @@ describe('PDF Edit Mode', () => {
     );
   });
 
+  it('enters edit mode, deletes an existing text line, and the overlay disappears', async () => {
+    await openPdfViaPathModal(fixturePdf);
+    await waitForPdfOpen();
+    await waitForPageRendered();
+
+    await enterPdfEditMode();
+    const editBtn = await $('[aria-label="Edit mode"]');
+    await editBtn.waitForDisplayed({ timeout: 10_000 });
+
+    const { cx, cy } = await getCenterOfTextSpan('Hello');
+
+    await browser
+      .action('pointer')
+      .move({ x: cx, y: cy })
+      .down({ button: 0 })
+      .up({ button: 0 })
+      .perform();
+
+    const textarea = await $('.rich-text-edit-textarea');
+    await textarea.waitForDisplayed({ timeout: 10_000 });
+
+    const deleteBtn = await $('.edit-toolbar-delete');
+    await deleteBtn.waitForDisplayed({ timeout: 10_000 });
+    await deleteBtn.click();
+
+    await browser.waitUntil(
+      async () => !(await $('.rich-text-edit-textarea').isDisplayed().catch(() => false)),
+      { timeout: 15_000, timeoutMsg: 'expected rich-text edit overlay to disappear after delete' },
+    );
+  });
+
   it('enters edit mode, edits a multi-line paragraph, and applies', async () => {
     await openPdfViaPathModal(fixturePdfParagraph);
     await waitForPdfOpen();

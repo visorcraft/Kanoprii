@@ -285,6 +285,27 @@ export function usePageInteractionEdit(deps: UsePageInteractionEditOptions) {
     [deps, pdfEdit],
   );
 
+  const deleteText = useCallback(
+    async (session: DocumentSessionData) => {
+      if (!session?.filePath || !pdfEdit.textDraft) return;
+      const draft = pdfEdit.textDraft;
+      if (draft.lineIndex !== undefined) {
+        await runStructuralEdit(deps, {
+          command: 'delete_text_line',
+          args: {
+            path: session.filePath,
+            pageIndex: draft.pageIndex,
+            lineIndex: draft.lineIndex,
+          },
+          reloadAt: draft.pageIndex,
+          toast: 'Text removed',
+        });
+      }
+      pdfEdit.onCancel();
+    },
+    [deps, pdfEdit],
+  );
+
   const deleteParagraph = useCallback(
     async (session: DocumentSessionData) => {
       if (!session?.filePath || !pdfEdit.paragraphDraft) return;
@@ -349,6 +370,7 @@ export function usePageInteractionEdit(deps: UsePageInteractionEditOptions) {
     handlePageClick,
     applyTextEdit,
     applyParagraphEdit,
+    deleteText,
     deleteParagraph,
     applyImageEdit,
     deleteImage,

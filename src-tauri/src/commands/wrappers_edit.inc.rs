@@ -16,6 +16,13 @@ fn edit_text_line(
 }
 
 #[tauri::command]
+fn delete_text_line(path: String, page_index: u32, line_index: usize) -> Result<(), String> {
+    crate::pdf::io::mutate_pdf(&PathBuf::from(path), |doc| {
+        crate::pdf::edit_object::delete_text_line(doc, page_index, line_index)
+    })
+}
+
+#[tauri::command]
 fn add_text_box(
     path: String,
     page_index: u32,
