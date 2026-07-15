@@ -1,9 +1,21 @@
 import type { BuildAppViewerSourceInput } from './buildAppViewerSource';
+import type { PdfEditState } from '../app/usePdfEditState';
 
 export type BuildAppShellViewerInputArgs = {
   document: Pick<
     BuildAppViewerSourceInput,
-    'filePath' | 'viewMode' | 'scrollViewMode' | 'pageCount' | 'currentPage' | 'pageSizes' | 'zoom' | 'markdownOcrNotice' | 'markdownPath' | 'markdownText' | 'sourcePath' | 'sourceText'
+    | 'filePath'
+    | 'viewMode'
+    | 'scrollViewMode'
+    | 'pageCount'
+    | 'currentPage'
+    | 'pageSizes'
+    | 'zoom'
+    | 'markdownOcrNotice'
+    | 'markdownPath'
+    | 'markdownText'
+    | 'sourcePath'
+    | 'sourceText'
   >;
   sidebar: Pick<
     BuildAppViewerSourceInput,
@@ -61,7 +73,9 @@ export type BuildAppShellViewerInputArgs = {
     | 'onApplyTextEdit'
     | 'onCancelTextEdit'
     | 'continuous'
-  >;
+  > & {
+    pdfEdit: PdfEditState;
+  };
   modes: Pick<
     BuildAppViewerSourceInput,
     | 'highlightMode'
@@ -113,7 +127,9 @@ export type BuildAppShellViewerInputArgs = {
   birdsEye: BuildAppViewerSourceInput['birdsEye'];
 };
 
-export function buildAppShellViewerInput(args: BuildAppShellViewerInputArgs): BuildAppViewerSourceInput {
+export function buildAppShellViewerInput(
+  args: BuildAppShellViewerInputArgs
+): BuildAppViewerSourceInput {
   return {
     ...args.document,
     ...args.sidebar,

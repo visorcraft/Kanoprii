@@ -1,10 +1,16 @@
-import type { ComponentProps, Dispatch, RefObject, SetStateAction } from 'react';
+import type {
+  ComponentProps,
+  Dispatch,
+  RefObject,
+  SetStateAction,
+} from 'react';
 import type { PdfPageView } from './PdfPageView';
 import type { PdfSidebar } from './PdfSidebar';
 import type { ViewerMain } from './ViewerMain';
 import type { PageControls } from './PageControls';
 import type { WorkspaceViewMode } from '../app/types';
 import type { BirdsEyeWorkspace } from '../app/useBirdsEyeWorkspace';
+import type { PdfEditState } from '../app/usePdfEditState';
 
 type SidebarProps = ComponentProps<typeof PdfSidebar>;
 type PdfPageProps = ComponentProps<typeof PdfPageView>;
@@ -57,7 +63,10 @@ export type BuildAppViewerSourceInput = {
   scrollViewMode: ViewerMainProps['scrollViewMode'];
   pageCount: ViewerMainProps['pageCount'];
   pageSizes: ViewerMainProps['pageSizes'];
-  continuous: Omit<NonNullable<ViewerMainProps['continuous']>, 'pdfPage' | 'pageImageSrc' | 'pageCount' | 'currentPage' | 'pageSizes'> | null;
+  continuous: Omit<
+    NonNullable<ViewerMainProps['continuous']>,
+    'pdfPage' | 'pageImageSrc' | 'pageCount' | 'currentPage' | 'pageSizes'
+  > | null;
   scrollRef: RefObject<HTMLDivElement | null>;
   handleWheel: ViewerMainProps['onWheel'];
   openPdf: ViewerMainProps['onOpenPdf'];
@@ -78,6 +87,7 @@ export type BuildAppViewerSourceInput = {
   onTextEditDraftChange: PdfPageProps['onTextEditDraftChange'];
   onApplyTextEdit: PdfPageProps['onApplyTextEdit'];
   onCancelTextEdit: PdfPageProps['onCancelTextEdit'];
+  pdfEdit: PdfEditState;
   imgRef: PdfPageProps['imgRef'];
   handleImageLoad: PdfPageProps['onImageLoad'];
   highlightMode: PdfPageProps['highlightMode'];
@@ -123,7 +133,9 @@ export type BuildAppViewerSourceInput = {
   birdsEye: BirdsEyeWorkspace;
 };
 
-export function buildAppViewerSource(input: BuildAppViewerSourceInput): BuildViewerContextInput {
+export function buildAppViewerSource(
+  input: BuildAppViewerSourceInput
+): BuildViewerContextInput {
   const sidebar: BuildViewerContextInput['sidebar'] = {
     filePath: input.filePath,
     thumbnails: input.thumbnails,
@@ -172,6 +184,7 @@ export function buildAppViewerSource(input: BuildAppViewerSourceInput): BuildVie
     onTextEditDraftChange: input.onTextEditDraftChange,
     onApplyTextEdit: input.onApplyTextEdit,
     onCancelTextEdit: input.onCancelTextEdit,
+    pdfEdit: input.pdfEdit,
     imgRef: input.imgRef,
     onImageLoad: input.handleImageLoad,
     highlightMode: input.highlightMode,
@@ -221,22 +234,24 @@ export function buildAppViewerSource(input: BuildAppViewerSourceInput): BuildVie
     : null;
 
   const showPageControls = input.pageCount !== null && input.viewMode === 'pdf';
-  const pageControls: PageControlsProps | null = showPageControls ? {
-    pageCount: input.pageCount!,
-    currentPage: input.currentPage,
-    pageInput: input.pageInput,
-    pageSizes: input.pageSizes,
-    onPageInputChange: input.setPageInput,
-    onCommitPage: input.commitPage,
-    onGoToPage: input.goToPage,
-    zoom: input.zoom,
-    zoomInput: input.zoomInput,
-    onZoomInputChange: input.setZoomInput,
-    onCommitZoom: input.commitZoom,
-    onZoomIn: input.zoomIn,
-    onZoomOut: input.zoomOut,
-    onResetZoom: input.resetZoom,
-  } : null;
+  const pageControls: PageControlsProps | null = showPageControls
+    ? {
+        pageCount: input.pageCount!,
+        currentPage: input.currentPage,
+        pageInput: input.pageInput,
+        pageSizes: input.pageSizes,
+        onPageInputChange: input.setPageInput,
+        onCommitPage: input.commitPage,
+        onGoToPage: input.goToPage,
+        zoom: input.zoom,
+        zoomInput: input.zoomInput,
+        onZoomInputChange: input.setZoomInput,
+        onCommitZoom: input.commitZoom,
+        onZoomIn: input.zoomIn,
+        onZoomOut: input.zoomOut,
+        onResetZoom: input.resetZoom,
+      }
+    : null;
 
   const viewer: BuildViewerContextInput['viewer'] = {
     viewMode: input.viewMode,

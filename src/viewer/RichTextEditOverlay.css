@@ -1,0 +1,27 @@
+.rich-text-edit-overlay {
+  display: flex;
+  flex-direction: column;
+  z-index: 10;
+}
+
+.rich-text-edit-overlay > .edit-toolbar {
+  border-radius: 6px 6px 0 0;
+  border-bottom: none;
+}
+
+.rich-text-edit-textarea {
+  flex: 1;
+  resize: none;
+  border: 2px dashed var(--pp-accent, #0066cc);
+  border-top: none;
+  border-radius: 0 0 4px 4px;
+  padding: 6px 8px;
+  background: var(--pp-surface, #fff);
+  color: var(--pp-text, #1a1a2e);
+  line-height: 1.25;
+  outline: none;
+}
+
+.rich-text-edit-textarea:focus {
+  border-color: var(--pp-accent, #0066cc);
+}

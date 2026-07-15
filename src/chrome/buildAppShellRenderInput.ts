@@ -16,11 +16,15 @@ import type { BuildAppChromeSourceInput } from './buildAppChromeSource';
 import type { TabMenuApi } from './useTabContextMenu';
 import type { BuildAppViewerSourceInput } from '../viewer/buildAppViewerSource';
 import type { PdfPageSize } from '../app/types';
-import type { AppSurface, SettingsFocusSection } from '../app/useAppSurfaceState';
+import type {
+  AppSurface,
+  SettingsFocusSection,
+} from '../app/useAppSurfaceState';
 import type { ShortcutBindingsState } from '../app/useShortcutBindingsState';
 import type { AppearanceKey } from '../settings/appearancePalettes';
 import type { WorkspaceViewMode } from '../app/types';
 import type { BirdsEyeWorkspace } from '../app/useBirdsEyeWorkspace';
+import type { PdfEditState } from '../app/usePdfEditState';
 
 type DrawingState = ReturnType<typeof useDrawingGesture>;
 
@@ -32,7 +36,10 @@ export type BuildAppShellRenderInputArgs = {
   modal: { pageSizes: PdfPageSize[] };
   panels: PanelsState;
   annotation: AnnotationState;
-  drawing: Pick<DrawingState, 'highlightStart' | 'highlightRect' | 'inkDraft' | 'shapeLineEnd' | 'drawing'>;
+  drawing: Pick<
+    DrawingState,
+    'highlightStart' | 'highlightRect' | 'inkDraft' | 'shapeLineEnd' | 'drawing'
+  >;
   help: HelpState;
   refs: Pick<RefsState, 'imgRef'>;
   pdfActions: AppPdfActions;
@@ -44,12 +51,19 @@ export type BuildAppShellRenderInputArgs = {
   activeSurface: AppSurface;
   settingsFocus: SettingsFocusSection;
   closeSettings: () => void;
-  workspace: { workspaceView: WorkspaceViewMode; setWorkspaceView: (mode: WorkspaceViewMode) => void };
+  workspace: {
+    workspaceView: WorkspaceViewMode;
+    setWorkspaceView: (mode: WorkspaceViewMode) => void;
+  };
   birdsEye: BirdsEyeWorkspace;
   shortcuts: ShortcutBindingsState;
   showToast: (message: string, type?: 'success' | 'error') => void;
   dismissToast: () => void;
-  appearance: { appearance: AppearanceKey; setAppearance: (key: AppearanceKey) => void };
+  appearance: {
+    appearance: AppearanceKey;
+    setAppearance: (key: AppearanceKey) => void;
+  };
+  pdfEdit: PdfEditState;
   viewer: Pick<
     BuildAppViewerSourceInput,
     | 'thumbnails'
@@ -175,6 +189,7 @@ export function buildAppShellRenderInput(args: BuildAppShellRenderInputArgs) {
         onTextEditDraftChange: args.pdfActions.setTextEditDraft,
         onApplyTextEdit: args.pdfActions.applyTextEdit,
         onCancelTextEdit: args.pdfActions.cancelTextEdit,
+        pdfEdit: args.pdfEdit,
         continuous: args.viewer.continuous,
       },
       modes: {

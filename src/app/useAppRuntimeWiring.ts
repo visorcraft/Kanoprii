@@ -39,7 +39,8 @@ export function useAppRuntimeWiring(bootstrap: Bootstrap) {
     workspace,
   } = bootstrap;
 
-  const { loaders, history, unsaved, browser, search, chrome, tesseract } = slices;
+  const { loaders, history, unsaved, browser, search, chrome, tesseract } =
+    slices;
 
   const tabActions = useDocumentTabActions({
     doc,
@@ -138,8 +139,14 @@ export function useAppRuntimeWiring(bootstrap: Bootstrap) {
       resetZoom: viewerWorkflow.resetZoom,
     },
     unsaved,
-    browser: { showBrowserModal: browser.showBrowserModal, setShowBrowserModal: browser.setShowBrowserModal },
-    search: { showSearchModal: search.showSearchModal, closeSearchModal: search.closeSearchModal },
+    browser: {
+      showBrowserModal: browser.showBrowserModal,
+      setShowBrowserModal: browser.setShowBrowserModal,
+    },
+    search: {
+      showSearchModal: search.showSearchModal,
+      closeSearchModal: search.closeSearchModal,
+    },
     shortcutBindings: shortcutBindingsState.bindings,
     surface,
     workspace,
@@ -151,7 +158,12 @@ export function useAppRuntimeWiring(bootstrap: Bootstrap) {
     annotation,
     pageRanges,
     help,
-    doc: { activeSession: doc.activeSession, currentPage: doc.currentPage, pageCount: doc.pageCount, ocrAvailable: doc.ocrAvailable },
+    doc: {
+      activeSession: doc.activeSession,
+      currentPage: doc.currentPage,
+      pageCount: doc.pageCount,
+      ocrAvailable: doc.ocrAvailable,
+    },
     workspace,
     slices,
     pdfActions,
@@ -249,7 +261,7 @@ export function useAppRuntimeWiring(bootstrap: Bootstrap) {
       }
       openPathPendingRef.current = false;
     })();
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional: stable option object / destructured deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional: stable option object / destructured deps
   }, []);
 
   // Move a tab's document into a fresh window. Opening it there is a fresh load
@@ -271,14 +283,14 @@ export function useAppRuntimeWiring(bootstrap: Bootstrap) {
         void run();
       }
     },
-    [doc, tabActions.finalizeCloseSession, unsaved, showToast],
+    [doc, tabActions.finalizeCloseSession, unsaved, showToast]
   );
 
   const openProperties = useCallback(
     (filePath: string) => {
       void pdfActions.openMetadataModal(filePath);
     },
-    [pdfActions],
+    [pdfActions]
   );
 
   const tabMenuApi = useMemo(
@@ -305,7 +317,7 @@ export function useAppRuntimeWiring(bootstrap: Bootstrap) {
       chrome.openPrintDialog,
       openProperties,
       showToast,
-    ],
+    ]
   );
 
   return useMemo(
@@ -335,6 +347,7 @@ export function useAppRuntimeWiring(bootstrap: Bootstrap) {
         showToast,
         dismissToast,
         appearance,
+        pdfEdit,
       }),
     [
       doc,
@@ -361,6 +374,7 @@ export function useAppRuntimeWiring(bootstrap: Bootstrap) {
       showToast,
       dismissToast,
       appearance,
-    ],
+      pdfEdit,
+    ]
   );
 }

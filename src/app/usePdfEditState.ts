@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 
 export type EditMode = 'idle' | 'text' | 'image';
 
@@ -28,10 +28,19 @@ export interface Point {
   y: number;
 }
 
+export interface Rect {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
 export interface TextEditDraft {
   pageIndex: number;
   point: Point;
   text: string;
+  /** Rectangle in natural page coordinates (800x1132 viewer space) where the overlay is placed. */
+  pageRect: Rect;
   /** Source of truth for the active text edit. New edits start from the top-level style. */
   style: TextStyle;
 }
@@ -68,12 +77,12 @@ export function usePdfEditState() {
   }, []);
 
   const startInsertingText = useCallback(
-    (pageIndex: number, point: Point) => {
-      setTextDraft({ pageIndex, point, text: '', style });
+    (pageIndex: number, point: Point, pageRect: Rect) => {
+      setTextDraft({ pageIndex, point, text: '', pageRect, style });
       setImageDraft(null);
       setMode('text');
     },
-    [style],
+    [style]
   );
 
   const startEditingImage = useCallback((draft: ImageEditDraft) => {
@@ -82,33 +91,54 @@ export function usePdfEditState() {
     setMode('image');
   }, []);
 
-  const updateTextDraft = useCallback((patch: Partial<TextEditDraft>) => {
+  const onUpdate = useCallback((patch: Partial<TextEditDraft>) => {
     setTextDraft((prev) => (prev ? { ...prev, ...patch } : null));
   }, []);
 
-  const updateStyle = useCallback((patch: Partial<TextStyle>) => {
-    setStyle((prev) => ({ ...prev, ...patch }));
-  }, []);
-
-  const clearDraft = useCallback(() => {
+  const onCancel = useCallback(() => {
     setMode('idle');
     setTextDraft(null);
     setImageDraft(null);
     setStyle(DEFAULT_TEXT_STYLE);
   }, []);
 
-  return {
-    mode,
-    textDraft,
-    imageDraft,
-    style,
-    startEditingText,
-    startInsertingText,
-    startEditingImage,
-    updateTextDraft,
-    updateStyle,
-    clearDraft,
-  };
+  const onApply = useCallback(() => {
+    // TODO: wire backend text insertion command (Task 9+).
+    onCancel();
+  }, [onCancel]);
+
+  const updateStyle = useCallback((patch: Partial<TextStyle>) => {
+    setStyle((prev) => ({ ...prev, ...patch }));
+  }, []);
+
+  return useMemo(
+    () => ({
+      mode,
+      textDraft,
+      imageDraft,
+      style,
+      startEditingText,
+      startInsertingText,
+      startEditingImage,
+      updateStyle,
+      onUpdate,
+      onApply,
+      onCancel,
+    }),
+    [
+      mode,
+      textDraft,
+      imageDraft,
+      style,
+      startEditingText,
+      startInsertingText,
+      startEditingImage,
+      updateStyle,
+      onUpdate,
+      onApply,
+      onCancel,
+    ]
+  );
 }
 
 /** Canonical alias for this hook's state shape. */
