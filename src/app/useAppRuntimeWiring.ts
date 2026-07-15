@@ -71,6 +71,7 @@ export function useAppRuntimeWiring(bootstrap: Bootstrap) {
       annotation.setFormAddMode(false);
       annotation.setShowNoteModal(false);
       annotation.setPendingNotePos(null);
+      pdfEdit.clearEditMode();
     },
     renderPage: loaders.renderPage,
     loadThumbnails: loaders.loadThumbnails,
@@ -119,6 +120,7 @@ export function useAppRuntimeWiring(bootstrap: Bootstrap) {
     security,
     panels,
     annotation,
+    pdfEdit,
     help,
     refs: { keyboardActionsRef: refs.keyboardActionsRef },
     pdfActions,

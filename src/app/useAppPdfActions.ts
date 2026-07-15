@@ -164,7 +164,8 @@ export function useAppPdfActions(input: UseAppPdfActionsInput) {
       input.textEditMode ||
       input.editTextRunMode ||
       input.vectorEditMode ||
-      input.formAddMode,
+      input.formAddMode ||
+      input.pdfEdit.editMode,
   });
   const activeSession = useMemo(
     () => input.sessions.find((s) => s.id === input.activeId) ?? null,

@@ -13,7 +13,8 @@ export type ModeSetters = {
   setTextEditMode: Dispatch<SetStateAction<boolean>>;
   setEditTextRunMode: Dispatch<SetStateAction<boolean>>;
   setVectorEditMode: Dispatch<SetStateAction<boolean>>;
-  clearPdfEdit: () => void;
+  clearEditMode: () => void;
+  setEditMode: Dispatch<SetStateAction<boolean>>;
   setShowNoteModal: (open: boolean) => void;
   setPendingNotePos: (pos: null) => void;
   setNoteDraft: (draft: string) => void;
@@ -35,7 +36,7 @@ export function clearOtherModes(
   if (except !== 'text') modes.setTextEditMode(false);
   if (except !== 'editText') modes.setEditTextRunMode(false);
   if (except !== 'vector') modes.setVectorEditMode(false);
-  if (except !== 'edit') modes.clearPdfEdit();
+  if (except !== 'edit') modes.clearEditMode();
   modes.setShowNoteModal(false);
   modes.setPendingNotePos(null);
 }

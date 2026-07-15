@@ -52,6 +52,8 @@ export interface AppMenuContext {
   imageInsertMode: boolean;
   textEditMode: boolean;
   vectorEditMode: boolean;
+  editMode: boolean;
+  toggleEditMode: () => void;
   showFormsPanel: boolean;
   showBookmarksPanel: boolean;
   showAnnotationsPanel: boolean;
@@ -249,6 +251,8 @@ export type AppMenuContextSource = {
   imageInsertMode: boolean;
   textEditMode: boolean;
   vectorEditMode: boolean;
+  editMode: boolean;
+  toggleEditMode: () => void;
   showFormsPanel: boolean;
   showBookmarksPanel: boolean;
   showAnnotationsPanel: boolean;

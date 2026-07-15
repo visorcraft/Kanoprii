@@ -47,6 +47,9 @@ export function buildAnnotMenu(ctx: AppMenuContext): MenuRoot {
         shortcutCommandId: 'toggle-vector-edit',
         active: ctx.vectorEditMode,
       }),
+      act('pdf-edit', ctx.editMode ? 'PDF Edit (on)' : 'PDF Edit', ctx.toggleEditMode, {
+        active: ctx.editMode,
+      }),
       act('edits', 'Manage page edits…', ctx.openPageEditsModal),
       sep(),
       act('forms', ctx.showFormsPanel ? 'Forms panel (on)' : 'Forms panel', ctx.toggleFormsPanel, {

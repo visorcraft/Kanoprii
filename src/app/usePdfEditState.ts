@@ -81,6 +81,8 @@ export function usePdfEditState() {
   const [imageDraft, setImageDraft] = useState<ImageEditDraft | null>(null);
   /** Default style applied to newly created text edits. */
   const [style, setStyle] = useState<TextStyle>(DEFAULT_TEXT_STYLE);
+  /** Whether the PDF edit tool is selected. Active independently of any current draft. */
+  const [editMode, setEditMode] = useState(false);
 
   const startEditingText = useCallback((draft: TextEditDraft) => {
     setTextDraft(draft);
@@ -113,6 +115,11 @@ export function usePdfEditState() {
     setImageDraft(null);
     setStyle(DEFAULT_TEXT_STYLE);
   }, []);
+
+  const clearEditMode = useCallback(() => {
+    setEditMode(false);
+    onCancel();
+  }, [onCancel]);
 
   const callbacksRef = useRef<PdfEditCallbacks>({});
 
@@ -149,6 +156,7 @@ export function usePdfEditState() {
   return useMemo(
     () => ({
       mode,
+      editMode,
       textDraft,
       imageDraft,
       style,
@@ -159,12 +167,15 @@ export function usePdfEditState() {
       onUpdate,
       onApply,
       onCancel,
+      setEditMode,
+      clearEditMode,
       onUpdateImageRect,
       onDeleteImage,
       bindEditCallbacks,
     }),
     [
       mode,
+      editMode,
       textDraft,
       imageDraft,
       style,
@@ -175,6 +186,8 @@ export function usePdfEditState() {
       onUpdate,
       onApply,
       onCancel,
+      setEditMode,
+      clearEditMode,
       onUpdateImageRect,
       onDeleteImage,
       bindEditCallbacks,

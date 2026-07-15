@@ -13,6 +13,7 @@ export type AppKeyboardActions = {
   imageInsertMode: boolean;
   textEditMode: boolean;
   vectorEditMode: boolean;
+  editMode: boolean;
   formAddMode: boolean;
   highlightMode: boolean;
   anyModalOpen: boolean;
@@ -30,6 +31,7 @@ export type AppKeyboardActions = {
   exitImageInsertMode: () => void;
   exitTextEditMode: () => void;
   exitVectorEditMode: () => void;
+  exitEditMode: () => void;
   exitFormAddMode: () => void;
   exitHighlightMode: () => void;
   goToPage: (page: number) => void;
@@ -41,6 +43,7 @@ export type AppKeyboardActions = {
   toggleRedactMode: () => void;
   toggleTextEditMode: () => void;
   toggleVectorEditMode: () => void;
+  toggleEditMode: () => void;
   toggleImageInsertMode: () => void;
   toggleFormsPanel: () => void;
   openDeleteModal: () => void;
@@ -86,6 +89,7 @@ export type BuildAppKeyboardActionsInput = {
   imageInsertMode: boolean;
   textEditMode: boolean;
   vectorEditMode: boolean;
+  editMode: boolean;
   formAddMode: boolean;
   highlightMode: boolean;
   anyModalOpen: boolean;
@@ -103,6 +107,7 @@ export type BuildAppKeyboardActionsInput = {
   exitImageInsertMode: () => void;
   exitTextEditMode: () => void;
   exitVectorEditMode: () => void;
+  exitEditMode: () => void;
   exitFormAddMode: () => void;
   exitHighlightMode: () => void;
   goToPage: (page: number) => void;
@@ -114,6 +119,7 @@ export type BuildAppKeyboardActionsInput = {
   toggleRedactMode: () => void;
   toggleTextEditMode: () => void;
   toggleVectorEditMode: () => void;
+  toggleEditMode: () => void;
   toggleImageInsertMode: () => void;
   toggleFormsPanel: () => void;
   openDeleteModal: () => void;
@@ -161,6 +167,7 @@ export function buildAppKeyboardActions(input: BuildAppKeyboardActionsInput): Ap
     imageInsertMode: input.imageInsertMode,
     textEditMode: input.textEditMode,
     vectorEditMode: input.vectorEditMode,
+    editMode: input.editMode,
     formAddMode: input.formAddMode,
     highlightMode: input.highlightMode,
     anyModalOpen: input.anyModalOpen,
@@ -178,6 +185,7 @@ export function buildAppKeyboardActions(input: BuildAppKeyboardActionsInput): Ap
     exitImageInsertMode: input.exitImageInsertMode,
     exitTextEditMode: input.exitTextEditMode,
     exitVectorEditMode: input.exitVectorEditMode,
+    exitEditMode: input.exitEditMode,
     exitFormAddMode: input.exitFormAddMode,
     exitHighlightMode: input.exitHighlightMode,
     goToPage: input.goToPage,
@@ -189,6 +197,7 @@ export function buildAppKeyboardActions(input: BuildAppKeyboardActionsInput): Ap
     toggleRedactMode: input.toggleRedactMode,
     toggleTextEditMode: input.toggleTextEditMode,
     toggleVectorEditMode: input.toggleVectorEditMode,
+    toggleEditMode: input.toggleEditMode,
     toggleImageInsertMode: input.toggleImageInsertMode,
     toggleFormsPanel: input.toggleFormsPanel,
     openDeleteModal: input.openDeleteModal,

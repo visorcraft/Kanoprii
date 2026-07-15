@@ -6,6 +6,7 @@ import type { HelpState } from '../app/useHelpChromeState';
 import type { ViewMode, WorkspaceViewMode } from '../app/types';
 import type { AppSurface, SettingsFocusSection } from '../app/useAppSurfaceState';
 import type { ShortcutBindings } from '../app/useShortcutBindingsState';
+import type { PdfEditState } from '../app/usePdfEditState';
 
 export type BuildAppMenuInputArgs = {
   doc: Pick<DocumentState, 'filePath' | 'originalPath' | 'sourcePath' | 'sourceKind' | 'isDirty' | 'pageCount' | 'currentPage' | 'viewMode' | 'scrollViewMode' | 'ocrAvailable'>;
@@ -34,4 +35,5 @@ export type BuildAppMenuInputArgs = {
   workspace: { workspaceView: WorkspaceViewMode; setWorkspaceView: (mode: WorkspaceViewMode) => void };
   shortcutBindings: ShortcutBindings;
   pdfActions: AppPdfActions;
+  pdfEdit: Pick<PdfEditState, 'editMode'>;
 };

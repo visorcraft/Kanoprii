@@ -19,7 +19,8 @@ export function useAnnotationModesMarkup(opts: UseAnnotationModesMarkupOptions) 
     setTextEditMode,
     setEditTextRunMode,
     setVectorEditMode,
-    clearPdfEdit,
+    clearEditMode,
+    setEditMode,
     setShowNoteModal,
     setPendingNotePos,
     setNoteDraft,
@@ -40,7 +41,8 @@ export function useAnnotationModesMarkup(opts: UseAnnotationModesMarkupOptions) 
     setTextEditMode,
     setEditTextRunMode,
     setVectorEditMode,
-    clearPdfEdit,
+    clearEditMode,
+    setEditMode,
     setShowNoteModal,
     setPendingNotePos,
     setNoteDraft,
@@ -117,6 +119,16 @@ export function useAnnotationModesMarkup(opts: UseAnnotationModesMarkupOptions) 
   // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional: stable option object / destructured deps
   }, [setVectorEditMode]);
 
+  const toggleEditMode = useCallback(() => {
+    clearOtherModes(modes, 'edit');
+    setEditMode((mode) => !mode);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional: stable option object / destructured deps
+  }, [setEditMode]);
+
+  const exitEditMode = useCallback(() => {
+    clearEditMode();
+  }, [clearEditMode]);
+
   const toggleRedactMode = useCallback(() => {
     clearOtherModes(modes, 'redact');
     setRedactMode((m) => !m);
@@ -154,6 +166,8 @@ export function useAnnotationModesMarkup(opts: UseAnnotationModesMarkupOptions) 
     toggleEditTextRunMode,
     exitEditTextRunMode,
     toggleVectorEditMode,
+    toggleEditMode,
+    exitEditMode,
     toggleRedactMode,
     exitRedactMode,
     exitNoteMode,

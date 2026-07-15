@@ -23,6 +23,7 @@ export function menuInputDocFields(args: BuildAppMenuInputArgs): Pick<
   | 'textEditMode'
   | 'editTextRunMode'
   | 'vectorEditMode'
+  | 'editMode'
   | 'showFormsPanel'
   | 'showBookmarksPanel'
   | 'showAnnotationsPanel'
@@ -100,9 +101,10 @@ export function menuInputDocFields(args: BuildAppMenuInputArgs): Pick<
   | 'toggleTextEditMode'
   | 'toggleEditTextRunMode'
   | 'toggleVectorEditMode'
+  | 'toggleEditMode'
   | 'toggleFormsPanel'
 > {
-  const { doc, annotation, panels, history, chrome, help, pdfActions } = args;
+  const { doc, annotation, panels, history, chrome, help, pdfActions, pdfEdit } = args;
   return {
     filePath: doc.filePath,
     hasDocument: !!(doc.sourcePath || doc.originalPath),
@@ -124,6 +126,7 @@ export function menuInputDocFields(args: BuildAppMenuInputArgs): Pick<
     textEditMode: annotation.textEditMode,
     editTextRunMode: annotation.editTextRunMode,
     vectorEditMode: annotation.vectorEditMode,
+    editMode: pdfEdit.editMode,
     showFormsPanel: panels.showFormsPanel,
     showBookmarksPanel: panels.showBookmarksPanel,
     showAnnotationsPanel: panels.showAnnotationsPanel,
@@ -201,6 +204,7 @@ export function menuInputDocFields(args: BuildAppMenuInputArgs): Pick<
     toggleTextEditMode: pdfActions.toggleTextEditMode,
     toggleEditTextRunMode: pdfActions.toggleEditTextRunMode,
     toggleVectorEditMode: pdfActions.toggleVectorEditMode,
+    toggleEditMode: pdfActions.toggleEditMode,
     toggleFormsPanel: pdfActions.toggleFormsPanel,
   };
 }
