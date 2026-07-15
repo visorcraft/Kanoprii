@@ -52,3 +52,48 @@ fn remove_page_image(path: String, page_index: u32, image_index: usize) -> Resul
         crate::pdf::edit_object::remove_page_image(doc, page_index, image_index)
     })
 }
+
+#[tauri::command]
+fn viewer_rect_to_pdf(path: String, page_index: u32, rect: PdfRect) -> Result<PdfRect, String> {
+    crate::pdf::io::with_pdf(&PathBuf::from(path), |doc| {
+        let page_id = doc
+            .page_iter()
+            .nth(page_index as usize)
+            .ok_or_else(|| "page index out of range".to_string())?;
+        let (x, y, w, h) =
+            crate::pdf::coords::viewer_rect_to_pdf(doc, page_id, rect.x, rect.y, rect.width, rect.height)?;
+        Ok(PdfRect {
+            x,
+            y,
+            width: w,
+            height: h,
+        })
+    })
+}
+
+#[tauri::command]
+fn pdf_rect_to_viewer_px(path: String, page_index: u32, rect: PdfRect) -> Result<PdfRect, String> {
+    crate::pdf::io::with_pdf(&PathBuf::from(path), |doc| {
+        let page_id = doc
+            .page_iter()
+            .nth(page_index as usize)
+            .ok_or_else(|| "page index out of range".to_string())?;
+        let media = crate::pdf::coords::page_media_box(doc, page_id)?;
+        let page_w = (media[2] - media[0]) as f32;
+        let page_h = (media[3] - media[1]) as f32;
+        let viewer = crate::pdf::coords::pdf_rect_to_viewer_px(
+            rect.x,
+            rect.y,
+            rect.x + rect.width,
+            rect.y + rect.height,
+            page_w,
+            page_h,
+        );
+        Ok(PdfRect {
+            x: viewer[0],
+            y: viewer[1],
+            width: viewer[2] - viewer[0],
+            height: viewer[3] - viewer[1],
+        })
+    })
+}

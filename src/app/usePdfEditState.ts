@@ -1,8 +1,14 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 
 export type EditMode = 'idle' | 'text' | 'image';
 
 export type TextAlignment = 'left' | 'center' | 'right';
+
+export type PdfEditCallbacks = {
+  onApplyText?: () => void | Promise<void>;
+  onApplyImage?: () => void | Promise<void>;
+  onDeleteImage?: () => void | Promise<void>;
+};
 
 /** Base font families. Bold/italic variants are selected at invoke time. */
 export type FontFamily = 'Helvetica' | 'LiberationSans' | 'Courier';
@@ -43,12 +49,16 @@ export interface TextEditDraft {
   pageRect: Rect;
   /** Source of truth for the active text edit. New edits start from the top-level style. */
   style: TextStyle;
+  /** When present, the edit updates an existing text line instead of adding a new box. */
+  lineIndex?: number;
 }
 
 export interface ImageEditDraft {
   pageIndex: number;
   point: Point;
   path: string;
+  /** Index of the image object within the page, used for transform/remove commands. */
+  index: number;
   width?: number;
   height?: number;
   /** Rectangle in natural page coordinates (800x1132 viewer space) for the selection frame. */
@@ -104,18 +114,32 @@ export function usePdfEditState() {
     setStyle(DEFAULT_TEXT_STYLE);
   }, []);
 
-  const onApply = useCallback(() => {
-    // TODO: wire backend text insertion command (Task 9+).
-    onCancel();
-  }, [onCancel]);
+  const callbacksRef = useRef<PdfEditCallbacks>({});
+
+  const bindEditCallbacks = useCallback((callbacks: PdfEditCallbacks) => {
+    callbacksRef.current = callbacks;
+  }, []);
+
+  const onApply = useCallback(async () => {
+    if (mode === 'text' && callbacksRef.current.onApplyText) {
+      await callbacksRef.current.onApplyText();
+    } else if (mode === 'image' && callbacksRef.current.onApplyImage) {
+      await callbacksRef.current.onApplyImage();
+    } else {
+      onCancel();
+    }
+  }, [mode, onCancel]);
 
   const onUpdateImageRect = useCallback((rect: Rect) => {
     setImageDraft((prev) => (prev ? { ...prev, pageRect: rect } : null));
   }, []);
 
-  const onDeleteImage = useCallback(() => {
-    // TODO: wire backend remove_page_image command (Task 10+).
-    onCancel();
+  const onDeleteImage = useCallback(async () => {
+    if (callbacksRef.current.onDeleteImage) {
+      await callbacksRef.current.onDeleteImage();
+    } else {
+      onCancel();
+    }
   }, [onCancel]);
 
   const updateStyle = useCallback((patch: Partial<TextStyle>) => {
@@ -137,6 +161,7 @@ export function usePdfEditState() {
       onCancel,
       onUpdateImageRect,
       onDeleteImage,
+      bindEditCallbacks,
     }),
     [
       mode,
@@ -152,6 +177,7 @@ export function usePdfEditState() {
       onCancel,
       onUpdateImageRect,
       onDeleteImage,
+      bindEditCallbacks,
     ]
   );
 }

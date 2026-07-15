@@ -2064,4 +2064,6 @@ tauri::generate_handler![
             list_page_images,
             transform_page_image,
             remove_page_image,
+            viewer_rect_to_pdf,
+            pdf_rect_to_viewer_px,
 ]

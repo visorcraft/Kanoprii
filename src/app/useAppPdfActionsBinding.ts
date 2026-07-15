@@ -1,3 +1,4 @@
+import { useCallback, useEffect } from 'react';
 import {
   useAppPdfActions,
   type UseAppPdfActionsInput,
@@ -89,7 +90,7 @@ export function useAppPdfActionsBinding(input: UseAppPdfActionsBindingInput) {
     runtime,
   } = input;
 
-  return useAppPdfActions({
+  const pdfActions = useAppPdfActions({
     ...modalPdfActionFields(m),
     ...securityPdfActionFields(s),
     ...panelsPdfActionFields(p),
@@ -109,5 +110,32 @@ export function useAppPdfActionsBinding(input: UseAppPdfActionsBindingInput) {
     setShowTesseractModal: help.setShowTesseractModal,
     setTesseractReminderSource: help.setTesseractReminderSource,
     openTesseractGuide: runtime.openTesseractGuide,
+    pdfEdit,
+    sessions: d.sessions,
+    activeId: d.activeId,
   });
+
+  const activeSession = d.sessions.find((s) => s.id === d.activeId);
+  const { pdfEditApplyText, pdfEditApplyImage, pdfEditDeleteImage } = pdfActions;
+
+  const onApplyText = useCallback(() => {
+    if (!activeSession) return Promise.resolve();
+    return pdfEditApplyText(activeSession);
+  }, [activeSession, pdfEditApplyText]);
+
+  const onApplyImage = useCallback(() => {
+    if (!activeSession) return Promise.resolve();
+    return pdfEditApplyImage(activeSession);
+  }, [activeSession, pdfEditApplyImage]);
+
+  const onDeleteImage = useCallback(() => {
+    if (!activeSession) return Promise.resolve();
+    return pdfEditDeleteImage(activeSession);
+  }, [activeSession, pdfEditDeleteImage]);
+
+  useEffect(() => {
+    pdfEdit.bindEditCallbacks({ onApplyText, onApplyImage, onDeleteImage });
+  }, [pdfEdit, onApplyText, onApplyImage, onDeleteImage]);
+
+  return pdfActions;
 }

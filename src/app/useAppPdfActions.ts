@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { useStructuralEdit } from '../pdf/useStructuralEdit';
 import { useImageExportActions } from '../pdf/useImageExportActions';
 import { usePdfModalOpeners } from '../pdf/usePdfModalOpeners';
@@ -33,6 +34,9 @@ import {
   useDocumentEnhancementActions,
   type UseDocumentEnhancementActionsOptions,
 } from '../pdf/useDocumentEnhancementActions';
+import { usePageInteractionEdit } from '../viewer/usePageInteractionEdit';
+import type { DocumentSessionData } from './documentSessionTypes';
+import type { PdfEditState } from './usePdfEditState';
 
 type HookOpts<H extends (...args: never) => unknown> = Parameters<H>[0];
 
@@ -75,6 +79,10 @@ export type UseAppPdfActionsInput = Omit<
   | 'saveAsViaNativeDialog'
   | 'exitNoteMode'
   | 'refreshAnnotations'
+  | 'pdfEdit'
+  | 'session'
+  | 'handleEditPageClick'
+  | 'hitTestImage'
 > &
   Pick<
     UseDocumentEnhancementActionsOptions,
@@ -96,6 +104,9 @@ export type UseAppPdfActionsInput = Omit<
     handleSaveRef: { current: () => void | Promise<void> };
     handleMarkdownViewRef: { current: () => void | Promise<void> };
     openTesseractGuide: () => void;
+    pdfEdit: PdfEditState;
+    sessions: DocumentSessionData[];
+    activeId: string | null;
   };
 
 function call<H extends (opts: never) => unknown>(
@@ -155,8 +166,27 @@ export function useAppPdfActions(input: UseAppPdfActionsInput) {
       input.vectorEditMode ||
       input.formAddMode,
   });
+  const activeSession = useMemo(
+    () => input.sessions.find((s) => s.id === input.activeId) ?? null,
+    [input.sessions, input.activeId],
+  );
+
+  const editInteraction = usePageInteractionEdit({
+    pdfEdit: input.pdfEdit,
+    filePath: input.filePath,
+    currentPage: input.currentPage,
+    withLoading: input.withLoading,
+    markPdfEdited: input.markPdfEdited,
+    reloadOpenPdf: input.reloadOpenPdf,
+    showToast: input.showToast,
+  });
+
   const pageInteraction = call(usePageInteraction, {
     ...withRunEdit,
+    pdfEdit: input.pdfEdit,
+    session: activeSession,
+    handleEditPageClick: editInteraction.handlePageClick,
+    hitTestImage: editInteraction.hitTestImage,
     editTextRunMode: input.editTextRunMode ?? false,
     handleEditTextRunClick: textLayerFlow.handleEditTextRunClick,
   });
@@ -225,6 +255,9 @@ export function useAppPdfActions(input: UseAppPdfActionsInput) {
     applyFormField: formField.applyFormField,
     ...pageInteraction,
     ...textLayerFlow,
+    pdfEditApplyText: editInteraction.applyTextEdit,
+    pdfEditApplyImage: editInteraction.applyImageEdit,
+    pdfEditDeleteImage: editInteraction.deleteImage,
     ...annotationModes,
     ...pageTextEdits,
     ...notePassword,
