@@ -9,8 +9,9 @@ fn edit_text_line(
     style: TextStyle,
     box_rect: PdfRect,
 ) -> Result<(), String> {
-    let _ = (path, page_index, line_index, new_text, style, box_rect);
-    Ok(())
+    crate::pdf::io::mutate_pdf(&PathBuf::from(path), |doc| {
+        crate::pdf::edit_object::edit_text_line(doc, page_index, line_index, &new_text, &style, &box_rect)
+    })
 }
 
 #[tauri::command]

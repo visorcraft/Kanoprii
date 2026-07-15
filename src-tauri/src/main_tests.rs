@@ -1,5 +1,8 @@
 use super::*;
-use lopdf::{Dictionary, Stream};
+use lopdf::{Dictionary, Document, Stream};
+use pdf::coords::pdf_rect_to_viewer_px;
+use pdf::edit_object::edit_text_line;
+use pdf::edit_types::{PdfRect, RgbColor, TextStyle};
 use pdf::markdown_heuristic::{
     apply_links_to_text, format_markdown_lines, is_symbol_glyph_candidate, map_symbol_glyph, merge_wrapped_line_pair,
     sort_lines_reading_order, strip_header_footer_lines, MarkdownPageLink, MarkdownTextCell, MarkdownTextLine,
@@ -11,6 +14,8 @@ use pdf::markdown_images::{
 };
 use pdf::markdown_tagged::tagged_markdown_by_page;
 use pdf::ocr::{ocr_language, resolve_tesseract};
+use pdf::page_text::read_page_content;
+use pdf::text_lines::decode_page_text_lines;
 use std::collections::BTreeSet;
 use std::path::PathBuf;
 
@@ -19581,4 +19586,39 @@ fn resolve_rename_target_rejects_separators_and_empty() {
     assert!(resolve_rename_target(&original, "a/b").is_err());
     assert!(resolve_rename_target(&original, "a\\b").is_err());
     assert!(resolve_rename_target(&original, "   ").is_err());
+}
+
+#[test]
+fn edit_text_line_styled_replaces_text_without_panic() {
+    let path = {
+        let mut doc = build_pdf(1);
+        save(&mut doc, "edit_text_line_styled")
+    };
+
+    let doc_loaded = Document::load(&path).unwrap();
+    let page_id = *doc_loaded.get_pages().get(&1).unwrap();
+    let lines = decode_page_text_lines(&doc_loaded, page_id).unwrap();
+    assert!(!lines.is_empty(), "fixture PDF should contain at least one text line");
+
+    let bbox = lines[0].bbox;
+    let v = pdf_rect_to_viewer_px(bbox[0], bbox[1], bbox[2], bbox[3], 612.0, 792.0);
+    let box_rect = PdfRect { x: v[0], y: v[1], width: (v[2] - v[0]).max(1.0), height: (v[3] - v[1]).max(1.0) };
+
+    let style = TextStyle {
+        font_family: "Helvetica".to_string(),
+        font_size: 12.0,
+        bold: false,
+        italic: false,
+        underline: false,
+        color: RgbColor { r: 0.0, g: 0.0, b: 0.0 },
+        align: "left".to_string(),
+    };
+
+    let mut doc = Document::load(&path).unwrap();
+    edit_text_line(&mut doc, 0, 0, "World", &style, &box_rect).unwrap();
+
+    let content = String::from_utf8_lossy(&read_page_content(&doc, page_id).unwrap()).into_owned();
+    assert!(content.contains("World"), "replacement text should appear in the content stream");
+
+    std::fs::remove_file(&path).ok();
 }

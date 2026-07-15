@@ -67,6 +67,36 @@ pub fn style_supports_text(style: &TextStyle, text: &str) -> Result<(), String> 
     Ok(())
 }
 
+/// Measure the rendered width of `text` for the given font family and size.
+///
+/// - LiberationSans uses the bundled TTF glyph advances.
+/// - Helvetica and Courier use Phase-1 approximate widths (0.5 em and 0.6 em
+///   per character respectively).
+pub fn measure_text_width(text: &str, font_family: &str, font_size: f64) -> f64 {
+    match font_family {
+        "LiberationSans" => {
+            let Ok(face) = ttf_parser::Face::parse(EMBEDDED_FONT_BYTES, 0) else {
+                return text.chars().count() as f64 * font_size * 0.5;
+            };
+            let units_per_em = face.units_per_em() as f64;
+            if units_per_em == 0.0 {
+                return text.chars().count() as f64 * font_size * 0.5;
+            }
+            let mut total = 0u32;
+            for ch in text.chars() {
+                let advance = face
+                    .glyph_index(ch)
+                    .and_then(|gid| face.glyph_hor_advance(gid))
+                    .unwrap_or((units_per_em * 0.5) as u16) as u32;
+                total += advance;
+            }
+            total as f64 * font_size / units_per_em
+        }
+        "Courier" => text.chars().count() as f64 * font_size * 0.6,
+        _ => text.chars().count() as f64 * font_size * 0.5,
+    }
+}
+
 /// Ensure the page has a standard Type1 Courier font resource.
 #[allow(dead_code)]
 fn ensure_courier_font(doc: &mut Document, page_id: ObjectId) -> Result<String, String> {
@@ -99,7 +129,7 @@ pub fn ensure_full_font(doc: &mut Document, page_id: ObjectId) -> Result<String,
     }
 
     let face =
-        ttf_parser::Face::parse(EMBEDDED_FONT_BYTES, 0).map_err(|e| format!("Failed to parse embedded font: {e:?}"))?;
+        ttf_parser::Face::parse(EMBEDDED_FONT_BYTES, 0).map_err(|e| format!("failed to parse embedded font: {e:?}"))?;
 
     let bbox = face.global_bounding_box();
     let ascent = face.ascender();
@@ -258,12 +288,12 @@ pub fn dedup_fonts_after_insert(doc: &mut Document, inserted_page_ids: &[ObjectI
                         .get_mut(b"Resources")
                         .map_err(|e| e.to_string())?
                         .as_dict_mut()
-                        .map_err(|_| "Bad Resources".to_string())?;
+                        .map_err(|_| "bad resources".to_string())?;
                     let fonts = resources
                         .get_mut(b"Font")
                         .map_err(|e| e.to_string())?
                         .as_dict_mut()
-                        .map_err(|_| "Bad Font dict".to_string())?;
+                        .map_err(|_| "bad font dict".to_string())?;
                     fonts.set(res_name, Object::Reference(existing_id));
                     deduped += 1;
                 }
