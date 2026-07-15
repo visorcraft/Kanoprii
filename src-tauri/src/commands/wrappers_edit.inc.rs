@@ -1,3 +1,4 @@
+use crate::pdf::edit_object::validate_rect_finite;
 use crate::pdf::edit_types::{PageImageInfo, PdfRect, TextStyle};
 
 #[tauri::command]
@@ -55,6 +56,7 @@ fn remove_page_image(path: String, page_index: u32, image_index: usize) -> Resul
 
 #[tauri::command]
 fn viewer_rect_to_pdf(path: String, page_index: u32, rect: PdfRect) -> Result<PdfRect, String> {
+    validate_rect_finite(&rect, "rect")?;
     crate::pdf::io::with_pdf(&PathBuf::from(path), |doc| {
         let page_id = doc
             .page_iter()
@@ -73,6 +75,7 @@ fn viewer_rect_to_pdf(path: String, page_index: u32, rect: PdfRect) -> Result<Pd
 
 #[tauri::command]
 fn pdf_rect_to_viewer_px(path: String, page_index: u32, rect: PdfRect) -> Result<PdfRect, String> {
+    validate_rect_finite(&rect, "rect")?;
     crate::pdf::io::with_pdf(&PathBuf::from(path), |doc| {
         let page_id = doc
             .page_iter()

@@ -24,13 +24,7 @@ pub fn edit_text_line(
 
 pub fn validate_style_inputs(style: &TextStyle, box_rect: &PdfRect) -> Result<(), String> {
     finite_f64(style.font_size, "font size")?;
-    finite_f64(box_rect.x, "box x")?;
-    finite_f64(box_rect.y, "box y")?;
-    finite_f64(box_rect.width, "box width")?;
-    finite_f64(box_rect.height, "box height")?;
-    if box_rect.width <= 0.0 || box_rect.height <= 0.0 {
-        return Err("Box rect must have positive width and height".into());
-    }
+    validate_rect_finite(box_rect, "box rect")?;
     finite_f64(style.color.r, "color r")?;
     finite_f64(style.color.g, "color g")?;
     finite_f64(style.color.b, "color b")?;
@@ -39,6 +33,17 @@ pub fn validate_style_inputs(style: &TextStyle, box_rect: &PdfRect) -> Result<()
         || !(0.0..=1.0).contains(&style.color.b)
     {
         return Err("Color components must be in the range [0, 1]".into());
+    }
+    Ok(())
+}
+
+pub fn validate_rect_finite(rect: &PdfRect, name: &str) -> Result<(), String> {
+    finite_f64(rect.x, &format!("{name} x"))?;
+    finite_f64(rect.y, &format!("{name} y"))?;
+    finite_f64(rect.width, &format!("{name} width"))?;
+    finite_f64(rect.height, &format!("{name} height"))?;
+    if rect.width <= 0.0 || rect.height <= 0.0 {
+        return Err(format!("{name} must have positive width and height"));
     }
     Ok(())
 }
@@ -169,6 +174,7 @@ pub fn transform_page_image(
     image_index: usize,
     new_rect: &PdfRect,
 ) -> Result<(), String> {
+    validate_rect_finite(new_rect, "new rect")?;
     let page_id = doc.page_iter().nth(page_index as usize).ok_or_else(|| "page index out of range".to_string())?;
     let contents = page_contents_id(doc, page_id)?;
     let content_obj = doc.get_object(contents).map_err(|e| e.to_string())?;
@@ -278,4 +284,34 @@ fn find_xobject_name(doc: &Document, page_index: u32, object_id: (u32, u16)) -> 
         }
     }
     Err("image xobject name not found".to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn validate_rect_finite_accepts_positive_box() {
+        validate_rect_finite(&PdfRect { x: 0.0, y: 0.0, width: 100.0, height: 50.0 }, "rect").unwrap();
+    }
+
+    #[test]
+    fn validate_rect_finite_rejects_non_positive_dimensions() {
+        let err = validate_rect_finite(&PdfRect { x: 0.0, y: 0.0, width: 0.0, height: 50.0 }, "rect").unwrap_err();
+        assert!(err.contains("positive width"));
+    }
+
+    #[test]
+    fn validate_rect_finite_rejects_nan() {
+        let err =
+            validate_rect_finite(&PdfRect { x: f64::NAN, y: 0.0, width: 100.0, height: 50.0 }, "rect").unwrap_err();
+        assert!(err.contains("must be a finite number"));
+    }
+
+    #[test]
+    fn validate_rect_finite_rejects_infinity() {
+        let err = validate_rect_finite(&PdfRect { x: 0.0, y: f64::INFINITY, width: 100.0, height: 50.0 }, "rect")
+            .unwrap_err();
+        assert!(err.contains("must be a finite number"));
+    }
 }

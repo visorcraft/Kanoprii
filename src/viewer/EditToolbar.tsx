@@ -57,7 +57,7 @@ export function EditToolbar({
         className="edit-toolbar-number"
         type="number"
         min={6}
-        max={144}
+        max={72}
         value={style.fontSize}
         onChange={(e) => onChange({ fontSize: Number(e.target.value) })}
         aria-label="Font size"
