@@ -93,7 +93,7 @@ export function ImageSelectionOverlay({
         const cx = box.left + box.width / 2;
         const cy = box.top + box.height / 2;
         const angle = Math.atan2(e.clientY - cy, e.clientX - cx);
-        const degrees = (angle * 180) / Math.PI + 90;
+        const degrees = -((angle * 180) / Math.PI + 90);
         updateRotation(degrees);
         return;
       }
@@ -192,7 +192,7 @@ export function ImageSelectionOverlay({
     >
       <div
         className="image-selection-inner"
-        style={{ transform: `rotate(${rotation}deg)` }}
+        style={{ transform: `rotate(${-rotation}deg)` }}
         aria-hidden="true"
       />
       <div

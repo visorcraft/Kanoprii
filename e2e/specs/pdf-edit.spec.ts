@@ -153,7 +153,7 @@ describe('PDF Edit Mode', () => {
       const el = document.querySelector('.image-selection-overlay') as HTMLElement | null;
       if (!el) throw new Error('missing image selection overlay');
       const rect = el.getBoundingClientRect();
-      return { rx: Math.round(rect.left + rect.width / 2), ry: Math.round(rect.top) - 18 };
+      return { rx: Math.round(rect.left + rect.width / 2), ry: Math.round(rect.top) - 12 };
     });
 
     await browser
