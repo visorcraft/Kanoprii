@@ -13,6 +13,7 @@ import { PdfPageOverlays } from './PdfPageOverlays';
 import { TextLayer } from './TextLayer';
 import { TextEditOverlay } from './TextEditOverlay';
 import { RichTextEditOverlay } from './RichTextEditOverlay';
+import { ImageSelectionOverlay } from './ImageSelectionOverlay';
 import type { PdfEditState } from '../app/usePdfEditState';
 
 type PdfPageViewProps = {
@@ -177,6 +178,17 @@ function PdfPageViewInner({
                   draft={pdfEdit.textDraft}
                   onUpdate={pdfEdit.onUpdate}
                   onApply={pdfEdit.onApply}
+                  onCancel={pdfEdit.onCancel}
+                />
+              )}
+            {pdfEdit?.imageDraft &&
+              pdfEdit.imageDraft.pageIndex === currentPage && (
+                <ImageSelectionOverlay
+                  draft={pdfEdit.imageDraft}
+                  zoom={zoom}
+                  onUpdate={pdfEdit.onUpdateImageRect}
+                  onApply={pdfEdit.onApply}
+                  onDelete={pdfEdit.onDeleteImage}
                   onCancel={pdfEdit.onCancel}
                 />
               )}

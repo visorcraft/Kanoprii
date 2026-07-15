@@ -1,0 +1,24 @@
+.image-selection-overlay {
+  position: absolute;
+  box-sizing: border-box;
+  border: 2px solid var(--pp-accent, #0066cc);
+  background: transparent;
+  cursor: grab;
+  z-index: 10;
+}
+
+.image-selection-overlay.move {
+  cursor: grabbing;
+}
+
+.image-selection-handle-br {
+  position: absolute;
+  right: -6px;
+  bottom: -6px;
+  width: 12px;
+  height: 12px;
+  background: var(--pp-accent, #0066cc);
+  border: 1px solid var(--pp-surface, #fff);
+  border-radius: 2px;
+  cursor: nwse-resize;
+}

@@ -51,6 +51,8 @@ export interface ImageEditDraft {
   path: string;
   width?: number;
   height?: number;
+  /** Rectangle in natural page coordinates (800x1132 viewer space) for the selection frame. */
+  pageRect: Rect;
 }
 
 export const DEFAULT_TEXT_STYLE: TextStyle = {
@@ -107,6 +109,15 @@ export function usePdfEditState() {
     onCancel();
   }, [onCancel]);
 
+  const onUpdateImageRect = useCallback((rect: Rect) => {
+    setImageDraft((prev) => (prev ? { ...prev, pageRect: rect } : null));
+  }, []);
+
+  const onDeleteImage = useCallback(() => {
+    // TODO: wire backend remove_page_image command (Task 10+).
+    onCancel();
+  }, [onCancel]);
+
   const updateStyle = useCallback((patch: Partial<TextStyle>) => {
     setStyle((prev) => ({ ...prev, ...patch }));
   }, []);
@@ -124,6 +135,8 @@ export function usePdfEditState() {
       onUpdate,
       onApply,
       onCancel,
+      onUpdateImageRect,
+      onDeleteImage,
     }),
     [
       mode,
@@ -137,6 +150,8 @@ export function usePdfEditState() {
       onUpdate,
       onApply,
       onCancel,
+      onUpdateImageRect,
+      onDeleteImage,
     ]
   );
 }
