@@ -87,6 +87,10 @@ struct TextLineInfo {
     y: f64,
     w: f64,
     h: f64,
+    font_family: String,
+    font_size: f64,
+    bold: bool,
+    italic: bool,
 }
 
 #[derive(Debug, Clone, Serialize)]

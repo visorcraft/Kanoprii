@@ -45,6 +45,27 @@ export function buildFileEditMenus(ctx: AppMenuContext): { fileMenu: MenuRoot; e
       act('undo', 'Undo', ctx.undo, { shortcutCommandId: 'undo', disabled: !ctx.canUndo }),
       act('redo', 'Redo', ctx.redo, { shortcutCommandId: 'redo', disabled: !ctx.canRedo }),
       sep(),
+      act('pdf-edit', ctx.editMode ? 'Edit PDF content (on)' : 'Edit PDF content', ctx.toggleEditMode, {
+        shortcutCommandId: 'toggle-pdf-edit',
+        active: ctx.editMode,
+      }),
+      act('edit-text', ctx.editTextRunMode ? 'Edit text (on)' : 'Edit text', ctx.toggleEditTextRunMode, {
+        active: ctx.editTextRunMode,
+      }),
+      act('page-text', ctx.textEditMode ? 'Add page text (on)' : 'Add page text', ctx.toggleTextEditMode, {
+        shortcutCommandId: 'toggle-text-edit',
+        active: ctx.textEditMode,
+      }),
+      act('insert-image', ctx.imageInsertMode ? 'Insert image (on)' : 'Insert image', ctx.toggleImageInsertMode, {
+        shortcutCommandId: 'toggle-image-insert',
+        active: ctx.imageInsertMode,
+      }),
+      act('vector', ctx.vectorEditMode ? 'Edit vector (on)' : 'Edit vector', ctx.toggleVectorEditMode, {
+        shortcutCommandId: 'toggle-vector-edit',
+        active: ctx.vectorEditMode,
+      }),
+      act('edits', 'Manage page edits…', ctx.openPageEditsModal),
+      sep(),
       act('find', 'Find text…', ctx.openSearchModal, { shortcutCommandId: 'find' }),
     ],
   };

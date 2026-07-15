@@ -184,7 +184,6 @@ function PdfPageViewInner({
                   onUpdate={pdfEdit.onUpdate}
                   onApply={pdfEdit.onApply}
                   onCancel={pdfEdit.onCancel}
-                  onDelete={pdfEdit.onDeleteText}
                 />
               )}
             {pdfEdit?.paragraphDraft &&
@@ -192,9 +191,11 @@ function PdfPageViewInner({
               !pdfEdit.paragraphEditing && (
                 <ParagraphSelectionOverlay
                   draft={pdfEdit.paragraphDraft}
+                  zoom={zoom}
                   onUpdate={pdfEdit.onUpdateParagraph}
                   onEnterEdit={pdfEdit.enterParagraphTextEdit}
                   onDelete={pdfEdit.onDeleteParagraph}
+                  onCancel={pdfEdit.onCancel}
                 />
               )}
             {pdfEdit?.paragraphDraft &&
@@ -206,7 +207,6 @@ function PdfPageViewInner({
                   onUpdate={pdfEdit.onUpdateParagraph}
                   onApply={pdfEdit.onApply}
                   onCancel={pdfEdit.onCancel}
-                  onDelete={pdfEdit.onDeleteParagraph}
                 />
               )}
             {pdfEdit?.imageDraft &&

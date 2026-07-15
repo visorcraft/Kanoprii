@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ParagraphEditDraft, Rect, TextEditDraft, TextStyle } from '../app/usePdfEditState';
 import { VIEWER_PAGE_H, VIEWER_PAGE_W } from '../app/constants';
-import { EditToolbar } from './EditToolbar';
 import './RichTextEditOverlay.css';
 
 type ResizeHandleKind = 'tl' | 'tr' | 'bl' | 'br';
@@ -13,7 +12,6 @@ type RichTextEditOverlayProps = {
   onUpdate: (patch: { text?: string; style?: TextStyle; pageRect?: Rect }) => void;
   onApply: () => void;
   onCancel: () => void;
-  onDelete?: () => void;
 };
 
 const MIN_W = 40;
@@ -83,7 +81,6 @@ export function RichTextEditOverlay({
   onUpdate,
   onApply,
   onCancel,
-  onDelete,
 }: RichTextEditOverlayProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [rect, setRect] = useState<Rect>(draft.pageRect);
@@ -298,13 +295,6 @@ export function RichTextEditOverlay({
         height: rect.h,
       }}
     >
-      <EditToolbar
-        style={style}
-        onChange={(patch) => onUpdate({ style: { ...style, ...patch } })}
-        onApply={onApply}
-        onCancel={onCancel}
-        onDelete={onDelete}
-      />
       <textarea
         ref={textareaRef}
         className="rich-text-edit-textarea"
@@ -323,7 +313,9 @@ export function RichTextEditOverlay({
           fontFamily:
             style.fontFamily === 'LiberationSans'
               ? 'Liberation Sans, sans-serif'
-              : style.fontFamily,
+              : style.fontFamily === 'Times'
+                ? 'Times New Roman, Times, serif'
+                : style.fontFamily,
           fontSize: style.fontSize,
           fontWeight: style.bold ? 'bold' : 'normal',
           fontStyle: style.italic ? 'italic' : 'normal',

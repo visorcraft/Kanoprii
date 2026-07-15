@@ -59,13 +59,6 @@ const IMAGE_DIALOG_FILTERS = [
   ...GIF_DIALOG_FILTER,
 ];
 
-type PdfRect = {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-};
-
 type HookOpts<H extends (...args: never) => unknown> = Parameters<H>[0];
 
 type AllHookOpts = HookOpts<typeof usePdfModalOpeners> &
@@ -200,22 +193,23 @@ export function useAppPdfActions(input: UseAppPdfActionsInput) {
     [input.sessions, input.activeId],
   );
 
+  const pickEditImage = useCallback(async () => {
+    if (!input.nativeDialogs) return window.prompt('Image path')?.trim() ?? '';
+    const selected = await openNativeDialog({
+      multiple: false,
+      directory: false,
+      filters: IMAGE_DIALOG_FILTERS,
+    });
+    if (selected === null) return '';
+    return typeof selected === 'string' ? selected : selected[0] ?? '';
+  }, [input.nativeDialogs]);
+
   const insertEditImage = useCallback(async () => {
     const filePath = input.filePath;
     if (!filePath) return;
     const pageIndex = input.currentPage;
 
-    const imagePath = input.nativeDialogs
-      ? await (async () => {
-          const selected = await openNativeDialog({
-            multiple: false,
-            directory: false,
-            filters: IMAGE_DIALOG_FILTERS,
-          });
-          if (selected === null) return '';
-          return typeof selected === 'string' ? selected : selected[0] ?? '';
-        })()
-      : window.prompt('Image path')?.trim() ?? '';
+    const imagePath = await pickEditImage();
     if (!imagePath) return;
 
     let dimensions: [number, number];
@@ -243,27 +237,39 @@ export function useAppPdfActions(input: UseAppPdfActionsInput) {
     const y = clamp((VIEWER_PAGE_H - defaultHeight) / 2, 0, VIEWER_PAGE_H - defaultHeight);
 
     const viewerRect: Rect = { x, y, w: defaultWidth, h: defaultHeight };
-    const pdfRect = await invoke<PdfRect>('viewer_rect_to_pdf', {
-      path: filePath,
-      pageIndex,
-      rect: { x: viewerRect.x, y: viewerRect.y, width: viewerRect.w, height: viewerRect.h },
-    });
 
     await runEdit({
       command: 'add_page_image',
       args: {
         pageIndex,
-        x: pdfRect.x,
-        y: pdfRect.y,
-        width: pdfRect.width,
-        height: pdfRect.height,
+        x: viewerRect.x,
+        y: viewerRect.y,
+        width: viewerRect.w,
+        height: viewerRect.h,
         imagePath,
       },
       reloadAt: pageIndex,
       toast: 'Image inserted',
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional: stable option object / destructured deps
-  }, [input.filePath, input.currentPage, input.nativeDialogs, input.showToast, runEdit]);
+  }, [input.filePath, input.currentPage, input.showToast, pickEditImage, runEdit]);
+
+  const replaceEditImage = useCallback(async () => {
+    const draft = input.pdfEdit.imageDraft;
+    if (!input.filePath || !draft) return;
+    const imagePath = await pickEditImage();
+    if (!imagePath) return;
+    await runEdit({
+      command: 'replace_page_image',
+      args: {
+        pageIndex: draft.pageIndex,
+        imageIndex: draft.index,
+        imagePath,
+      },
+      reloadAt: draft.pageIndex,
+      toast: 'Image replaced',
+    });
+  }, [input.filePath, input.pdfEdit, pickEditImage, runEdit]);
 
   const editInteraction = usePageInteractionEdit({
     pdfEdit: input.pdfEdit,
@@ -355,6 +361,7 @@ export function useAppPdfActions(input: UseAppPdfActionsInput) {
     pdfEditDeleteParagraph: editInteraction.deleteParagraph,
     pdfEditApplyImage: editInteraction.applyImageEdit,
     pdfEditDeleteImage: editInteraction.deleteImage,
+    pdfEditReplaceImage: replaceEditImage,
     insertEditImage,
     ...annotationModes,
     ...pageTextEdits,

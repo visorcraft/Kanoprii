@@ -84,6 +84,10 @@ export const SHORTCUT_REGISTRY: ShortcutBinding[] = [
   { commandId: 'undo', category: 'Edit', label: 'Undo', defaultShortcuts: ['Ctrl+Z'] },
   { commandId: 'redo', category: 'Edit', label: 'Redo', defaultShortcuts: ['Ctrl+Y', 'Ctrl+Shift+Z'] },
   { commandId: 'find', category: 'Edit', label: 'Find text', defaultShortcuts: ['Ctrl+F'] },
+  { commandId: 'toggle-text-edit', category: 'Edit', label: 'Add text', defaultShortcuts: ['E'] },
+  { commandId: 'toggle-vector-edit', category: 'Edit', label: 'Edit vector', defaultShortcuts: ['G'] },
+  { commandId: 'toggle-pdf-edit', category: 'Edit', label: 'Edit objects', defaultShortcuts: ['P'] },
+  { commandId: 'toggle-image-insert', category: 'Edit', label: 'Add image', defaultShortcuts: ['I'] },
 
   { commandId: 'rotate-page', category: 'Pages', label: 'Rotate page', defaultShortcuts: ['Ctrl+R'] },
   { commandId: 'duplicate-page', category: 'Pages', label: 'Duplicate page', defaultShortcuts: ['Ctrl+Shift+D'] },
@@ -96,6 +100,7 @@ export const SHORTCUT_REGISTRY: ShortcutBinding[] = [
   { commandId: 'delete-page', category: 'Pages', label: 'Delete page', defaultShortcuts: ['Delete'] },
 
   { commandId: 'markdown-view', category: 'View', label: 'Markdown view', defaultShortcuts: ['Ctrl+Shift+M'] },
+  { commandId: 'toggle-forms', category: 'View', label: 'Forms panel', defaultShortcuts: ['F'] },
 
   { commandId: 'optimize-pdf', category: 'Document', label: 'Optimize PDF', defaultShortcuts: ['Ctrl+Shift+O'] },
   { commandId: 'export-images', category: 'Document', label: 'Export images', defaultShortcuts: ['Ctrl+Shift+B'] },
@@ -108,12 +113,6 @@ export const SHORTCUT_REGISTRY: ShortcutBinding[] = [
   { commandId: 'toggle-shape', category: 'Annotation', label: 'Shape', defaultShortcuts: ['S'] },
   { commandId: 'toggle-stamp', category: 'Annotation', label: 'Stamp', defaultShortcuts: ['T'] },
   { commandId: 'toggle-redact', category: 'Annotation', label: 'Redact', defaultShortcuts: ['X'] },
-  { commandId: 'toggle-text-edit', category: 'Annotation', label: 'Page text', defaultShortcuts: ['E'] },
-  { commandId: 'toggle-vector-edit', category: 'Annotation', label: 'Vector edit', defaultShortcuts: ['G'] },
-  { commandId: 'toggle-pdf-edit', category: 'Annotation', label: 'PDF edit', defaultShortcuts: ['P'] },
-  { commandId: 'toggle-image-insert', category: 'Annotation', label: 'Insert image', defaultShortcuts: ['I'] },
-  { commandId: 'toggle-forms', category: 'Annotation', label: 'Forms', defaultShortcuts: ['F'] },
-
   { commandId: 'previous-page', category: 'Navigation', label: 'Previous page', defaultShortcuts: ['ArrowLeft', 'PageUp'] },
   { commandId: 'next-page', category: 'Navigation', label: 'Next page', defaultShortcuts: ['ArrowRight', 'PageDown'] },
   { commandId: 'first-page', category: 'Navigation', label: 'First page', defaultShortcuts: ['Home'] },

@@ -17,7 +17,7 @@ async function enterPdfEditMode() {
     await toolbarBtn.click();
     return;
   }
-  await clickMenuAction('annotate', 'pdf-edit');
+  await clickMenuAction('edit', 'pdf-edit');
 }
 
 async function getCenterOfTextSpan(text: string): Promise<{ cx: number; cy: number }> {
@@ -40,6 +40,24 @@ describe('PDF Edit Mode', () => {
     await resetToWelcome();
   });
 
+  it('shows a dedicated edit toolbar and keeps editing commands out of Annotate', async () => {
+    await openPdfViaPathModal(fixturePdf);
+    await waitForPdfOpen();
+
+    const toolbar = await $('[data-testid="pdf-edit-toolbar"]');
+    await toolbar.waitForDisplayed({ timeout: 10_000 });
+    await expect(toolbar).toHaveElementClass('pdf-edit-ribbon');
+    await expect($('button=Edit Text')).toBeDisplayed();
+    await expect($('button=Add Text')).toBeDisplayed();
+    await expect($('button=Add Image')).toBeDisplayed();
+    await expect($('button=Edit Objects')).toBeDisplayed();
+    await expect($('button=Edit Vector')).toBeDisplayed();
+
+    await $('[data-testid="menu-annotate"]').click();
+    expect(await $('[data-testid="pdf-edit"]').isDisplayed().catch(() => false)).toBe(false);
+    expect(await $('[data-testid="edit-text"]').isDisplayed().catch(() => false)).toBe(false);
+  });
+
   it('enters edit mode, resizes the rich-text edit box, and applies', async () => {
     await openPdfViaPathModal(fixturePdf);
     await waitForPdfOpen();
@@ -60,6 +78,21 @@ describe('PDF Edit Mode', () => {
 
     const textarea = await $('.rich-text-edit-textarea');
     await textarea.waitForDisplayed({ timeout: 10_000 });
+
+    const layout = await browser.execute(() => {
+      const overlay = document.querySelector('.rich-text-edit-overlay')!.getBoundingClientRect();
+      const toolbar = document.querySelector('.edit-toolbar')!.getBoundingClientRect();
+      const input = document.querySelector('.rich-text-edit-textarea')!.getBoundingClientRect();
+      return {
+        overlay: { top: overlay.top, bottom: overlay.bottom, width: overlay.width, height: overlay.height },
+        toolbar: { top: toolbar.top, bottom: toolbar.bottom, width: toolbar.width },
+        input: { width: input.width, height: input.height },
+      };
+    });
+    expect(layout.toolbar.width).toBeGreaterThan(layout.overlay.width);
+    expect(layout.toolbar.bottom <= layout.overlay.top || layout.toolbar.top >= layout.overlay.bottom).toBe(true);
+    expect(Math.round(layout.input.width)).toBe(Math.round(layout.overlay.width));
+    expect(Math.round(layout.input.height)).toBe(Math.round(layout.overlay.height));
 
     const handle = await $('.rich-text-resize-handle-br');
     await handle.waitForDisplayed({ timeout: 10_000 });
@@ -253,6 +286,8 @@ describe('PDF Edit Mode', () => {
 
     const selectionOverlay = await $('.paragraph-selection-overlay');
     await selectionOverlay.waitForDisplayed({ timeout: 10_000 });
+    await $('[aria-label="Paragraph editing toolbar"]').waitForDisplayed({ timeout: 10_000 });
+    await $('button=Edit Text').waitForDisplayed({ timeout: 10_000 });
 
     await selectionOverlay.click();
     await browser.keys('Enter');
@@ -302,6 +337,12 @@ describe('PDF Edit Mode', () => {
 
     const overlay = await $('.image-selection-overlay');
     await overlay.waitForDisplayed({ timeout: 10_000 });
+    await $('[aria-label="Image editing toolbar"]').waitForDisplayed({ timeout: 10_000 });
+    await $('button=Rotate Left').waitForDisplayed({ timeout: 10_000 });
+    await $('button=Replace').waitForDisplayed({ timeout: 10_000 });
+    await $('button=Apply').waitForDisplayed({ timeout: 10_000 });
+    await $('button=Delete').waitForDisplayed({ timeout: 10_000 });
+    await $('button=Cancel').waitForDisplayed({ timeout: 10_000 });
 
     const rotator = await $('.image-selection-handle-rotate');
     await rotator.waitForDisplayed({ timeout: 10_000 });
@@ -334,13 +375,13 @@ describe('PDF Edit Mode', () => {
     expect(await errorToast.isDisplayed().catch(() => false)).toBe(false);
   });
 
-  it('shows an Insert Image button when edit mode is active', async () => {
+  it('shows an Add Image button when edit mode is active', async () => {
     await openPdfViaPathModal(fixturePdf);
     await waitForPdfOpen();
     await waitForPageRendered();
 
     await enterPdfEditMode();
-    const insertBtn = await $('[aria-label="Insert image"]');
+    const insertBtn = await $('[aria-label="Add image"]');
     await insertBtn.waitForDisplayed({ timeout: 10_000 });
     expect(await insertBtn.isClickable()).toBe(true);
   });

@@ -3,6 +3,7 @@ import { invoke } from '@tauri-apps/api/core';
 import type { DocumentSessionData } from '../app/documentSessionTypes';
 import type { PdfEditState, Rect, TextStyle } from '../app/usePdfEditState';
 import { runStructuralEdit, type StructuralEditDeps } from '../pdf/runStructuralEdit';
+import type { PageTextRun } from '../pdf/useTextLayerLoader';
 
 type PdfRect = {
   x: number;
@@ -14,6 +15,8 @@ type PdfRect = {
 type PageImageInfo = {
   index: number;
   bbox: PdfRect;
+  rect: PdfRect;
+  rotation: number;
   width?: number;
   height?: number;
 };
@@ -21,6 +24,7 @@ type PageImageInfo = {
 type PageImageHit = {
   index: number;
   viewerRect: Rect;
+  rotation: number;
   width?: number;
   height?: number;
 };
@@ -29,6 +33,10 @@ type TextLine = {
   lineIndex: number;
   text: string;
   bbox: Rect;
+  fontFamily: TextStyle['fontFamily'];
+  fontSize: number;
+  bold: boolean;
+  italic: boolean;
 };
 
 type UsePageInteractionEditOptions = {
@@ -48,6 +56,22 @@ function toBackendStyle(style: TextStyle): TextStyle & { color: { r: number; g: 
 
 function rectToPdfRect(rect: Rect): PdfRect {
   return { x: rect.x, y: rect.y, width: rect.w, height: rect.h };
+}
+
+function sourceTextStyle(
+  base: TextStyle,
+  source: Pick<TextLine, 'fontFamily' | 'fontSize' | 'bold' | 'italic'> & {
+    color?: TextStyle['color'];
+  },
+): TextStyle {
+  return {
+    ...base,
+    fontFamily: source.fontFamily,
+    fontSize: Math.max(6, Math.min(72, source.fontSize)),
+    bold: source.bold,
+    italic: source.italic,
+    color: source.color ?? base.color,
+  };
 }
 
 export function usePageInteractionEdit(deps: UsePageInteractionEditOptions) {
@@ -79,7 +103,19 @@ export function usePageInteractionEdit(deps: UsePageInteractionEditOptions) {
   const loadPageTextLines = useCallback(
     async (session: DocumentSessionData, pageIndex: number): Promise<TextLine[]> => {
       if (!session?.filePath) return [];
-      const lines = await invoke<Array<{ text: string; x: number; y: number; w: number; h: number }>>(
+      const lines = await invoke<
+        Array<{
+          text: string;
+          x: number;
+          y: number;
+          w: number;
+          h: number;
+          fontFamily: TextStyle['fontFamily'];
+          fontSize: number;
+          bold: boolean;
+          italic: boolean;
+        }>
+      >(
         'get_page_text_lines',
         {
           path: session.filePath,
@@ -91,6 +127,10 @@ export function usePageInteractionEdit(deps: UsePageInteractionEditOptions) {
         lineIndex: idx,
         text: line.text,
         bbox: { x: line.x, y: line.y, w: line.w, h: line.h },
+        fontFamily: line.fontFamily,
+        fontSize: line.fontSize,
+        bold: line.bold,
+        italic: line.italic,
       }));
     },
     [],
@@ -104,19 +144,41 @@ export function usePageInteractionEdit(deps: UsePageInteractionEditOptions) {
         pageIndex,
       });
       for (const img of images) {
-        const rect = await pdfRectToViewerPx(pageIndex, img.bbox);
+        const hitRect = await pdfRectToViewerPx(pageIndex, img.bbox);
         if (
-          x >= rect.x &&
-          x <= rect.x + rect.w &&
-          y >= rect.y &&
-          y <= rect.y + rect.h
+          x >= hitRect.x &&
+          x <= hitRect.x + hitRect.w &&
+          y >= hitRect.y &&
+          y <= hitRect.y + hitRect.h
         ) {
-          return { index: img.index, viewerRect: rect, width: img.width, height: img.height };
+          const viewerRect = await pdfRectToViewerPx(pageIndex, img.rect);
+          return {
+            index: img.index,
+            viewerRect,
+            rotation: img.rotation,
+            width: img.width,
+            height: img.height,
+          };
         }
       }
       return null;
     },
     [filePath, pdfRectToViewerPx],
+  );
+
+  const hitTestPdfiumText = useCallback(
+    async (session: DocumentSessionData, pageIndex: number, x: number, y: number): Promise<PageTextRun | null> => {
+      const runs = await invoke<PageTextRun[]>('get_page_text_layout', {
+        path: session.filePath,
+        pageIndex,
+      }).catch(() => []);
+      for (let i = runs.length - 1; i >= 0; i -= 1) {
+        const run = runs[i]!;
+        if (x >= run.x && x <= run.x + run.w && y >= run.y && y <= run.y + run.h) return run;
+      }
+      return null;
+    },
+    [],
   );
 
   const handlePageClick = useCallback(
@@ -143,6 +205,7 @@ export function usePageInteractionEdit(deps: UsePageInteractionEditOptions) {
             break;
           }
         }
+        const hitRun = await hitTestPdfiumText(session, pageIndex, point.x, point.y);
         if (hitLine) {
           // Try to detect a multi-line paragraph first.
           const paragraph = await invoke<{ lineIndices: number[]; x: number; y: number; w: number; h: number } | null>(
@@ -157,12 +220,13 @@ export function usePageInteractionEdit(deps: UsePageInteractionEditOptions) {
             const text = paragraph.lineIndices
               .map((idx) => lines[idx]?.text ?? '')
               .join('\n');
+            const firstLine = lines[paragraph.lineIndices[0]!] ?? hitLine;
             pdfEdit.startEditingParagraph({
               pageIndex,
               lineIndices: paragraph.lineIndices,
               text,
               pageRect: { x: paragraph.x, y: paragraph.y, w: paragraph.w, h: paragraph.h },
-              style: pdfEdit.style,
+              style: sourceTextStyle(pdfEdit.style, hitRun ?? firstLine),
             });
           } else {
             pdfEdit.startEditingText({
@@ -170,10 +234,20 @@ export function usePageInteractionEdit(deps: UsePageInteractionEditOptions) {
               point,
               text: hitLine.text,
               pageRect: hitLine.bbox,
-              style: pdfEdit.style,
+              style: sourceTextStyle(pdfEdit.style, hitRun ?? hitLine),
               lineIndex: hitLine.lineIndex,
             });
           }
+        } else if (hitRun) {
+          const rect = { x: hitRun.x, y: hitRun.y, w: hitRun.w, h: hitRun.h };
+          pdfEdit.startEditingText({
+            pageIndex,
+            point,
+            text: hitRun.text,
+            pageRect: rect,
+            sourceRect: rect,
+            style: sourceTextStyle(pdfEdit.style, hitRun),
+          });
         } else if (pdfEdit.mode === 'text' || pdfEdit.mode === 'paragraph') {
           pdfEdit.startInsertingText(pageIndex, point, {
             x: point.x - 50,
@@ -193,6 +267,7 @@ export function usePageInteractionEdit(deps: UsePageInteractionEditOptions) {
               width: image.width,
               height: image.height,
               pageRect: image.viewerRect,
+              rotation: image.rotation,
             });
           } else {
             pdfEdit.startInsertingText(pageIndex, point, {
@@ -214,11 +289,12 @@ export function usePageInteractionEdit(deps: UsePageInteractionEditOptions) {
             width: image.width,
             height: image.height,
             pageRect: image.viewerRect,
+            rotation: image.rotation,
           });
         }
       }
     },
-    [pdfEdit, loadPageTextLines],
+    [hitTestPdfiumText, pdfEdit, loadPageTextLines],
   );
 
   const applyTextEdit = useCallback(
@@ -227,9 +303,10 @@ export function usePageInteractionEdit(deps: UsePageInteractionEditOptions) {
       const draft = pdfEdit.textDraft;
       const boxRect = rectToPdfRect(draft.pageRect);
       const style = toBackendStyle(draft.style);
+      let result: unknown;
 
       if (draft.lineIndex !== undefined) {
-        await runStructuralEdit(deps, {
+        result = await runStructuralEdit(deps, {
           command: 'edit_text_line',
           args: {
             path: session.filePath,
@@ -242,8 +319,22 @@ export function usePageInteractionEdit(deps: UsePageInteractionEditOptions) {
           reloadAt: draft.pageIndex,
           toast: 'Text updated',
         });
+      } else if (draft.sourceRect) {
+        result = await runStructuralEdit(deps, {
+          command: 'edit_text_region',
+          args: {
+            path: session.filePath,
+            pageIndex: draft.pageIndex,
+            sourceRect: rectToPdfRect(draft.sourceRect),
+            newText: draft.text,
+            style,
+            boxRect,
+          },
+          reloadAt: draft.pageIndex,
+          toast: 'Text updated',
+        });
       } else {
-        await runStructuralEdit(deps, {
+        result = await runStructuralEdit(deps, {
           command: 'add_text_box',
           args: {
             path: session.filePath,
@@ -256,7 +347,7 @@ export function usePageInteractionEdit(deps: UsePageInteractionEditOptions) {
           toast: 'Text added',
         });
       }
-      pdfEdit.onCancel();
+      if (result !== undefined) pdfEdit.onCancel();
     },
     [deps, pdfEdit],
   );
@@ -267,7 +358,7 @@ export function usePageInteractionEdit(deps: UsePageInteractionEditOptions) {
       const draft = pdfEdit.paragraphDraft;
       const boxRect = rectToPdfRect(draft.pageRect);
       const style = toBackendStyle(draft.style);
-      await runStructuralEdit(deps, {
+      const result = await runStructuralEdit(deps, {
         command: 'edit_paragraph',
         args: {
           path: session.filePath,
@@ -280,7 +371,7 @@ export function usePageInteractionEdit(deps: UsePageInteractionEditOptions) {
         reloadAt: draft.pageIndex,
         toast: 'Paragraph updated',
       });
-      pdfEdit.onCancel();
+      if (result !== undefined) pdfEdit.onCancel();
     },
     [deps, pdfEdit],
   );
@@ -289,8 +380,9 @@ export function usePageInteractionEdit(deps: UsePageInteractionEditOptions) {
     async (session: DocumentSessionData) => {
       if (!session?.filePath || !pdfEdit.textDraft) return;
       const draft = pdfEdit.textDraft;
+      let result: unknown;
       if (draft.lineIndex !== undefined) {
-        await runStructuralEdit(deps, {
+        result = await runStructuralEdit(deps, {
           command: 'delete_text_line',
           args: {
             path: session.filePath,
@@ -300,8 +392,22 @@ export function usePageInteractionEdit(deps: UsePageInteractionEditOptions) {
           reloadAt: draft.pageIndex,
           toast: 'Text removed',
         });
+      } else if (draft.sourceRect) {
+        result = await runStructuralEdit(deps, {
+          command: 'delete_text_region',
+          args: {
+            path: session.filePath,
+            pageIndex: draft.pageIndex,
+            sourceRect: rectToPdfRect(draft.sourceRect),
+          },
+          reloadAt: draft.pageIndex,
+          toast: 'Text removed',
+        });
+      } else {
+        pdfEdit.onCancel();
+        return;
       }
-      pdfEdit.onCancel();
+      if (result !== undefined) pdfEdit.onCancel();
     },
     [deps, pdfEdit],
   );
@@ -310,7 +416,7 @@ export function usePageInteractionEdit(deps: UsePageInteractionEditOptions) {
     async (session: DocumentSessionData) => {
       if (!session?.filePath || !pdfEdit.paragraphDraft) return;
       const draft = pdfEdit.paragraphDraft;
-      await runStructuralEdit(deps, {
+      const result = await runStructuralEdit(deps, {
         command: 'delete_paragraph',
         args: {
           path: session.filePath,
@@ -320,7 +426,7 @@ export function usePageInteractionEdit(deps: UsePageInteractionEditOptions) {
         reloadAt: draft.pageIndex,
         toast: 'Paragraph removed',
       });
-      pdfEdit.onCancel();
+      if (result !== undefined) pdfEdit.onCancel();
     },
     [deps, pdfEdit],
   );
@@ -330,7 +436,7 @@ export function usePageInteractionEdit(deps: UsePageInteractionEditOptions) {
       if (!session?.filePath || !pdfEdit.imageDraft) return;
       const draft = pdfEdit.imageDraft;
       const newRect = await viewerRectToPdf(draft.pageIndex, draft.pageRect);
-      await runStructuralEdit(deps, {
+      const result = await runStructuralEdit(deps, {
         command: 'transform_page_image',
         args: {
           path: session.filePath,
@@ -342,7 +448,7 @@ export function usePageInteractionEdit(deps: UsePageInteractionEditOptions) {
         reloadAt: draft.pageIndex,
         toast: 'Image updated',
       });
-      pdfEdit.onCancel();
+      if (result !== undefined) pdfEdit.onCancel();
     },
     [deps, pdfEdit, viewerRectToPdf],
   );
@@ -351,7 +457,7 @@ export function usePageInteractionEdit(deps: UsePageInteractionEditOptions) {
     async (session: DocumentSessionData) => {
       if (!session?.filePath || !pdfEdit.imageDraft) return;
       const draft = pdfEdit.imageDraft;
-      await runStructuralEdit(deps, {
+      const result = await runStructuralEdit(deps, {
         command: 'remove_page_image',
         args: {
           path: session.filePath,
@@ -361,7 +467,7 @@ export function usePageInteractionEdit(deps: UsePageInteractionEditOptions) {
         reloadAt: draft.pageIndex,
         toast: 'Image removed',
       });
-      pdfEdit.onCancel();
+      if (result !== undefined) pdfEdit.onCancel();
     },
     [deps, pdfEdit],
   );

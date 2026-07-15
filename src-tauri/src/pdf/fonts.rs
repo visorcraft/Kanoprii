@@ -28,33 +28,37 @@ pub fn font_has_glyphs_for(text: &str) -> bool {
 // in the upcoming `edit_text_line` / `add_text_box` implementation tasks.
 #[allow(dead_code)]
 pub fn ensure_font_family(doc: &mut Document, style: &TextStyle, page_id: ObjectId) -> Result<String, String> {
-    let base_name = match style.font_family.as_str() {
-        "Helvetica" => "Helv",
-        "LiberationSans" => "PPFullFont",
-        "Courier" => "Cour",
+    if style.font_family == "LiberationSans" {
+        ensure_full_font(doc, page_id)?;
+        return Ok(FONT_RESOURCE_NAME.to_string());
+    }
+
+    let (prefix, base, italic_suffix) = match style.font_family.as_str() {
+        "Helvetica" => ("Helv", "Helvetica", "Oblique"),
+        "Courier" => ("Cour", "Courier", "Oblique"),
+        "Times" => ("Times", "Times-Roman", "Italic"),
         other => return Err(format!("unsupported font family: {}", other)),
     };
-
-    // TODO(Phase 1 synthetic fallback): bold/italic suffixes are computed here
-    // for future use, but for now we always register and return the regular face.
-    let _variant_suffix = if style.bold && style.italic {
-        "BI"
-    } else if style.bold {
-        "B"
-    } else if style.italic {
-        "I"
-    } else {
-        ""
+    let (resource_name, pdf_name) = match (style.bold, style.italic) {
+        (true, true) => (
+            format!("{prefix}BI"),
+            format!("{base_family}-Bold{italic_suffix}", base_family = base.trim_end_matches("-Roman")),
+        ),
+        (true, false) => {
+            (format!("{prefix}B"), format!("{base_family}-Bold", base_family = base.trim_end_matches("-Roman")))
+        }
+        (false, true) => (
+            format!("{prefix}I"),
+            format!("{base_family}-{italic_suffix}", base_family = base.trim_end_matches("-Roman")),
+        ),
+        (false, false) => (prefix.to_string(), base.to_string()),
     };
+    ensure_standard_type1_font(doc, page_id, &resource_name, &pdf_name)?;
+    Ok(resource_name)
+}
 
-    match base_name {
-        "Helv" => crate::pdf::page_text::ensure_helvetica_font(doc, page_id)?,
-        "PPFullFont" => ensure_full_font(doc, page_id)?,
-        "Cour" => ensure_courier_font(doc, page_id)?,
-        _ => unreachable!(),
-    };
-
-    Ok(base_name.to_string())
+pub fn uses_synthetic_font_style(style: &TextStyle) -> bool {
+    style.font_family == "LiberationSans"
 }
 
 /// Validate that `text` can be rendered with the requested style. For Phase 1
@@ -97,25 +101,61 @@ pub fn measure_text_width(text: &str, font_family: &str, font_size: f64) -> f64 
     }
 }
 
+/// Collapse a PDF font name into one of the editor's writable families and
+/// infer the two styles the editor can preserve.
+pub fn editable_font_style(font_name: &str) -> (&'static str, bool, bool) {
+    let base = font_name.rsplit_once('+').map_or(font_name, |(_, name)| name).to_ascii_lowercase();
+    let family = if base.contains("courier") || base.contains("mono") {
+        "Courier"
+    } else if base.contains("times") || base.contains("serif") {
+        "Times"
+    } else if base.contains("liberation") {
+        "LiberationSans"
+    } else {
+        "Helvetica"
+    };
+    let bold = base.contains("bold") || base.contains("demi") || base.contains("black");
+    let italic = base.contains("italic") || base.contains("oblique");
+    (family, bold, italic)
+}
+
+pub fn page_font_name_for_resource(doc: &Document, page_id: ObjectId, resource_name: &str) -> Option<String> {
+    let resources = page_resources_for_edit(doc, page_id);
+    let fonts = resources.get(b"Font").ok().and_then(|obj| dictionary_object_to_owned(doc, obj))?;
+    let font = fonts.get(resource_name.as_bytes()).ok().and_then(|obj| dictionary_object_to_owned(doc, obj))?;
+    let base = font.get(b"BaseFont").ok()?.as_name().ok()?;
+    Some(String::from_utf8_lossy(base).into_owned())
+}
+
 /// Ensure the page has a standard Type1 Courier font resource.
 #[allow(dead_code)]
 fn ensure_courier_font(doc: &mut Document, page_id: ObjectId) -> Result<String, String> {
+    ensure_standard_type1_font(doc, page_id, "Cour", "Courier")?;
+    Ok("Cour".to_string())
+}
+
+fn ensure_standard_type1_font(
+    doc: &mut Document,
+    page_id: ObjectId,
+    resource_name: &str,
+    pdf_name: &str,
+) -> Result<(), String> {
     let mut resources = page_resources_for_edit(doc, page_id);
     let mut fonts =
         resources.get(b"Font").ok().and_then(|obj| dictionary_object_to_owned(doc, obj)).unwrap_or_default();
-    if fonts.get(b"Cour").is_err() {
+    if fonts.get(resource_name.as_bytes()).is_err() {
         fonts.set(
-            b"Cour",
+            resource_name.as_bytes(),
             Object::Dictionary(Dictionary::from_iter(vec![
                 (b"Type".to_vec(), Object::Name(b"Font".to_vec())),
                 (b"Subtype".to_vec(), Object::Name(b"Type1".to_vec())),
-                (b"BaseFont".to_vec(), Object::Name(b"Courier".to_vec())),
+                (b"BaseFont".to_vec(), Object::Name(pdf_name.as_bytes().to_vec())),
             ])),
         );
     }
     resources.set(b"Font", Object::Dictionary(fonts));
     doc.get_dictionary_mut(page_id).map_err(|e| e.to_string())?.set(b"Resources", Object::Dictionary(resources));
-    Ok("Cour".to_string())
+    Ok(())
 }
 
 /// Ensure the page (and document) has the embedded full font available.
@@ -425,6 +465,24 @@ mod tests {
     }
 
     #[test]
+    fn ensure_font_family_registers_times() {
+        let (mut doc, page_id) = build_doc_with_inherited_resources();
+        let name = ensure_font_family(&mut doc, &style("Times"), page_id).unwrap();
+        assert_eq!(name, "Times");
+        let page = doc.get_dictionary(page_id).unwrap();
+        let fonts = page.get(b"Resources").unwrap().as_dict().unwrap().get(b"Font").unwrap().as_dict().unwrap();
+        assert!(fonts.get(b"Times").is_ok());
+    }
+
+    #[test]
+    fn editable_font_style_maps_pdf_names() {
+        assert_eq!(editable_font_style("ABCDEF+TimesNewRomanPS-BoldItalicMT"), ("Times", true, true));
+        assert_eq!(editable_font_style("LiberationSans-Regular"), ("LiberationSans", false, false));
+        assert_eq!(editable_font_style("Courier-Oblique"), ("Courier", false, true));
+        assert_eq!(editable_font_style("ArialMT"), ("Helvetica", false, false));
+    }
+
+    #[test]
     fn ensure_courier_font_preserves_inherited_resources() {
         let (mut doc, page_id) = build_doc_with_inherited_resources();
         let name = ensure_courier_font(&mut doc, page_id).unwrap();
@@ -445,15 +503,28 @@ mod tests {
     }
 
     #[test]
-    fn ensure_font_family_bold_italic_falls_back_to_base_face() {
+    fn ensure_font_family_registers_bold_italic_face() {
         let (mut doc, page_id) = build_doc_with_inherited_resources();
         let mut s = style("Helvetica");
         s.bold = true;
         s.italic = true;
         let name = ensure_font_family(&mut doc, &s, page_id).unwrap();
-        // Phase 1 returns the regular face name; synthetic bold/italic is applied
-        // by the caller through the text rendering matrix.
-        assert_eq!(name, "Helv");
+        assert_eq!(name, "HelvBI");
+        let page = doc.get_dictionary(page_id).unwrap();
+        let font = page
+            .get(b"Resources")
+            .unwrap()
+            .as_dict()
+            .unwrap()
+            .get(b"Font")
+            .unwrap()
+            .as_dict()
+            .unwrap()
+            .get(b"HelvBI")
+            .unwrap()
+            .as_dict()
+            .unwrap();
+        assert_eq!(font.get(b"BaseFont").unwrap().as_name().unwrap(), b"Helvetica-BoldOblique");
     }
 
     #[test]

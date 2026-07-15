@@ -7,6 +7,11 @@ export type PageTextRun = {
   y: number;
   w: number;
   h: number;
+  fontFamily: import('../app/usePdfEditState').FontFamily;
+  fontSize: number;
+  bold: boolean;
+  italic: boolean;
+  color: import('../app/usePdfEditState').RgbColor;
 };
 
 type CacheKey = string;

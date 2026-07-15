@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RgbColor {
     pub r: f64,
@@ -20,7 +20,7 @@ pub struct TextStyle {
     pub align: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PdfRect {
     pub x: f64,
@@ -34,7 +34,13 @@ pub struct PdfRect {
 pub struct PageImageInfo {
     pub index: usize,
     pub object_id: (u32, u16),
+    pub resource_name: String,
+    pub occurrence: usize,
+    /// Axis-aligned hit bounds after rotation.
     pub bbox: PdfRect,
+    /// Unrotated placement rectangle centered on the transformed image.
+    pub rect: PdfRect,
+    pub rotation: f64,
     pub width: u32,
     pub height: u32,
 }

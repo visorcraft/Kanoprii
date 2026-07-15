@@ -19742,7 +19742,7 @@ fn add_text_box_emits_color_operators() {
 }
 
 #[test]
-fn add_text_box_bold_draws_twice() {
+fn add_text_box_bold_uses_standard_bold_face() {
     let path = save(&mut build_pdf(1), "add_text_box_bold");
     let mut doc = Document::load(&path).unwrap();
     let mut style = text_box_style();
@@ -19751,13 +19751,14 @@ fn add_text_box_bold_draws_twice() {
 
     let page_id = *doc.get_pages().get(&1).unwrap();
     let content = String::from_utf8_lossy(&read_page_content(&doc, page_id).unwrap()).into_owned();
-    assert_eq!(content.matches("Tj").count(), 3, "bold should emit two new text show operators plus the original one");
+    assert_eq!(content.matches("Tj").count(), 2);
+    assert!(content.contains("/HelvB 12 Tf"));
 
     std::fs::remove_file(&path).ok();
 }
 
 #[test]
-fn add_text_box_italic_uses_shear_matrix() {
+fn add_text_box_italic_uses_standard_italic_face() {
     let path = save(&mut build_pdf(1), "add_text_box_italic");
     let mut doc = Document::load(&path).unwrap();
     let mut style = text_box_style();
@@ -19766,7 +19767,8 @@ fn add_text_box_italic_uses_shear_matrix() {
 
     let page_id = *doc.get_pages().get(&1).unwrap();
     let content = String::from_utf8_lossy(&read_page_content(&doc, page_id).unwrap()).into_owned();
-    assert!(content.contains("1 0 0.25 1"), "italic should use a shear matrix");
+    assert!(content.contains("/HelvI 12 Tf"));
+    assert!(!content.contains("1 0 0.25 1"));
 
     std::fs::remove_file(&path).ok();
 }
@@ -19889,8 +19891,10 @@ fn list_page_images_finds_inline_image_xobject() {
     assert_eq!(images[0].index, 0);
     assert_eq!(images[0].width, 2);
     assert_eq!(images[0].height, 2);
-    assert_eq!(images[0].bbox.width, 2.0);
-    assert_eq!(images[0].bbox.height, 2.0);
+    assert_eq!(images[0].bbox.width, 100.0);
+    assert_eq!(images[0].bbox.height, 100.0);
+    assert_eq!(images[0].rect.width, 100.0);
+    assert_eq!(images[0].rect.height, 100.0);
     std::fs::remove_file(&path).ok();
 }
 
@@ -19925,8 +19929,7 @@ fn remove_page_image_removes_do_operator() {
     std::fs::remove_file(&path).ok();
 }
 
-/// Build a one-page PDF whose image is invoked without a preceding `cm`, so
-/// transform/remove must reject the unsupported pattern.
+/// Build a one-page PDF whose image is invoked without a preceding `cm`.
 fn build_pdf_with_unsupported_image() -> Document {
     let mut doc = build_pdf_with_image();
     let page_id = *doc.get_pages().get(&1).unwrap();
@@ -19937,11 +19940,13 @@ fn build_pdf_with_unsupported_image() -> Document {
 }
 
 #[test]
-fn transform_page_image_rejects_unsupported_pattern() {
+fn transform_page_image_supports_do_without_cm() {
     let path = save(&mut build_pdf_with_unsupported_image(), "transform_unsupported");
     let new_rect = PdfRect { x: 10.0, y: 20.0, width: 30.0, height: 40.0 };
     let mut doc = Document::load(&path).unwrap();
-    let err = pdf::edit_object::transform_page_image(&mut doc, 0, 0, &new_rect, 0.0).unwrap_err();
-    assert!(err.contains("not supported"), "expected unsupported pattern error, got {err}");
+    pdf::edit_object::transform_page_image(&mut doc, 0, 0, &new_rect, 0.0).unwrap();
+    let images = pdf::page_images::list_page_images(&doc, 0).unwrap();
+    assert_eq!(images.len(), 1);
+    assert_eq!(images[0].rect, new_rect);
     std::fs::remove_file(&path).ok();
 }

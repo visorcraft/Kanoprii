@@ -23,6 +23,27 @@ fn delete_text_line(path: String, page_index: u32, line_index: usize) -> Result<
 }
 
 #[tauri::command]
+fn edit_text_region(
+    path: String,
+    page_index: u32,
+    source_rect: PdfRect,
+    new_text: String,
+    style: TextStyle,
+    box_rect: PdfRect,
+) -> Result<(), String> {
+    crate::pdf::io::mutate_pdf(&PathBuf::from(path), |doc| {
+        crate::pdf::edit_object::edit_text_region(doc, page_index, &source_rect, &new_text, &style, &box_rect)
+    })
+}
+
+#[tauri::command]
+fn delete_text_region(path: String, page_index: u32, source_rect: PdfRect) -> Result<(), String> {
+    crate::pdf::io::mutate_pdf(&PathBuf::from(path), |doc| {
+        crate::pdf::edit_object::delete_text_region(doc, page_index, &source_rect)
+    })
+}
+
+#[tauri::command]
 fn add_text_box(
     path: String,
     page_index: u32,
@@ -59,6 +80,13 @@ fn transform_page_image(
 fn remove_page_image(path: String, page_index: u32, image_index: usize) -> Result<(), String> {
     crate::pdf::io::mutate_pdf(&PathBuf::from(path), |doc| {
         crate::pdf::edit_object::remove_page_image(doc, page_index, image_index)
+    })
+}
+
+#[tauri::command]
+fn replace_page_image(path: String, page_index: u32, image_index: usize, image_path: String) -> Result<(), String> {
+    crate::pdf::io::mutate_pdf(&PathBuf::from(path), |doc| {
+        crate::pdf::edit_object::replace_page_image(doc, page_index, image_index, &PathBuf::from(&image_path))
     })
 }
 

@@ -197,56 +197,123 @@ pub fn export_page_as_pdf(path: &Path, page_index: u32, output_path: &Path) -> R
     extract_pdf_pages(path, output_path, page_index, page_index)
 }
 
-/// List image XObjects referenced by a page's /Resources /XObject dictionary.
-///
-/// Phase 1: returns the intrinsic width/height and a placeholder bbox at the
-/// origin. Computing the actual drawn bbox from the content stream is future
-/// work.
+/// List each image XObject placement in page drawing order.
 pub fn list_page_images(doc: &Document, page_index: u32) -> Result<Vec<PageImageInfo>, String> {
     let page_id = doc.page_iter().nth(page_index as usize).ok_or_else(|| "page index out of range".to_string())?;
     let resources = page_resources(doc, page_id)?;
     let xobjects = resources.get(b"XObject").map_err(|_| "missing XObject resources".to_string())?;
-    let xobjects = xobjects.as_dict().map_err(|_| "XObject not dict".to_string())?;
-
-    let mut images = Vec::new();
-    for (_name, obj) in xobjects.iter() {
+    let xobjects = object_dictionary(doc, xobjects).ok_or_else(|| "XObject not dict".to_string())?;
+    let mut image_resources = std::collections::BTreeMap::new();
+    for (name, obj) in xobjects.iter() {
         let id = obj.as_reference().map_err(|_| "xobject not reference".to_string())?;
         let xobj =
             doc.get_object(id).map_err(|e| e.to_string())?.as_stream().map_err(|_| "xobject not stream".to_string())?;
         if xobj.dict.get(b"Subtype").ok().and_then(|s| s.as_name().ok()) != Some(b"Image".as_slice()) {
             continue;
         }
-        // Ignore duplicate names pointing at the same object.
-        if images.iter().any(|info: &PageImageInfo| info.object_id == (id.0, id.1)) {
-            continue;
-        }
         let width = xobj.dict.get(b"Width").and_then(|w| w.as_i64()).unwrap_or(0) as u32;
         let height = xobj.dict.get(b"Height").and_then(|h| h.as_i64()).unwrap_or(0) as u32;
-        images.push(PageImageInfo {
-            index: images.len(),
-            object_id: (id.0, id.1),
-            bbox: PdfRect { x: 0.0, y: 0.0, width: width as f64, height: height as f64 },
-            width,
-            height,
-        });
+        image_resources.insert(name.clone(), (id, width, height));
+    }
+
+    let bytes = doc.get_page_content(page_id).map_err(|e| e.to_string())?;
+    let content = lopdf::content::Content::decode(&bytes).map_err(|e| e.to_string())?;
+    let mut ctm = [1.0, 0.0, 0.0, 1.0, 0.0, 0.0];
+    let mut stack = Vec::new();
+    let mut occurrence_by_name = std::collections::BTreeMap::<Vec<u8>, usize>::new();
+    let mut images = Vec::new();
+    for op in content.operations {
+        match op.operator.as_str() {
+            "q" => stack.push(ctm),
+            "Q" => ctm = stack.pop().unwrap_or([1.0, 0.0, 0.0, 1.0, 0.0, 0.0]),
+            "cm" => {
+                let matrix: Vec<f64> =
+                    op.operands.iter().filter_map(|value| value.as_float().ok().map(f64::from)).collect();
+                if let [a, b, c, d, e, f] = matrix.as_slice() {
+                    ctm = multiply_matrices(ctm, [*a, *b, *c, *d, *e, *f]);
+                }
+            }
+            "Do" => {
+                let Some(name) = op.operands.first().and_then(|value| value.as_name().ok()) else {
+                    continue;
+                };
+                let Some(&(id, width, height)) = image_resources.get(name) else {
+                    continue;
+                };
+                let occurrence = occurrence_by_name.entry(name.to_vec()).or_default();
+                let [(x0, y0), (x1, y1), (x2, y2), (x3, y3)] = [
+                    transform_point(ctm, 0.0, 0.0),
+                    transform_point(ctm, 1.0, 0.0),
+                    transform_point(ctm, 0.0, 1.0),
+                    transform_point(ctm, 1.0, 1.0),
+                ];
+                let left = x0.min(x1).min(x2).min(x3);
+                let right = x0.max(x1).max(x2).max(x3);
+                let bottom = y0.min(y1).min(y2).min(y3);
+                let top = y0.max(y1).max(y2).max(y3);
+                let placement_width = ctm[0].hypot(ctm[1]);
+                let placement_height = ctm[2].hypot(ctm[3]);
+                let center = transform_point(ctm, 0.5, 0.5);
+                images.push(PageImageInfo {
+                    index: images.len(),
+                    object_id: (id.0, id.1),
+                    resource_name: String::from_utf8_lossy(name).into_owned(),
+                    occurrence: *occurrence,
+                    bbox: PdfRect { x: left, y: bottom, width: right - left, height: top - bottom },
+                    rect: PdfRect {
+                        x: center.0 - placement_width / 2.0,
+                        y: center.1 - placement_height / 2.0,
+                        width: placement_width,
+                        height: placement_height,
+                    },
+                    rotation: ctm[1].atan2(ctm[0]).to_degrees(),
+                    width,
+                    height,
+                });
+                *occurrence += 1;
+            }
+            _ => {}
+        }
     }
 
     Ok(images)
 }
 
-/// Resolve a page's /Resources dictionary, following an indirect reference if
-/// necessary.
-pub fn page_resources(doc: &Document, page_id: lopdf::ObjectId) -> Result<lopdf::Dictionary, String> {
-    let dict = doc.get_dictionary(page_id).map_err(|e| e.to_string())?;
-    let resources = dict.get(b"Resources").map_err(|_| "missing resources".to_string())?;
-    match resources {
-        Object::Reference(id) => doc
-            .get_object(*id)
-            .map_err(|e| e.to_string())?
-            .as_dict()
-            .cloned()
-            .map_err(|_| "resources not dict".to_string()),
-        Object::Dictionary(d) => Ok(d.clone()),
-        _ => Err("resources not dict".to_string()),
+fn multiply_matrices(left: [f64; 6], right: [f64; 6]) -> [f64; 6] {
+    [
+        left[0] * right[0] + left[2] * right[1],
+        left[1] * right[0] + left[3] * right[1],
+        left[0] * right[2] + left[2] * right[3],
+        left[1] * right[2] + left[3] * right[3],
+        left[0] * right[4] + left[2] * right[5] + left[4],
+        left[1] * right[4] + left[3] * right[5] + left[5],
+    ]
+}
+
+fn transform_point(matrix: [f64; 6], x: f64, y: f64) -> (f64, f64) {
+    (matrix[0] * x + matrix[2] * y + matrix[4], matrix[1] * x + matrix[3] * y + matrix[5])
+}
+
+fn object_dictionary(doc: &Document, object: &Object) -> Option<Dictionary> {
+    match object {
+        Object::Dictionary(dict) => Some(dict.clone()),
+        Object::Reference(id) => doc.get_dictionary(*id).ok().cloned(),
+        _ => None,
     }
+}
+
+/// Resolve page resources, including inherited and indirect dictionaries.
+pub fn page_resources(doc: &Document, page_id: lopdf::ObjectId) -> Result<lopdf::Dictionary, String> {
+    let mut current = page_id;
+    for _ in 0..64 {
+        let dict = doc.get_dictionary(current).map_err(|e| e.to_string())?;
+        if let Ok(resources) = dict.get(b"Resources") {
+            return object_dictionary(doc, resources).ok_or_else(|| "resources not dict".to_string());
+        }
+        let Some(parent) = dict.get(b"Parent").ok().and_then(|object| object.as_reference().ok()) else {
+            break;
+        };
+        current = parent;
+    }
+    Err("missing resources".to_string())
 }

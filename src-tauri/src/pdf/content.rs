@@ -17,6 +17,9 @@ pub fn append_page_content(doc: &mut Document, page_id: ObjectId, ops: &[u8]) ->
             let obj = doc.get_object_mut(id).map_err(|e| e.to_string())?;
             if let Object::Stream(stream) = obj {
                 let mut body = stream.get_plain_content().map_err(|e| e.to_string())?;
+                if body.last().is_some_and(|byte| !byte.is_ascii_whitespace()) {
+                    body.push(b'\n');
+                }
                 body.extend_from_slice(ops);
                 stream.set_plain_content(body);
             } else {

@@ -52,6 +52,7 @@ export function EditToolbar({
       >
         <option value="Helvetica">Helvetica</option>
         <option value="LiberationSans">Liberation Sans</option>
+        <option value="Times">Times</option>
         <option value="Courier">Courier</option>
       </select>
 

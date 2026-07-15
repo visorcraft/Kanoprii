@@ -1,5 +1,5 @@
 import type { AppMenuContext, MenuRoot } from './types';
-import { act, sep } from './menuBuilders';
+import { act } from './menuBuilders';
 
 export function buildAnnotMenu(ctx: AppMenuContext): MenuRoot {
   return {
@@ -30,31 +30,6 @@ export function buildAnnotMenu(ctx: AppMenuContext): MenuRoot {
       act('redact', ctx.redactMode ? 'Redact (on)' : 'Redact', ctx.toggleRedactMode, {
         shortcutCommandId: 'toggle-redact',
         active: ctx.redactMode,
-      }),
-      sep(),
-      act('insert-image', ctx.imageInsertMode ? 'Insert image (on)' : 'Insert image on page', ctx.toggleImageInsertMode, {
-        shortcutCommandId: 'toggle-image-insert',
-        active: ctx.imageInsertMode,
-      }),
-      act('page-text', ctx.textEditMode ? 'Page text (on)' : 'Page text', ctx.toggleTextEditMode, {
-        shortcutCommandId: 'toggle-text-edit',
-        active: ctx.textEditMode,
-      }),
-      act('edit-text', ctx.editTextRunMode ? 'Edit text (on)' : 'Edit text', ctx.toggleEditTextRunMode, {
-        active: ctx.editTextRunMode,
-      }),
-      act('vector', ctx.vectorEditMode ? 'Vector (on)' : 'Vector', ctx.toggleVectorEditMode, {
-        shortcutCommandId: 'toggle-vector-edit',
-        active: ctx.vectorEditMode,
-      }),
-      act('pdf-edit', ctx.editMode ? 'PDF Edit (on)' : 'PDF Edit', ctx.toggleEditMode, {
-        active: ctx.editMode,
-      }),
-      act('edits', 'Manage page edits…', ctx.openPageEditsModal),
-      sep(),
-      act('forms', ctx.showFormsPanel ? 'Forms panel (on)' : 'Forms panel', ctx.toggleFormsPanel, {
-        shortcutCommandId: 'toggle-forms',
-        active: ctx.showFormsPanel,
       }),
     ],
   };

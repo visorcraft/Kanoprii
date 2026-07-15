@@ -178,9 +178,20 @@ export function useAppChromeBindings(input: UseAppChromeBindingsInput) {
 
   const modeToolbarExtras = buildModeToolbarExtras({
     filePath: input.doc.filePath,
-    editMode: input.pdfEdit.editMode,
+    pdfEdit: input.pdfEdit,
     onToggleEditMode: input.pdfActions.toggleEditMode,
-    onInsertEditImage: input.pdfActions.insertEditImage,
+    editTextRunMode: input.annotation.editTextRunMode,
+    onToggleEditTextRunMode: input.pdfActions.toggleEditTextRunMode,
+    onBeginTextInsert: () => {
+      if (!input.pdfEdit.editMode) input.pdfActions.toggleEditMode();
+      input.pdfEdit.beginTextInsert();
+    },
+    onInsertEditImage: () => {
+      if (!input.pdfEdit.editMode) input.pdfActions.toggleEditMode();
+      void input.pdfActions.insertEditImage();
+    },
+    vectorEditMode: input.annotation.vectorEditMode,
+    onToggleVectorEditMode: input.pdfActions.toggleVectorEditMode,
     imageInsertMode: input.annotation.imageInsertMode,
     imageSourcePath: input.annotation.imageSourcePath,
     onOpenImageInsertModal: input.pdfActions.openImageInsertModal,

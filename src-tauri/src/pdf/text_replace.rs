@@ -4,6 +4,7 @@ use crate::pdf::edit_object::validate_style_inputs;
 use crate::pdf::edit_types::{PdfRect, TextStyle};
 use crate::pdf::fonts::{
     ensure_font_family, ensure_full_font, font_has_glyphs_for, measure_text_width, style_supports_text,
+    uses_synthetic_font_style,
 };
 use crate::pdf::io::mutate_pdf;
 use crate::pdf::page_text::ensure_helvetica_font;
@@ -162,15 +163,19 @@ pub fn replace_text_line_styled(
     let mut ops =
         format!("q {r} {g} {b} rg {r} {g} {b} RG\n", r = style.color.r, g = style.color.g, b = style.color.b,);
 
-    let text_matrix =
-        if style.italic { format!("1 0 0.25 1 {tx} {baseline}") } else { format!("1 0 0 1 {tx} {baseline}") };
+    let synthetic_style = uses_synthetic_font_style(style);
+    let text_matrix = if synthetic_style && style.italic {
+        format!("1 0 0.25 1 {tx} {baseline}")
+    } else {
+        format!("1 0 0 1 {tx} {baseline}")
+    };
     ops.push_str(&format!(
         "BT /{font_name} {font_size} Tf {text_matrix} Tm ({escaped}) Tj ET\n",
         font_name = font_name,
         font_size = style.font_size,
     ));
 
-    if style.bold {
+    if synthetic_style && style.bold {
         let bold_tx = tx + 0.5;
         let bold_matrix = if style.italic {
             format!("1 0 0.25 1 {bold_tx} {baseline}")
@@ -436,27 +441,25 @@ mod tests {
     }
 
     #[test]
-    fn replace_text_line_styled_bold_draws_twice() {
+    fn replace_text_line_styled_bold_uses_standard_bold_face() {
         let (mut doc, page_id) = build_doc_with_text("BT /F1 12 Tf 1 0 0 1 100 700 Tm (Hello) Tj ET");
         let mut style = style_with_align("left");
         style.bold = true;
         replace_text_line_styled(&mut doc, 0, 0, "World", &style, &full_page_box()).unwrap();
         let content = String::from_utf8_lossy(&read_page_content(&doc, page_id).unwrap()).into_owned();
-        assert_eq!(
-            content.matches("Tj").count(),
-            3,
-            "bold should emit two new text show operators plus the original one"
-        );
+        assert_eq!(content.matches("Tj").count(), 2);
+        assert!(content.contains("/HelvB 12 Tf"));
     }
 
     #[test]
-    fn replace_text_line_styled_italic_uses_shear_matrix() {
+    fn replace_text_line_styled_italic_uses_standard_italic_face() {
         let (mut doc, page_id) = build_doc_with_text("BT /F1 12 Tf 1 0 0 1 100 700 Tm (Hello) Tj ET");
         let mut style = style_with_align("left");
         style.italic = true;
         replace_text_line_styled(&mut doc, 0, 0, "World", &style, &full_page_box()).unwrap();
         let content = String::from_utf8_lossy(&read_page_content(&doc, page_id).unwrap()).into_owned();
-        assert!(content.contains("1 0 0.25 1"), "italic should use a shear matrix");
+        assert!(content.contains("/HelvI 12 Tf"));
+        assert!(!content.contains("1 0 0.25 1"));
     }
 
     #[test]

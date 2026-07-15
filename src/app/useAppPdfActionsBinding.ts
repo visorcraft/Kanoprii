@@ -117,7 +117,15 @@ export function useAppPdfActionsBinding(input: UseAppPdfActionsBindingInput) {
   });
 
   const activeSession = d.sessions.find((s) => s.id === d.activeId);
-  const { pdfEditApplyText, pdfEditApplyParagraph, pdfEditDeleteText, pdfEditDeleteParagraph, pdfEditApplyImage, pdfEditDeleteImage } = pdfActions;
+  const {
+    pdfEditApplyText,
+    pdfEditApplyParagraph,
+    pdfEditDeleteText,
+    pdfEditDeleteParagraph,
+    pdfEditApplyImage,
+    pdfEditDeleteImage,
+    pdfEditReplaceImage,
+  } = pdfActions;
 
   const onApplyText = useCallback(() => {
     if (!activeSession) return Promise.resolve();
@@ -149,9 +157,19 @@ export function useAppPdfActionsBinding(input: UseAppPdfActionsBindingInput) {
     return pdfEditDeleteImage(activeSession);
   }, [activeSession, pdfEditDeleteImage]);
 
+  const onReplaceImage = useCallback(() => pdfEditReplaceImage(), [pdfEditReplaceImage]);
+
   useEffect(() => {
-    pdfEdit.bindEditCallbacks({ onApplyText, onApplyParagraph, onDeleteText, onDeleteParagraph, onApplyImage, onDeleteImage });
-  }, [pdfEdit, onApplyText, onApplyParagraph, onDeleteText, onDeleteParagraph, onApplyImage, onDeleteImage]);
+    pdfEdit.bindEditCallbacks({
+      onApplyText,
+      onApplyParagraph,
+      onDeleteText,
+      onDeleteParagraph,
+      onApplyImage,
+      onDeleteImage,
+      onReplaceImage,
+    });
+  }, [pdfEdit, onApplyText, onApplyParagraph, onDeleteText, onDeleteParagraph, onApplyImage, onDeleteImage, onReplaceImage]);
 
   return pdfActions;
 }

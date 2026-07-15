@@ -11,10 +11,11 @@ export type PdfEditCallbacks = {
   onDeleteParagraph?: () => void | Promise<void>;
   onApplyImage?: () => void | Promise<void>;
   onDeleteImage?: () => void | Promise<void>;
+  onReplaceImage?: () => void | Promise<void>;
 };
 
 /** Base font families. Bold/italic variants are selected at invoke time. */
-export type FontFamily = 'Helvetica' | 'LiberationSans' | 'Courier';
+export type FontFamily = 'Helvetica' | 'LiberationSans' | 'Times' | 'Courier';
 
 export interface RgbColor {
   r: number;
@@ -54,6 +55,8 @@ export interface TextEditDraft {
   style: TextStyle;
   /** When present, the edit updates an existing text line instead of adding a new box. */
   lineIndex?: number;
+  /** Original viewer rectangle to white out when PDFium found text the content decoder could not address. */
+  sourceRect?: Rect;
 }
 
 export interface ImageEditDraft {
@@ -118,6 +121,14 @@ export function usePdfEditState() {
     },
     [style]
   );
+
+  const beginTextInsert = useCallback(() => {
+    setTextDraft(null);
+    setImageDraft(null);
+    setParagraphDraft(null);
+    setParagraphEditing(false);
+    setMode('text');
+  }, []);
 
   const startEditingImage = useCallback((draft: ImageEditDraft) => {
     setImageDraft(draft);
@@ -210,6 +221,10 @@ export function usePdfEditState() {
     }
   }, [onCancel]);
 
+  const onReplaceImage = useCallback(async () => {
+    await callbacksRef.current.onReplaceImage?.();
+  }, []);
+
   const updateStyle = useCallback((patch: Partial<TextStyle>) => {
     setStyle((prev) => ({ ...prev, ...patch }));
   }, []);
@@ -225,6 +240,7 @@ export function usePdfEditState() {
       style,
       startEditingText,
       startInsertingText,
+      beginTextInsert,
       startEditingParagraph,
       enterParagraphTextEdit,
       startEditingImage,
@@ -240,6 +256,7 @@ export function usePdfEditState() {
       onDeleteText,
       onDeleteParagraph,
       onDeleteImage,
+      onReplaceImage,
       bindEditCallbacks,
     }),
     [
@@ -252,6 +269,7 @@ export function usePdfEditState() {
       style,
       startEditingText,
       startInsertingText,
+      beginTextInsert,
       startEditingParagraph,
       enterParagraphTextEdit,
       startEditingImage,
@@ -267,6 +285,7 @@ export function usePdfEditState() {
       onDeleteText,
       onDeleteParagraph,
       onDeleteImage,
+      onReplaceImage,
       bindEditCallbacks,
     ]
   );

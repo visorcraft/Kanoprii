@@ -1183,6 +1183,79 @@ body {
   align-items: center;
 }
 
+.mode-toolbar-extras {
+  display: flex;
+  flex: 1 0 100%;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.pdf-edit-ribbon {
+  display: flex;
+  flex: 1 0 100%;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  padding: 7px 9px;
+  border: 1px solid color-mix(in srgb, var(--pp-accent), var(--pp-border) 70%);
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--pp-accent), var(--pp-surface) 94%);
+}
+
+.pdf-edit-ribbon-tools,
+.pdf-edit-context {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 7px;
+}
+
+.pdf-edit-ribbon-title,
+.pdf-edit-context-label {
+  color: var(--pp-text);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.pdf-edit-ribbon-title {
+  padding-right: 9px;
+  border-right: 1px solid var(--pp-border);
+}
+
+.pdf-edit-ribbon-hint {
+  color: var(--pp-text-muted);
+  font-size: 12px;
+}
+
+.pdf-edit-context {
+  padding-top: 6px;
+  border-top: 1px solid var(--pp-border);
+}
+
+.pdf-edit-context > .edit-toolbar {
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.pdf-edit-context .btn.primary {
+  color: #fff;
+  border-color: var(--pp-accent);
+  background: var(--pp-accent);
+}
+
+.pdf-edit-context .btn.danger {
+  color: var(--pp-danger, #d32f2f);
+  border-color: var(--pp-danger, #d32f2f);
+}
+
 .muted {
   font-size: 13px;
   color: var(--pp-text-muted);

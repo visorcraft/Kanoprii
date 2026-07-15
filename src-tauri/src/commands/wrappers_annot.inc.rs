@@ -539,12 +539,19 @@ fn get_page_text_lines(path: String, page_index: u32) -> Result<Vec<TextLineInfo
     for line in lines {
         let [left, bottom, right, top] = line.bbox;
         let viewer = pdf::coords::pdf_rect_to_viewer_px(left, bottom, right, top, page_w, page_h);
+        let pdf_font_name = pdf::fonts::page_font_name_for_resource(&doc, page_id, &line.font_name)
+            .unwrap_or_else(|| line.font_name.clone());
+        let (font_family, bold, italic) = pdf::fonts::editable_font_style(&pdf_font_name);
         out.push(TextLineInfo {
             text: line.text,
             x: viewer[0],
             y: viewer[1],
             w: (viewer[2] - viewer[0]).max(1.0),
             h: (viewer[3] - viewer[1]).max(1.0),
+            font_family: font_family.to_string(),
+            font_size: line.font_size,
+            bold,
+            italic,
         });
     }
     Ok(out)

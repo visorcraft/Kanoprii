@@ -1,19 +1,26 @@
 import { useEffect, useRef, useState } from 'react';
 import type { ParagraphEditDraft, Rect } from '../app/usePdfEditState';
+import { VIEWER_PAGE_H, VIEWER_PAGE_W } from '../app/constants';
 import './ParagraphSelectionOverlay.css';
 
 type HandleDir = 'nw' | 'n' | 'ne' | 'w' | 'e' | 'sw' | 's' | 'se';
 
 type ParagraphSelectionOverlayProps = {
   draft: ParagraphEditDraft;
+  zoom: number;
   onUpdate: (patch: Partial<ParagraphEditDraft>) => void;
   onEnterEdit: () => void;
   onDelete: () => void;
+  onCancel: () => void;
 };
 
 const MIN_SIZE = 20;
 
-export function ParagraphSelectionOverlay({ draft, onUpdate, onEnterEdit, onDelete }: ParagraphSelectionOverlayProps) {
+function clamp(value: number, min: number, max: number): number {
+  return Math.max(min, Math.min(max, value));
+}
+
+export function ParagraphSelectionOverlay({ draft, zoom, onUpdate, onEnterEdit, onDelete, onCancel }: ParagraphSelectionOverlayProps) {
   const { pageRect } = draft;
   const [dragging, setDragging] = useState<{ kind: 'move' | HandleDir; start: Rect; pointerX: number; pointerY: number } | null>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
@@ -26,16 +33,16 @@ export function ParagraphSelectionOverlay({ draft, onUpdate, onEnterEdit, onDele
     if (!dragging) return;
 
     const onMove = (e: MouseEvent) => {
-      const dx = e.clientX - dragging.pointerX;
-      const dy = e.clientY - dragging.pointerY;
+      const dx = (e.clientX - dragging.pointerX) / zoom;
+      const dy = (e.clientY - dragging.pointerY) / zoom;
       const start = dragging.start;
 
       if (dragging.kind === 'move') {
         onUpdate({
           pageRect: {
             ...start,
-            x: start.x + dx,
-            y: start.y + dy,
+            x: clamp(start.x + dx, 0, VIEWER_PAGE_W - start.w),
+            y: clamp(start.y + dy, 0, VIEWER_PAGE_H - start.h),
           },
         });
         return;
@@ -44,18 +51,18 @@ export function ParagraphSelectionOverlay({ draft, onUpdate, onEnterEdit, onDele
       const next: Rect = { ...start };
       const k = dragging.kind;
       if (k.includes('e')) {
-        next.w = Math.max(MIN_SIZE, start.w + dx);
+        next.w = clamp(start.w + dx, MIN_SIZE, VIEWER_PAGE_W - start.x);
       }
       if (k.includes('s')) {
-        next.h = Math.max(MIN_SIZE, start.h + dy);
+        next.h = clamp(start.h + dy, MIN_SIZE, VIEWER_PAGE_H - start.y);
       }
       if (k.includes('w')) {
-        const newW = Math.max(MIN_SIZE, start.w - dx);
+        const newW = clamp(start.w - dx, MIN_SIZE, start.x + start.w);
         next.x = start.x + start.w - newW;
         next.w = newW;
       }
       if (k.includes('n')) {
-        const newH = Math.max(MIN_SIZE, start.h - dy);
+        const newH = clamp(start.h - dy, MIN_SIZE, start.y + start.h);
         next.y = start.y + start.h - newH;
         next.h = newH;
       }
@@ -70,7 +77,7 @@ export function ParagraphSelectionOverlay({ draft, onUpdate, onEnterEdit, onDele
       window.removeEventListener('mousemove', onMove);
       window.removeEventListener('mouseup', onUp);
     };
-  }, [dragging, onUpdate]);
+  }, [dragging, onUpdate, zoom]);
 
   const startDrag = (kind: 'move' | HandleDir) => (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -100,7 +107,7 @@ export function ParagraphSelectionOverlay({ draft, onUpdate, onEnterEdit, onDele
           onDelete();
         } else if (e.key === 'Escape') {
           e.preventDefault();
-          // Let the consumer decide what Escape does; we just stop propagation.
+          onCancel();
         }
       }}
       tabIndex={0}

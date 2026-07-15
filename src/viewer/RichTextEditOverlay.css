@@ -4,18 +4,16 @@
   z-index: 10;
 }
 
-.rich-text-edit-overlay > .edit-toolbar {
-  border-radius: 6px 6px 0 0;
-  border-bottom: none;
-}
-
 .rich-text-edit-textarea {
   flex: 1;
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
   resize: none;
   border: 2px dashed var(--pp-accent, #0066cc);
-  border-top: none;
-  border-radius: 0 0 4px 4px;
-  padding: 6px 8px;
+  border-radius: 4px;
+  padding: 0 3px;
   background: var(--pp-surface, #fff);
   color: var(--pp-text, #1a1a2e);
   line-height: 1.25;

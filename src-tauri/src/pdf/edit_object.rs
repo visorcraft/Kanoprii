@@ -1,12 +1,13 @@
 use crate::pdf::content::append_page_content;
 use crate::pdf::coords::{finite_f64, viewer_rect_to_pdf};
 use crate::pdf::edit_types::{PdfRect, TextStyle};
-use crate::pdf::fonts::{ensure_font_family, measure_text_width, style_supports_text};
+use crate::pdf::fonts::{ensure_font_family, measure_text_width, style_supports_text, uses_synthetic_font_style};
 use crate::pdf::page_images::page_resources;
 use crate::pdf::page_text::escape_pdf_literal_string;
 use crate::pdf::text_lines::decode_page_text_lines;
 use crate::pdf::text_replace::replace_text_line_styled;
 use lopdf::{Document, Object};
+use std::path::Path;
 
 /// Edit an existing text line in a PDF document.
 ///
@@ -134,6 +135,7 @@ pub fn render_wrapped_text_box(
     }
 
     let align = style.align.to_lowercase();
+    let synthetic_style = uses_synthetic_font_style(style);
     let mut ops = format!("q {r} {g} {b} rg {r} {g} {b} RG\n", r = style.color.r, g = style.color.g, b = style.color.b);
 
     for (i, line) in lines.iter().enumerate() {
@@ -149,15 +151,18 @@ pub fn render_wrapped_text_box(
         }
 
         let escaped = escape_pdf_literal_string(line);
-        let text_matrix =
-            if style.italic { format!("1 0 0.25 1 {tx} {baseline}") } else { format!("1 0 0 1 {tx} {baseline}") };
+        let text_matrix = if synthetic_style && style.italic {
+            format!("1 0 0.25 1 {tx} {baseline}")
+        } else {
+            format!("1 0 0 1 {tx} {baseline}")
+        };
         ops.push_str(&format!(
             "BT /{font_name} {font_size} Tf {text_matrix} Tm ({escaped}) Tj ET\n",
             font_name = font_name,
             font_size = style.font_size,
         ));
 
-        if style.bold {
+        if synthetic_style && style.bold {
             let bold_tx = tx + 0.5;
             let bold_matrix = if style.italic {
                 format!("1 0 0.25 1 {bold_tx} {baseline}")
@@ -277,11 +282,32 @@ pub fn delete_text_line(doc: &mut Document, page_index: u32, line_index: usize) 
     Ok(())
 }
 
-/// Transform the page-space rectangle of an image drawn with a simple
-/// `q ... cm Do Q` pattern.
-///
-/// Phase 1 limitation: only images whose preceding operator is `cm` can be
-/// transformed. More complex nested or scaled patterns return an error.
+fn whiteout_viewer_rect(doc: &mut Document, page_id: lopdf::ObjectId, rect: &PdfRect) -> Result<(), String> {
+    validate_rect_finite(rect, "source rect")?;
+    let (x, y, width, height) = viewer_rect_to_pdf(doc, page_id, rect.x, rect.y, rect.width, rect.height)?;
+    append_page_content(doc, page_id, format!("q 1 1 1 rg {x} {y} {width} {height} re f Q\n").as_bytes())
+}
+
+/// Replace text located by PDFium when the content-stream decoder cannot address a line.
+pub fn edit_text_region(
+    doc: &mut Document,
+    page_index: u32,
+    source_rect: &PdfRect,
+    new_text: &str,
+    style: &TextStyle,
+    box_rect: &PdfRect,
+) -> Result<(), String> {
+    let page_id = *doc.get_pages().get(&(page_index + 1)).ok_or_else(|| "Page not found".to_string())?;
+    whiteout_viewer_rect(doc, page_id, source_rect)?;
+    add_text_box(doc, page_index, new_text, style, box_rect)
+}
+
+pub fn delete_text_region(doc: &mut Document, page_index: u32, source_rect: &PdfRect) -> Result<(), String> {
+    let page_id = *doc.get_pages().get(&(page_index + 1)).ok_or_else(|| "Page not found".to_string())?;
+    whiteout_viewer_rect(doc, page_id, source_rect)
+}
+
+/// Move, resize, or rotate one page-level image occurrence.
 pub fn transform_page_image(
     doc: &mut Document,
     page_index: u32,
@@ -292,17 +318,8 @@ pub fn transform_page_image(
     validate_rect_finite(new_rect, "new rect")?;
     finite_f64(rotation_degrees, "rotation")?;
     let page_id = doc.page_iter().nth(page_index as usize).ok_or_else(|| "page index out of range".to_string())?;
-    let contents = page_contents_id(doc, page_id)?;
-    let content_obj = doc.get_object(contents).map_err(|e| e.to_string())?;
-    let mut content = content_obj
-        .as_stream()
-        .map_err(|_| "content not stream".to_string())?
-        .decode_content()
-        .map_err(|e| e.to_string())?;
-
     let images = crate::pdf::page_images::list_page_images(doc, page_index)?;
     let target = images.get(image_index).ok_or_else(|| "image index out of range".to_string())?;
-    let target_name = find_xobject_name(doc, page_index, target.object_id)?;
 
     // Build the `cm` matrix that maps the unit image square onto a rectangle
     // of size (w, h), rotated by theta about its center (cx, cy). The first
@@ -330,102 +347,123 @@ pub fn transform_page_image(
     let e = sanitize(e);
     let f = sanitize(f);
 
-    let mut found = false;
-    for (i, op) in content.operations.iter().enumerate() {
-        if op.operator == "Do"
-            && op.operands.first().and_then(|o| o.as_name().ok()) == Some(target_name.as_bytes())
-            && i > 0
-            && content.operations[i - 1].operator == "cm"
-        {
-            content.operations[i - 1].operands = vec![
-                Object::Real(a as f32),
-                Object::Real(b as f32),
-                Object::Real(c as f32),
-                Object::Real(d as f32),
-                Object::Real(e as f32),
-                Object::Real(f as f32),
-            ];
-            found = true;
-            break;
-        }
-    }
-
-    if !found {
-        return Err("image transform not supported for this content pattern".to_string());
-    }
-
-    let encoded = content.encode().map_err(|e| e.to_string())?;
-    doc.set_object(contents, Object::Stream(lopdf::Stream::new(lopdf::Dictionary::new(), encoded)));
+    rewrite_image_do(doc, page_id, &target.resource_name, target.occurrence, None)?;
+    let ops = format!("q {a} {b} {c} {d} {e} {f} cm /{} Do Q\n", target.resource_name);
+    append_page_content(doc, page_id, ops.as_bytes())?;
     Ok(())
 }
 
-/// Remove an image drawn with a simple `q ... cm Do Q` pattern.
-///
-/// Phase 1: removes the `cm Do` pair and, when present, the surrounding
-/// `q ... Q` wrapper. Complex nested patterns return an error.
+/// Remove one page-level image occurrence.
 pub fn remove_page_image(doc: &mut Document, page_index: u32, image_index: usize) -> Result<(), String> {
     let page_id = doc.page_iter().nth(page_index as usize).ok_or_else(|| "page index out of range".to_string())?;
-    let contents = page_contents_id(doc, page_id)?;
-    let content_obj = doc.get_object(contents).map_err(|e| e.to_string())?;
-    let mut content = content_obj
-        .as_stream()
-        .map_err(|_| "content not stream".to_string())?
-        .decode_content()
-        .map_err(|e| e.to_string())?;
-
     let images = crate::pdf::page_images::list_page_images(doc, page_index)?;
     let target = images.get(image_index).ok_or_else(|| "image index out of range".to_string())?;
-    let target_name = find_xobject_name(doc, page_index, target.object_id)?;
-
-    let do_idx = content
-        .operations
-        .iter()
-        .position(|op| {
-            op.operator == "Do" && op.operands.first().and_then(|o| o.as_name().ok()) == Some(target_name.as_bytes())
-        })
-        .ok_or_else(|| "image Do operator not found".to_string())?;
-
-    // Determine the range to remove. Phase 1 supports q <cm> Do Q.
-    let mut start = do_idx;
-    let mut end = do_idx;
-    if do_idx > 0 && content.operations[do_idx - 1].operator == "cm" {
-        start = do_idx - 1;
-        if do_idx > 1 && content.operations[do_idx - 2].operator == "q" {
-            start = do_idx - 2;
-        }
-        if do_idx + 1 < content.operations.len() && content.operations[do_idx + 1].operator == "Q" {
-            end = do_idx + 1;
-        }
-    }
-
-    content.operations.drain(start..=end);
-
-    let encoded = content.encode().map_err(|e| e.to_string())?;
-    doc.set_object(contents, Object::Stream(lopdf::Stream::new(lopdf::Dictionary::new(), encoded)));
-    Ok(())
+    rewrite_image_do(doc, page_id, &target.resource_name, target.occurrence, None)
 }
 
-fn page_contents_id(doc: &Document, page_id: lopdf::ObjectId) -> Result<lopdf::ObjectId, String> {
+/// Replace one image occurrence while leaving other uses of the same XObject unchanged.
+pub fn replace_page_image(
+    doc: &mut Document,
+    page_index: u32,
+    image_index: usize,
+    image_path: &Path,
+) -> Result<(), String> {
+    if !image_path.is_file() {
+        return Err("Image file not found".to_string());
+    }
+    let image = image::open(image_path).map_err(|e| e.to_string())?.to_rgb8();
+    let (width, height) = image.dimensions();
+    if width == 0 || height == 0 {
+        return Err("Image has no pixels".to_string());
+    }
+    let mut jpeg = Vec::new();
+    image::DynamicImage::ImageRgb8(image)
+        .write_to(&mut std::io::Cursor::new(&mut jpeg), image::ImageFormat::Jpeg)
+        .map_err(|e| e.to_string())?;
+
+    let page_id = doc.page_iter().nth(page_index as usize).ok_or_else(|| "page index out of range".to_string())?;
+    let images = crate::pdf::page_images::list_page_images(doc, page_index)?;
+    let target = images.get(image_index).ok_or_else(|| "image index out of range".to_string())?;
+    let target_name = target.resource_name.clone();
+    let target_occurrence = target.occurrence;
+
+    let image_id = crate::pdf::content::embed_jpeg_xobject(doc, jpeg, width, height);
+    let mut resources = page_resources(doc, page_id)?;
+    let mut xobjects = resources
+        .get(b"XObject")
+        .ok()
+        .and_then(|object| match object {
+            Object::Dictionary(dict) => Some(dict.clone()),
+            Object::Reference(id) => doc.get_dictionary(*id).ok().cloned(),
+            _ => None,
+        })
+        .unwrap_or_default();
+    let replacement_name = crate::pdf::content::next_image_xobject_name(&xobjects);
+    xobjects.set(replacement_name.as_bytes(), Object::Reference(image_id));
+    resources.set(b"XObject", Object::Dictionary(xobjects));
+    doc.get_dictionary_mut(page_id).map_err(|e| e.to_string())?.set(b"Resources", Object::Dictionary(resources));
+    rewrite_image_do(doc, page_id, &target_name, target_occurrence, Some(&replacement_name))
+}
+
+fn page_content_ids(doc: &Document, page_id: lopdf::ObjectId) -> Result<Vec<lopdf::ObjectId>, String> {
     let dict = doc.get_dictionary(page_id).map_err(|e| e.to_string())?;
     let obj = dict.get(b"Contents").map_err(|_| "page has no content stream".to_string())?;
     match obj {
-        Object::Reference(id) => Ok(*id),
-        Object::Array(_) => Err("page content array not supported for image editing".to_string()),
+        Object::Reference(id) => Ok(vec![*id]),
+        Object::Array(items) => items
+            .iter()
+            .map(|item| item.as_reference().map_err(|_| "page content array contains a non-reference".to_string()))
+            .collect(),
         _ => Err("page has no content stream".to_string()),
     }
 }
 
-fn find_xobject_name(doc: &Document, page_index: u32, object_id: (u32, u16)) -> Result<String, String> {
-    let page_id = doc.page_iter().nth(page_index as usize).ok_or_else(|| "page index out of range".to_string())?;
-    let resources = page_resources(doc, page_id)?;
-    let xobjects = resources.get(b"XObject").map_err(|_| "missing XObject resources".to_string())?;
-    let xobjects = xobjects.as_dict().map_err(|_| "XObject not dict".to_string())?;
-    for (name, obj) in xobjects.iter() {
-        if obj.as_reference().map(|id| id == object_id).unwrap_or(false) {
-            return String::from_utf8(name.clone()).map_err(|_| "invalid xobject name".to_string());
+fn rewrite_image_do(
+    doc: &mut Document,
+    page_id: lopdf::ObjectId,
+    resource_name: &str,
+    target_occurrence: usize,
+    replacement_name: Option<&str>,
+) -> Result<(), String> {
+    let mut occurrence = 0usize;
+    for content_id in page_content_ids(doc, page_id)? {
+        let mut content = doc
+            .get_object(content_id)
+            .map_err(|e| e.to_string())?
+            .as_stream()
+            .map_err(|_| "content not stream".to_string())?
+            .decode_content()
+            .map_err(|e| e.to_string())?;
+        let mut found = None;
+        for (index, op) in content.operations.iter().enumerate() {
+            if op.operator != "Do"
+                || op.operands.first().and_then(|object| object.as_name().ok()) != Some(resource_name.as_bytes())
+            {
+                continue;
+            }
+            if occurrence == target_occurrence {
+                found = Some(index);
+                break;
+            }
+            occurrence += 1;
+        }
+        if let Some(index) = found {
+            if let Some(name) = replacement_name {
+                content.operations[index].operands[0] = Object::Name(name.as_bytes().to_vec());
+            } else {
+                content.operations.remove(index);
+            }
+            let encoded = content.encode().map_err(|e| e.to_string())?;
+            let stream = doc
+                .get_object_mut(content_id)
+                .map_err(|e| e.to_string())?
+                .as_stream_mut()
+                .map_err(|_| "content not stream".to_string())?;
+            stream.set_plain_content(encoded);
+            return Ok(());
         }
     }
-    Err("image xobject name not found".to_string())
+    Err("image Do operator not found".to_string())
 }
 
 #[cfg(test)]
@@ -658,8 +696,32 @@ mod tests {
     }
 
     #[test]
+    fn pdfium_text_region_can_be_replaced_or_deleted() {
+        let source = PdfRect { x: 100.0, y: 100.0, width: 120.0, height: 30.0 };
+        let style = style_with_align("left");
+        let (mut edited, edited_page) = build_doc_with_text("BT /F1 12 Tf 1 0 0 1 100 700 Tm (Hidden) Tj ET");
+        edit_text_region(&mut edited, 0, &source, "Replacement", &style, &source).unwrap();
+        let content = String::from_utf8_lossy(&crate::pdf::page_text::read_page_content(&edited, edited_page).unwrap())
+            .into_owned();
+        assert!(content.contains("(Replacement)"));
+        assert!(content.contains("re f Q"));
+
+        let (mut deleted, deleted_page) = build_doc_with_text("BT /F1 12 Tf 1 0 0 1 100 700 Tm (Hidden) Tj ET");
+        delete_text_region(&mut deleted, 0, &source).unwrap();
+        let content =
+            String::from_utf8_lossy(&crate::pdf::page_text::read_page_content(&deleted, deleted_page).unwrap())
+                .into_owned();
+        assert!(content.contains("re f Q"));
+    }
+
+    #[test]
     fn transform_page_image_rotates_90_degrees() {
         let (mut doc, _page_id, content_id) = build_doc_with_image();
+        let image = crate::pdf::page_images::list_page_images(&doc, 0).unwrap().remove(0);
+        assert_eq!(image.bbox.x, 50.0);
+        assert_eq!(image.bbox.y, 50.0);
+        assert_eq!(image.bbox.width, 100.0);
+        assert_eq!(image.bbox.height, 100.0);
         let new_rect = PdfRect { x: 50.0, y: 50.0, width: 100.0, height: 100.0 };
         transform_page_image(&mut doc, 0, 0, &new_rect, 90.0).unwrap();
 
@@ -694,5 +756,74 @@ mod tests {
         assert_real_eq(vals[3], 0.0, 1e-4);
         assert_real_eq(vals[4], 150.0, 1e-4);
         assert_real_eq(vals[5], 50.0, 1e-4);
+
+        let moved = crate::pdf::page_images::list_page_images(&doc, 0).unwrap();
+        assert_real_eq(moved[0].rect.x, 50.0, 1e-4);
+        assert_real_eq(moved[0].rect.y, 50.0, 1e-4);
+        assert_real_eq(moved[0].rect.width, 100.0, 1e-4);
+        assert_real_eq(moved[0].rect.height, 100.0, 1e-4);
+        assert_real_eq(moved[0].rotation, 90.0, 1e-4);
+    }
+
+    #[test]
+    fn image_instances_work_across_content_arrays_and_inherited_resources() {
+        let (mut doc, page_id, first_content_id) = build_doc_with_image();
+        doc.get_object_mut(first_content_id)
+            .unwrap()
+            .as_stream_mut()
+            .unwrap()
+            .set_plain_content(b"q 40 0 0 40 10 10 cm /Im1 Do Q\n".to_vec());
+        let second_content_id = doc.add_object(Object::Stream(lopdf::Stream::new(
+            lopdf::Dictionary::new(),
+            b"q 60 0 0 60 100 100 cm /Im1 Do Q\n".to_vec(),
+        )));
+        doc.get_dictionary_mut(page_id).unwrap().set(
+            b"Contents",
+            Object::Array(vec![Object::Reference(first_content_id), Object::Reference(second_content_id)]),
+        );
+
+        let resources = doc.get_dictionary(page_id).unwrap().get(b"Resources").unwrap().clone();
+        let pages_id = doc.get_dictionary(page_id).unwrap().get(b"Parent").unwrap().as_reference().unwrap();
+        doc.get_dictionary_mut(page_id).unwrap().remove(b"Resources");
+        doc.get_dictionary_mut(pages_id).unwrap().set(b"Resources", resources);
+
+        let before = crate::pdf::page_images::list_page_images(&doc, 0).unwrap();
+        assert_eq!(before.len(), 2);
+        assert_eq!(before[0].occurrence, 0);
+        assert_eq!(before[1].occurrence, 1);
+
+        transform_page_image(&mut doc, 0, 1, &PdfRect { x: 200.0, y: 210.0, width: 80.0, height: 90.0 }, 0.0).unwrap();
+        let moved = crate::pdf::page_images::list_page_images(&doc, 0).unwrap();
+        assert_eq!(moved.len(), 2);
+        assert_real_eq(moved[0].bbox.x, 10.0, 1e-4);
+        assert_real_eq(moved[1].bbox.x, 200.0, 1e-4);
+        assert_real_eq(moved[1].bbox.y, 210.0, 1e-4);
+
+        remove_page_image(&mut doc, 0, 0).unwrap();
+        let remaining = crate::pdf::page_images::list_page_images(&doc, 0).unwrap();
+        assert_eq!(remaining.len(), 1);
+        assert_real_eq(remaining[0].bbox.x, 200.0, 1e-4);
+    }
+
+    #[test]
+    fn replace_page_image_changes_only_target_resource() {
+        let (mut doc, _, _) = build_doc_with_image();
+        let path = std::env::temp_dir().join(format!(
+            "kanoprii-replace-image-{}-{}.png",
+            std::process::id(),
+            std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos()
+        ));
+        image::DynamicImage::new_rgb8(2, 3).save(&path).unwrap();
+
+        replace_page_image(&mut doc, 0, 0, &path).unwrap();
+        let images = crate::pdf::page_images::list_page_images(&doc, 0).unwrap();
+        std::fs::remove_file(path).unwrap();
+
+        assert_eq!(images.len(), 1);
+        assert_ne!(images[0].resource_name, "Im1");
+        assert_eq!(images[0].width, 2);
+        assert_eq!(images[0].height, 3);
+        assert_real_eq(images[0].bbox.x, 50.0, 1e-4);
+        assert_real_eq(images[0].bbox.y, 50.0, 1e-4);
     }
 }

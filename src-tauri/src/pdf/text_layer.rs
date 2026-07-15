@@ -1,22 +1,29 @@
 use crate::pdf::coords::pdf_rect_to_viewer_px;
+use crate::pdf::edit_types::RgbColor;
 use pdfium_render::prelude::*;
 use std::path::Path;
 
 #[derive(serde::Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct PageTextRun {
     pub text: String,
     pub x: f64,
     pub y: f64,
     pub w: f64,
     pub h: f64,
+    pub font_family: String,
+    pub font_size: f64,
+    pub bold: bool,
+    pub italic: bool,
+    pub color: RgbColor,
 }
 
-pub fn group_chars_into_runs(chars: Vec<(char, [f64; 4])>) -> Vec<PageTextRun> {
+pub fn group_chars_into_runs(chars: Vec<(char, [f64; 4], f64, String, RgbColor)>) -> Vec<PageTextRun> {
     if chars.is_empty() {
         return Vec::new();
     }
 
-    let advances: Vec<f64> = chars.iter().map(|(_, b)| (b[2] - b[0]).max(0.1)).filter(|w| *w > 0.0).collect();
+    let advances: Vec<f64> = chars.iter().map(|(_, b, _, _, _)| (b[2] - b[0]).max(0.1)).filter(|w| *w > 0.0).collect();
     let mut sorted = advances.clone();
     sorted.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
     let median_advance = sorted.get(sorted.len() / 2).copied().unwrap_or(4.0).max(1.0);
@@ -25,9 +32,17 @@ pub fn group_chars_into_runs(chars: Vec<(char, [f64; 4])>) -> Vec<PageTextRun> {
     let mut runs: Vec<PageTextRun> = Vec::new();
     let mut run_text = String::new();
     let mut run_bounds: Option<[f64; 4]> = None;
+    let mut run_font_size = 12.0;
+    let mut run_font_name = String::new();
+    let mut run_color = RgbColor { r: 0.0, g: 0.0, b: 0.0 };
     let mut prev: Option<(char, [f64; 4])> = None;
 
-    let flush = |text: &mut String, bounds: &mut Option<[f64; 4]>, runs: &mut Vec<PageTextRun>| {
+    let flush = |text: &mut String,
+                 bounds: &mut Option<[f64; 4]>,
+                 font_size: f64,
+                 font_name: &str,
+                 color: &RgbColor,
+                 runs: &mut Vec<PageTextRun>| {
         if text.is_empty() {
             return;
         }
@@ -37,18 +52,38 @@ pub fn group_chars_into_runs(chars: Vec<(char, [f64; 4])>) -> Vec<PageTextRun> {
         };
         let w = (right - left).max(1.0);
         let h = (bottom - top).max(1.0);
-        runs.push(PageTextRun { text: std::mem::take(text), x: left, y: top, w, h });
+        let (font_family, bold, italic) = crate::pdf::fonts::editable_font_style(font_name);
+        runs.push(PageTextRun {
+            text: std::mem::take(text),
+            x: left,
+            y: top,
+            w,
+            h,
+            font_family: font_family.to_string(),
+            font_size,
+            bold,
+            italic,
+            color: color.clone(),
+        });
         *bounds = None;
     };
 
-    for (ch, bounds) in chars {
+    for (ch, bounds, font_size, font_name, color) in chars {
+        let style_changed = !run_text.is_empty()
+            && ((font_size - run_font_size).abs() > 0.1 || font_name != run_font_name || color != run_color);
         if let Some((_, prev_bounds)) = prev {
             let baseline_jump = (bounds[1] - prev_bounds[1]).abs();
             let char_h = (prev_bounds[3] - prev_bounds[1]).max((bounds[3] - bounds[1]).max(1.0));
             let horizontal_gap = bounds[0] - prev_bounds[2];
-            if baseline_jump > char_h * 0.4 || horizontal_gap > gap_threshold {
-                flush(&mut run_text, &mut run_bounds, &mut runs);
+            if style_changed || baseline_jump > char_h * 0.4 || horizontal_gap > gap_threshold {
+                flush(&mut run_text, &mut run_bounds, run_font_size, &run_font_name, &run_color, &mut runs);
             }
+        }
+
+        if run_text.is_empty() {
+            run_font_size = font_size;
+            run_font_name = font_name;
+            run_color = color;
         }
 
         run_text.push(ch);
@@ -58,7 +93,7 @@ pub fn group_chars_into_runs(chars: Vec<(char, [f64; 4])>) -> Vec<PageTextRun> {
         });
         prev = Some((ch, bounds));
     }
-    flush(&mut run_text, &mut run_bounds, &mut runs);
+    flush(&mut run_text, &mut run_bounds, run_font_size, &run_font_name, &run_color, &mut runs);
     runs
 }
 
@@ -95,7 +130,14 @@ pub fn get_page_text_layout(pdfium: &Pdfium, path: &Path, page_index: u32) -> Re
             continue;
         }
         let viewer = pdf_rect_to_viewer_px(left, bottom, right, top, page_w, page_h);
-        chars.push((ch, viewer));
+        let color = text_char.fill_color().unwrap_or(PdfColor::BLACK);
+        chars.push((
+            ch,
+            viewer,
+            f64::from(text_char.scaled_font_size().value),
+            text_char.font_name(),
+            RgbColor { r: f64::from(color.red()), g: f64::from(color.green()), b: f64::from(color.blue()) },
+        ));
     }
 
     Ok(group_chars_into_runs(chars))
@@ -105,6 +147,10 @@ pub fn get_page_text_layout(pdfium: &Pdfium, path: &Path, page_index: u32) -> Re
 mod tests {
     use super::*;
 
+    fn black() -> RgbColor {
+        RgbColor { r: 0.0, g: 0.0, b: 0.0 }
+    }
+
     #[test]
     fn group_chars_empty_input() {
         assert!(group_chars_into_runs(vec![]).is_empty());
@@ -112,7 +158,10 @@ mod tests {
 
     #[test]
     fn group_chars_one_baseline_merges() {
-        let chars = vec![('H', [10.0, 20.0, 18.0, 32.0]), ('i', [19.0, 20.0, 24.0, 32.0])];
+        let chars = vec![
+            ('H', [10.0, 20.0, 18.0, 32.0], 12.0, "Helvetica".into(), black()),
+            ('i', [19.0, 20.0, 24.0, 32.0], 12.0, "Helvetica".into(), black()),
+        ];
         let runs = group_chars_into_runs(chars);
         assert_eq!(runs.len(), 1);
         assert_eq!(runs[0].text, "Hi");
@@ -120,15 +169,36 @@ mod tests {
 
     #[test]
     fn group_chars_baseline_jump_splits() {
-        let chars = vec![('A', [10.0, 20.0, 20.0, 40.0]), ('B', [22.0, 80.0, 32.0, 100.0])];
+        let chars = vec![
+            ('A', [10.0, 20.0, 20.0, 40.0], 12.0, "Helvetica".into(), black()),
+            ('B', [22.0, 80.0, 32.0, 100.0], 12.0, "Helvetica".into(), black()),
+        ];
         let runs = group_chars_into_runs(chars);
         assert_eq!(runs.len(), 2);
     }
 
     #[test]
     fn group_chars_large_gap_splits() {
-        let chars = vec![('a', [10.0, 20.0, 20.0, 32.0]), ('b', [80.0, 20.0, 90.0, 32.0])];
+        let chars = vec![
+            ('a', [10.0, 20.0, 20.0, 32.0], 12.0, "Helvetica".into(), black()),
+            ('b', [80.0, 20.0, 90.0, 32.0], 12.0, "Helvetica".into(), black()),
+        ];
         let runs = group_chars_into_runs(chars);
         assert_eq!(runs.len(), 2);
+    }
+
+    #[test]
+    fn group_chars_style_change_splits_and_reports_style() {
+        let chars = vec![
+            ('A', [10.0, 20.0, 20.0, 32.0], 12.0, "Helvetica".into(), black()),
+            ('B', [21.0, 20.0, 31.0, 32.0], 14.0, "Times-BoldItalic".into(), RgbColor { r: 255.0, g: 0.0, b: 0.0 }),
+        ];
+        let runs = group_chars_into_runs(chars);
+        assert_eq!(runs.len(), 2);
+        assert_eq!(runs[1].font_family, "Times");
+        assert_eq!(runs[1].font_size, 14.0);
+        assert!(runs[1].bold);
+        assert!(runs[1].italic);
+        assert_eq!(runs[1].color.r, 255.0);
     }
 }

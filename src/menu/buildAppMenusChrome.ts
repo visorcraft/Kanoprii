@@ -34,6 +34,10 @@ export function buildViewMenu(ctx: AppMenuContext): MenuRoot {
       ctx.toggleAnnotationsPanel,
       { active: ctx.showAnnotationsPanel },
     ),
+    act('forms', ctx.showFormsPanel ? 'Forms panel (on)' : 'Forms panel', ctx.toggleFormsPanel, {
+      shortcutCommandId: 'toggle-forms',
+      active: ctx.showFormsPanel,
+    }),
     act(
       'show-hidden-layers',
       ctx.showHiddenLayers ? 'Hidden watermarks/layers (on)' : 'Hidden watermarks/layers',
