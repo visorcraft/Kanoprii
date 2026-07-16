@@ -8,6 +8,10 @@ const ext = os.platform() === 'win32' ? '.exe' : '';
 const targetDir = path.join(root, 'src-tauri', 'target');
 const appBinary = path.join(targetDir, 'debug', `kanoprii${ext}`);
 
+// Native OS dialogs cannot be driven through the embedded WebDriver. Keep E2E
+// on Kanoprii's in-app path prompt so Add Image and other picker flows are testable.
+process.env.KANOPRII_DISABLE_NATIVE_DIALOGS = '1';
+
 if (!fs.existsSync(appBinary)) {
   throw new Error(
     `Missing ${appBinary}. Run scripts/e2e-build.sh (or scripts/e2e-test.sh) before npm run test:e2e.`,

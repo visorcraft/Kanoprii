@@ -36,7 +36,7 @@ import {
   useDocumentEnhancementActions,
   type UseDocumentEnhancementActionsOptions,
 } from '../pdf/useDocumentEnhancementActions';
-import { usePageInteractionEdit } from '../viewer/usePageInteractionEdit';
+import { usePageInteractionEdit, type PageImageInfo, type PdfRect } from '../viewer/usePageInteractionEdit';
 import {
   BMP_DIALOG_FILTER,
   GIF_DIALOG_FILTER,
@@ -240,6 +240,7 @@ export function useAppPdfActions(input: UseAppPdfActionsInput) {
 
     const viewerRect: Rect = { x, y, w: defaultWidth, h: defaultHeight };
 
+    let inserted = false;
     await runEdit({
       command: 'add_page_image',
       args: {
@@ -252,9 +253,28 @@ export function useAppPdfActions(input: UseAppPdfActionsInput) {
       },
       reloadAt: pageIndex,
       toast: 'Image inserted',
+      onSuccess: () => { inserted = true; },
+    });
+    if (!inserted) return;
+
+    // Match Word/Photoshop: the object just inserted is immediately selected,
+    // ready to move, resize, rotate, replace, or delete.
+    const images = await invoke<PageImageInfo[]>('list_page_images', { path: filePath, pageIndex });
+    const image = images.at(-1);
+    if (!image) return;
+    const rect = await invoke<PdfRect>('pdf_rect_to_viewer_px', { path: filePath, pageIndex, rect: image.rect });
+    input.pdfEdit.startEditingImage({
+      pageIndex,
+      point: { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 },
+      path: filePath,
+      index: image.index,
+      width: image.width,
+      height: image.height,
+      pageRect: { x: rect.x, y: rect.y, w: rect.width, h: rect.height },
+      rotation: image.rotation,
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional: stable option object / destructured deps
-  }, [input.filePath, input.currentPage, input.showToast, pickEditImage, runEdit]);
+  }, [input.filePath, input.currentPage, input.showToast, input.pdfEdit, pickEditImage, runEdit]);
 
   const replaceEditImage = useCallback(async () => {
     const draft = input.pdfEdit.imageDraft;

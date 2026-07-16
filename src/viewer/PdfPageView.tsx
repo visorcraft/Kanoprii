@@ -150,6 +150,8 @@ function PdfPageViewInner({
     textEditMode ? 'text-edit-cursor' : '',
     editTextRunMode ? 'text-edit-cursor' : '',
     textEditActiveRun ? 'text-edit-cursor' : '',
+    pdfEdit?.editMode && pdfEdit.mode === 'text' ? 'text-edit-cursor' : '',
+    pdfEdit?.editMode && pdfEdit.mode !== 'text' ? 'object-edit-cursor' : '',
     vectorEditMode ? 'vector-edit-cursor' : '',
     formAddMode ? 'form-add-cursor' : '',
   ]
@@ -196,7 +198,11 @@ function PdfPageViewInner({
                 transformOrigin: 'top left',
               }}
             >
-            <TextLayer runs={textRuns} interactive={textLayerInteractive} />
+            <TextLayer
+              runs={textRuns}
+              interactive={textLayerInteractive}
+              editTargets={editTextRunMode || Boolean(pdfEdit?.editMode && pdfEdit.mode === 'idle')}
+            />
             {(textEditActiveRun || textEditActiveLine) &&
               onTextEditDraftChange &&
               onApplyTextEdit &&

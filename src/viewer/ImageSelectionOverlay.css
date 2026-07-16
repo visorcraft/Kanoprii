@@ -21,16 +21,30 @@
   transform-origin: center;
 }
 
-.image-selection-handle-br {
+.image-selection-handle {
   position: absolute;
-  right: -6px;
-  bottom: -6px;
   width: 12px;
   height: 12px;
+  padding: 0;
   background: var(--pp-accent, #0066cc);
   border: 1px solid var(--pp-surface, #fff);
   border-radius: 2px;
-  cursor: nwse-resize;
+  z-index: 2;
+}
+
+.image-selection-handle-nw { left: -6px; top: -6px; cursor: nwse-resize; }
+.image-selection-handle-n { left: 50%; top: -6px; margin-left: -6px; cursor: ns-resize; }
+.image-selection-handle-ne { right: -6px; top: -6px; cursor: nesw-resize; }
+.image-selection-handle-e { right: -6px; top: 50%; margin-top: -6px; cursor: ew-resize; }
+.image-selection-handle-se { right: -6px; bottom: -6px; cursor: nwse-resize; }
+.image-selection-handle-s { left: 50%; bottom: -6px; margin-left: -6px; cursor: ns-resize; }
+.image-selection-handle-sw { left: -6px; bottom: -6px; cursor: nesw-resize; }
+.image-selection-handle-w { left: -6px; top: 50%; margin-top: -6px; cursor: ew-resize; }
+
+.image-selection-handle:focus-visible,
+.image-selection-handle-rotate:focus-visible {
+  outline: 2px solid var(--pp-focus-ring, var(--pp-accent, #0066cc));
+  outline-offset: 2px;
 }
 
 .image-selection-handle-rotate {
@@ -39,6 +53,7 @@
   top: -18px;
   width: 12px;
   height: 12px;
+  padding: 0;
   margin-left: -6px;
   background: var(--pp-accent, #0066cc);
   border: 1px solid var(--pp-surface, #fff);

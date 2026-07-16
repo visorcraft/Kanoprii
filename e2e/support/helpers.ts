@@ -1,17 +1,25 @@
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const fixturesDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', 'fixtures');
+const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
+const fixturesDir = path.join(rootDir, 'e2e', 'fixtures');
 
 export const fixturePdf = path.join(fixturesDir, 'sample.pdf');
 export const fixturePdf3p = path.join(fixturesDir, 'sample-3p.pdf');
 export const fixturePdfB = path.join(fixturesDir, 'sample-b.pdf');
 export const fixturePdfParagraph = path.join(fixturesDir, 'sample-paragraph.pdf');
 export const fixturePdfImage = path.join(fixturesDir, 'sample-image.pdf');
+export const fixturePng = path.join(rootDir, 'src', 'assets', 'kanoprii_face.png');
 export const fixtureMarkdown = path.join(fixturesDir, 'import-markdown.md');
 export const fixtureHtml = path.join(fixturesDir, 'import-webpage.html');
 
-type TauriExecute = <T>(script: (api: { core: { invoke: (cmd: string, args?: Record<string, unknown>) => Promise<unknown> } }) => T | Promise<T>, ...args: unknown[]) => Promise<T>;
+type TauriExecute = <T, Args extends unknown[]>(
+  script: (
+    api: { core: { invoke: (cmd: string, args?: Record<string, unknown>) => Promise<unknown> } },
+    ...args: Args
+  ) => T | Promise<T>,
+  ...args: Args
+) => Promise<T>;
 
 function tauriExecute(): TauriExecute {
   const tauri = (browser as WebdriverIO.Browser & { tauri?: { execute: TauriExecute } }).tauri;
@@ -45,7 +53,11 @@ export async function waitForShell() {
 }
 
 export async function invokeBackend<T>(cmd: string, args: Record<string, unknown> = {}): Promise<T> {
-  return tauriExecute()(({ core }) => core.invoke(cmd, args) as Promise<T>);
+  return tauriExecute()(
+    ({ core }, command, payload) => core.invoke(command as string, payload as Record<string, unknown>) as Promise<T>,
+    cmd,
+    args,
+  );
 }
 
 export async function pathExists(filePath: string): Promise<boolean> {

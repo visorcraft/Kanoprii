@@ -8,7 +8,7 @@ type HandleDir = 'nw' | 'n' | 'ne' | 'w' | 'e' | 'sw' | 's' | 'se';
 type ParagraphSelectionOverlayProps = {
   draft: { pageRect: Rect };
   zoom: number;
-  onUpdate: (patch: { pageRect: Rect }) => void;
+  onUpdate: (patch: { pageRect: Rect; geometryModified?: boolean }) => void;
   onEnterEdit?: () => void;
   onDelete: () => void;
   onCancel: () => void;
@@ -45,6 +45,7 @@ export function ParagraphSelectionOverlay({ draft, zoom, onUpdate, onEnterEdit, 
             x: clamp(start.x + dx, 0, VIEWER_PAGE_W - start.w),
             y: clamp(start.y + dy, 0, VIEWER_PAGE_H - start.h),
           },
+          geometryModified: true,
         });
         return;
       }
@@ -67,7 +68,7 @@ export function ParagraphSelectionOverlay({ draft, zoom, onUpdate, onEnterEdit, 
         next.y = start.y + start.h - newH;
         next.h = newH;
       }
-      onUpdate({ pageRect: next });
+      onUpdate({ pageRect: next, geometryModified: true });
     };
 
     const onUp = () => setDragging(null);
@@ -100,7 +101,21 @@ export function ParagraphSelectionOverlay({ draft, zoom, onUpdate, onEnterEdit, 
       onMouseDown={startDrag('move')}
       onClick={(e) => e.stopPropagation()}
       onKeyDown={(e) => {
-        if (e.key === 'Enter' && onEnterEdit) {
+        if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.key)) {
+          e.preventDefault();
+          e.stopPropagation();
+          const step = e.shiftKey ? 10 : 1;
+          const dx = e.key === 'ArrowLeft' ? -step : e.key === 'ArrowRight' ? step : 0;
+          const dy = e.key === 'ArrowUp' ? -step : e.key === 'ArrowDown' ? step : 0;
+          onUpdate({
+            pageRect: {
+              ...pageRect,
+              x: clamp(pageRect.x + dx, 0, VIEWER_PAGE_W - pageRect.w),
+              y: clamp(pageRect.y + dy, 0, VIEWER_PAGE_H - pageRect.h),
+            },
+            geometryModified: true,
+          });
+        } else if (e.key === 'Enter' && onEnterEdit) {
           e.preventDefault();
           onEnterEdit();
         } else if (e.key === 'Delete' || e.key === 'Backspace') {

@@ -3,14 +3,15 @@ import type { PageTextRun } from '../pdf/useTextLayerLoader';
 type TextLayerProps = {
   runs: PageTextRun[];
   interactive: boolean;
+  editTargets?: boolean;
 };
 
-export function TextLayer({ runs, interactive }: TextLayerProps) {
+export function TextLayer({ runs, interactive, editTargets = false }: TextLayerProps) {
   if (runs.length === 0) return null;
 
   return (
     <div
-      className="text-layer"
+      className={`text-layer${editTargets ? ' edit-targets' : ''}`}
       data-testid="text-layer"
       style={{
         position: 'absolute',
@@ -18,7 +19,7 @@ export function TextLayer({ runs, interactive }: TextLayerProps) {
         top: 0,
         width: '100%',
         height: '100%',
-        pointerEvents: interactive ? 'auto' : 'none',
+        pointerEvents: interactive || editTargets ? 'auto' : 'none',
         userSelect: interactive ? 'text' : 'none',
       }}
       aria-hidden={!interactive}

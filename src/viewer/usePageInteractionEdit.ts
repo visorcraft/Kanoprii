@@ -7,14 +7,14 @@ import type { PdfPageSize } from '../app/types';
 import { runStructuralEdit, type StructuralEditDeps } from '../pdf/runStructuralEdit';
 import type { PageTextRun } from '../pdf/useTextLayerLoader';
 
-type PdfRect = {
+export type PdfRect = {
   x: number;
   y: number;
   width: number;
   height: number;
 };
 
-type PageImageInfo = {
+export type PageImageInfo = {
   index: number;
   bbox: PdfRect;
   rect: PdfRect;
@@ -59,6 +59,10 @@ function toBackendStyle(style: TextStyle): TextStyle & { color: { r: number; g: 
 
 function rectToPdfRect(rect: Rect): PdfRect {
   return { x: rect.x, y: rect.y, width: rect.w, height: rect.h };
+}
+
+function sameRect(a: Rect, b: Rect): boolean {
+  return a.x === b.x && a.y === b.y && a.w === b.w && a.h === b.h;
 }
 
 function sourceTextStyle(
@@ -206,6 +210,19 @@ export function usePageInteractionEdit(deps: UsePageInteractionEditOptions) {
         return;
       }
 
+      // Add Text is insertion-only. Existing text remains selectable through
+      // Edit Text and Edit Objects, so each ribbon tool has one predictable job.
+      if (!textOnly && pdfEdit.mode === 'text' && !pdfEdit.textDraft) {
+        const fontPx = fontPxAt(pageIndex);
+        pdfEdit.startInsertingText(pageIndex, point, {
+          x: point.x,
+          y: point.y - fontPx,
+          w: 320,
+          h: Math.max(44, fontPx + 12),
+        });
+        return;
+      }
+
       if (pdfEdit.mode === 'text' || pdfEdit.mode === 'paragraph' || pdfEdit.mode === 'idle') {
         const lines = await loadPageTextLines(session, pageIndex);
         let hitLine: TextLine | null = null;
@@ -274,15 +291,6 @@ export function usePageInteractionEdit(deps: UsePageInteractionEditOptions) {
           });
         } else if (textOnly) {
           return;
-        } else if (pdfEdit.mode === 'text' || pdfEdit.mode === 'paragraph') {
-          const fontPx = fontPxAt(pageIndex);
-          pdfEdit.startInsertingText(pageIndex, point, {
-            x: point.x,
-            // Place box so PDF baseline (box.y + fontPx) lands at the click y.
-            y: point.y - fontPx,
-            w: 320,
-            h: Math.max(44, fontPx + 12),
-          });
         } else {
           // In idle mode, decide text vs. image by hit-testing.
           const image = await hitTestImageFn?.(pageIndex, point.x, point.y);
@@ -296,14 +304,6 @@ export function usePageInteractionEdit(deps: UsePageInteractionEditOptions) {
               height: image.height,
               pageRect: image.viewerRect,
               rotation: image.rotation,
-            });
-          } else {
-            const fontPx = fontPxAt(pageIndex);
-            pdfEdit.startInsertingText(pageIndex, point, {
-              x: point.x,
-              y: point.y - fontPx,
-              w: 320,
-              h: Math.max(44, fontPx + 12),
             });
           }
         }
@@ -394,6 +394,15 @@ export function usePageInteractionEdit(deps: UsePageInteractionEditOptions) {
     async (session: DocumentSessionData) => {
       if (!session?.filePath || !pdfEdit.paragraphDraft) return;
       const draft = pdfEdit.paragraphDraft;
+      if (
+        draft.original &&
+        draft.text === draft.original.text &&
+        !draft.geometryModified &&
+        JSON.stringify(draft.style) === JSON.stringify(draft.original.style)
+      ) {
+        pdfEdit.onCancel();
+        return;
+      }
       const boxRect = rectToPdfRect(draft.pageRect);
       const style = toBackendStyle(draft.style);
       const result = await runStructuralEdit(deps, {
@@ -473,6 +482,14 @@ export function usePageInteractionEdit(deps: UsePageInteractionEditOptions) {
     async (session: DocumentSessionData) => {
       if (!session?.filePath || !pdfEdit.imageDraft) return;
       const draft = pdfEdit.imageDraft;
+      if (
+        draft.original &&
+        sameRect(draft.pageRect, draft.original.pageRect) &&
+        (draft.rotation ?? 0) === draft.original.rotation
+      ) {
+        pdfEdit.onCancel();
+        return;
+      }
       const result = await runStructuralEdit(deps, {
         command: 'transform_page_image',
         args: {
@@ -513,6 +530,10 @@ export function usePageInteractionEdit(deps: UsePageInteractionEditOptions) {
     async (session: DocumentSessionData) => {
       if (!session?.filePath || !pdfEdit.vectorDraft) return;
       const draft = pdfEdit.vectorDraft;
+      if (draft.original && sameRect(draft.pageRect, draft.original)) {
+        pdfEdit.onCancel();
+        return;
+      }
       const result = await runStructuralEdit(deps, {
         command: 'update_page_vector_rect',
         args: {

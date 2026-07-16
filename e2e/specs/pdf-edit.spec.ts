@@ -4,6 +4,7 @@ import {
   fixturePdf,
   fixturePdfImage,
   fixturePdfParagraph,
+  fixturePng,
   openPdfViaPathModal,
   resetToWelcome,
   rotateCurrentPage,
@@ -118,6 +119,49 @@ describe('PDF Edit Mode', () => {
     expect(layout.stampToolbar).toBe(false);
 
     await $('.edit-toolbar-cancel').click();
+  });
+
+  it('keeps Edit Objects selection-only on empty page space', async () => {
+    await openPdfViaPathModal(fixturePdf);
+    await waitForPdfOpen();
+    await waitForPageRendered();
+
+    const editObjects = await $('[aria-label="Edit mode"]');
+    await editObjects.click();
+    await expect(editObjects).toHaveAttribute('aria-pressed', 'true');
+    await expect($('.pdf-edit-ribbon-hint')).toHaveText('Click text or an image to select it.');
+    await expect($('.page-container')).toHaveElementClass('object-edit-cursor');
+    await expect($('.text-layer')).toHaveElementClass('edit-targets');
+
+    const hover = await browser.execute(() => {
+      const span = Array.from(document.querySelectorAll('.text-layer span')).find((el) => el.textContent === 'Hello')!;
+      const style = getComputedStyle(span);
+      return {
+        background: style.backgroundColor,
+        shadow: style.boxShadow,
+      };
+    });
+    expect(hover.background).not.toBe('rgba(0, 0, 0, 0)');
+    expect(hover.shadow).not.toBe('none');
+
+    const blank = await browser.execute(() => {
+      const page = document.querySelector('.page-image')!.getBoundingClientRect();
+      return { x: Math.round(page.left + page.width * 0.75), y: Math.round(page.top + page.height * 0.25) };
+    });
+    await browser.action('pointer').move(blank).down({ button: 0 }).up({ button: 0 }).perform();
+    await browser.pause(250);
+    expect(await $('.rich-text-edit-textarea').isDisplayed().catch(() => false)).toBe(false);
+    await expect(editObjects).toHaveAttribute('aria-pressed', 'true');
+
+    await $('button=Add Text').click();
+    await expect($('.pdf-edit-ribbon-hint')).toHaveText('Click the page to place text.');
+    await expect($('.page-container')).toHaveElementClass('text-edit-cursor');
+    await expect($('.text-layer')).not.toHaveElementClass('edit-targets');
+    const textPoint = await getCenterOfTextSpan('Hello');
+    await browser.action('pointer').move({ x: textPoint.cx, y: textPoint.cy }).down({ button: 0 }).up({ button: 0 }).perform();
+    const textarea = await $('.rich-text-edit-textarea');
+    await textarea.waitForDisplayed({ timeout: 10_000 });
+    await expect(textarea).toHaveValue('');
   });
 
   it('matches Add Text preview proportions on a rotated page', async () => {
@@ -473,19 +517,36 @@ describe('PDF Edit Mode', () => {
     await $('[aria-label="Paragraph editing toolbar"]').waitForDisplayed({ timeout: 10_000 });
     expect(await $('[aria-label="Paragraph editing toolbar"]').$$('.pdf-edit-context-icon')).toHaveLength(3);
     await $('button=Edit Text').waitForDisplayed({ timeout: 10_000 });
-
     await selectionOverlay.click();
     await browser.keys('Enter');
 
     const textarea = await $('.rich-text-edit-textarea');
     await textarea.waitForDisplayed({ timeout: 10_000 });
 
+    await $('.edit-toolbar-apply').click();
+    await browser.waitUntil(
+      async () => !(await $('.rich-text-edit-textarea').isDisplayed().catch(() => false)),
+      { timeout: 5_000, timeoutMsg: 'expected unchanged paragraph editor to close' },
+    );
+    await expect($('[data-testid="undo-btn"]')).toBeDisabled();
+
+    const point = await getCenterOfTextSpan('First line');
+    await browser.action('pointer').move({ x: point.cx, y: point.cy }).down({ button: 0 }).up({ button: 0 }).perform();
+    await $('.paragraph-selection-overlay').waitForDisplayed({ timeout: 10_000 });
+    const paragraphLeft = await browser.execute(() => Number.parseFloat(getComputedStyle(document.querySelector('.paragraph-selection-overlay')!).left));
+    await browser.keys(['ArrowRight', 'ArrowRight']);
+    const nudgedParagraphLeft = await browser.execute(() => Number.parseFloat(getComputedStyle(document.querySelector('.paragraph-selection-overlay')!).left));
+    expect(nudgedParagraphLeft - paragraphLeft).toBe(2);
+    await browser.keys('Enter');
+    const reopenedTextarea = await $('.rich-text-edit-textarea');
+    await reopenedTextarea.waitForDisplayed({ timeout: 10_000 });
+
     // Verify the textarea contains the paragraph text (both lines joined by newline).
-    const value = await textarea.getValue();
+    const value = await reopenedTextarea.getValue();
     expect(value).toContain('First line of paragraph');
     expect(value).toContain('Second line of paragraph');
 
-    await textarea.setValue('Edited paragraph text');
+    await reopenedTextarea.setValue('Edited paragraph text');
 
     const applyBtn = await $('.edit-toolbar-apply');
     await applyBtn.click();
@@ -530,6 +591,21 @@ describe('PDF Edit Mode', () => {
     await $('button=Delete').waitForDisplayed({ timeout: 10_000 });
     await $('button=Cancel').waitForDisplayed({ timeout: 10_000 });
 
+    await $('button=Apply').click();
+    await browser.waitUntil(
+      async () => !(await $('.image-selection-overlay').isDisplayed().catch(() => false)),
+      { timeout: 5_000, timeoutMsg: 'expected unchanged image selection to close' },
+    );
+    await expect($('[data-testid="undo-btn"]')).toBeDisabled();
+    const freshImagePoint = await browser.execute(() => {
+      const img = document.querySelector('.page-image') as HTMLImageElement | null;
+      if (!img) throw new Error('missing page image');
+      const rect = img.getBoundingClientRect();
+      return { x: Math.round(rect.left + rect.width / 2), y: Math.round(rect.top + rect.height * 0.35) };
+    });
+    await browser.action('pointer').move(freshImagePoint).down({ button: 0 }).up({ button: 0 }).perform();
+    await $('.image-selection-overlay').waitForDisplayed({ timeout: 10_000 });
+
     const rotator = await $('.image-selection-handle-rotate');
     await rotator.waitForDisplayed({ timeout: 10_000 });
 
@@ -561,15 +637,61 @@ describe('PDF Edit Mode', () => {
     expect(await errorToast.isDisplayed().catch(() => false)).toBe(false);
   });
 
-  it('shows an Add Image button when edit mode is active', async () => {
+  it('inserts and immediately selects an image', async () => {
     await openPdfViaPathModal(fixturePdf);
     await waitForPdfOpen();
     await waitForPageRendered();
 
-    await enterPdfEditMode();
     const insertBtn = await $('[aria-label="Add image"]');
     await insertBtn.waitForDisplayed({ timeout: 10_000 });
-    expect(await insertBtn.isClickable()).toBe(true);
+    await browser.execute((imagePath) => {
+      const target = window as Window & { __kanopriiOriginalPrompt?: typeof window.prompt };
+      target.__kanopriiOriginalPrompt = window.prompt;
+      window.prompt = () => imagePath;
+    }, fixturePng);
+    await insertBtn.click();
+
+    const selection = await $('.image-selection-overlay');
+    await selection.waitForDisplayed({ timeout: 15_000 });
+    await $('[aria-label="Image editing toolbar"]').waitForDisplayed({ timeout: 10_000 });
+    await expect($('button=Rotate Left')).toBeDisplayed();
+    await expect($('button=Rotate Right')).toBeDisplayed();
+    await expect($('button=Replace')).toBeDisplayed();
+    await expect($('button=Apply')).toBeDisplayed();
+    await expect($('button=Delete')).toBeDisplayed();
+    await expect($('button=Cancel')).toBeDisplayed();
+    expect(await selection.$$('.image-selection-handle')).toHaveLength(8);
+
+    const beforeNudge = await browser.execute(() => Number.parseFloat(getComputedStyle(document.querySelector('.image-selection-overlay')!).left));
+    await browser.execute(() => (document.querySelector('.image-selection-overlay') as HTMLElement).focus());
+    await browser.keys(['ArrowRight', 'ArrowRight']);
+    const afterNudge = await browser.execute(() => Number.parseFloat(getComputedStyle(document.querySelector('.image-selection-overlay')!).left));
+    expect(afterNudge - beforeNudge).toBe(2);
+
+    const before = await selection.getSize();
+    const handle = await $('.image-selection-handle-se');
+    const handleCenter = await browser.execute(() => {
+      const rect = document.querySelector('.image-selection-handle-se')!.getBoundingClientRect();
+      return { x: Math.round(rect.left + rect.width / 2), y: Math.round(rect.top + rect.height / 2) };
+    });
+    await browser.action('pointer').move(handleCenter).down({ button: 0 })
+      .move({ x: handleCenter.x + 40, y: handleCenter.y + 30 }).up({ button: 0 }).perform();
+    await handle.waitForDisplayed({ timeout: 5_000 });
+    const after = await selection.getSize();
+    expect(after.width).toBeGreaterThan(before.width);
+    expect(after.height).toBeGreaterThan(before.height);
+
+    await $('button=Cancel').click();
+    await browser.waitUntil(
+      async () => !(await $('.image-selection-overlay').isDisplayed().catch(() => false)),
+      { timeout: 5_000, timeoutMsg: 'expected inserted image selection to close' },
+    );
+    await expect($('[data-testid="undo-btn"]')).toBeEnabled();
+    await browser.execute(() => {
+      const target = window as Window & { __kanopriiOriginalPrompt?: typeof window.prompt };
+      if (target.__kanopriiOriginalPrompt) window.prompt = target.__kanopriiOriginalPrompt;
+      delete target.__kanopriiOriginalPrompt;
+    });
   });
 
   it('selects, moves, and applies an existing vector', async () => {
@@ -591,35 +713,65 @@ describe('PDF Edit Mode', () => {
       .move({ x: points.x1, y: points.y1 }).down({ button: 0 })
       .move({ x: points.x2, y: points.y2 }).up({ button: 0 }).perform();
 
-    const vector = await $('.page-vector-edit-overlay:not(.page-vector-draft)');
-    await vector.waitForDisplayed({ timeout: 15_000 });
-    const before = await vector.getLocation();
-    const center = await browser.execute(() => {
-      const rect = document.querySelector('.page-vector-edit-overlay:not(.page-vector-draft)')!.getBoundingClientRect();
-      return { x: Math.round(rect.left + rect.width / 2), y: Math.round(rect.top + rect.height / 2) };
-    });
-    await browser.action('pointer').move(center).down({ button: 0 }).up({ button: 0 }).perform();
-
     const selection = await $('[aria-label="Vector selection"]');
-    await selection.waitForDisplayed({ timeout: 10_000 });
+    await selection.waitForDisplayed({ timeout: 15_000 });
     const vectorToolbar = await $('[aria-label="Vector editing toolbar"]');
     await vectorToolbar.waitForDisplayed({ timeout: 10_000 });
     expect(await selection.$$('.paragraph-handle')).toHaveLength(8);
     await expect(vectorToolbar.$('button=Apply')).toBeDisplayed();
     await expect(vectorToolbar.$('button=Delete')).toBeDisplayed();
     await expect(vectorToolbar.$('button=Cancel')).toBeDisplayed();
+    await vectorToolbar.$('button=Apply').click();
+    await browser.waitUntil(
+      async () => !(await $('[aria-label="Vector selection"]').isDisplayed().catch(() => false)),
+      { timeout: 5_000, timeoutMsg: 'expected unchanged vector selection to close' },
+    );
+
+    const undo = await $('[data-testid="undo-btn"]');
+    await undo.click();
+    await browser.waitUntil(() => undo.isEnabled().then((enabled) => !enabled), {
+      timeout: 15_000,
+      timeoutMsg: 'expected one Undo to remove the newly created vector',
+    });
+    expect(await $('.page-vector-edit-overlay:not(.page-vector-draft)').isDisplayed().catch(() => false)).toBe(false);
+
+    await browser.action('pointer')
+      .move({ x: points.x1, y: points.y1 }).down({ button: 0 })
+      .move({ x: points.x2, y: points.y2 }).up({ button: 0 }).perform();
+    const restoredSelection = await $('[aria-label="Vector selection"]');
+    await restoredSelection.waitForDisplayed({ timeout: 15_000 });
+
+    const beforeNudge = await browser.execute(() => Number.parseFloat(getComputedStyle(document.querySelector('[aria-label="Vector selection"]')!).left));
+    await browser.keys(['ArrowRight', 'ArrowRight']);
+    const afterNudge = await browser.execute(() => Number.parseFloat(getComputedStyle(document.querySelector('[aria-label="Vector selection"]')!).left));
+    expect(afterNudge - beforeNudge).toBe(2);
+    const before = await restoredSelection.getLocation();
+    const center = await browser.execute(() => {
+      const rect = document.querySelector('[aria-label="Vector selection"]')!.getBoundingClientRect();
+      return { x: Math.round(rect.left + rect.width / 2), y: Math.round(rect.top + rect.height / 2) };
+    });
     await browser.action('pointer').move(center).down({ button: 0 })
       .move({ x: center.x + 60, y: center.y + 40 }).up({ button: 0 }).perform();
-    await vectorToolbar.$('button=Apply').click();
+    const movedSelection = await restoredSelection.getLocation();
+    expect(movedSelection.x - before.x).toBeGreaterThan(30);
+    expect(movedSelection.y - before.y).toBeGreaterThan(20);
+    const movedNatural = await browser.execute(() => {
+      const style = getComputedStyle(document.querySelector('[aria-label="Vector selection"]')!);
+      return { x: Number.parseFloat(style.left), y: Number.parseFloat(style.top) };
+    });
+    await $('[aria-label="Vector editing toolbar"]').$('button=Apply').click();
 
     await browser.waitUntil(
       async () => !(await $('[aria-label="Vector selection"]').isDisplayed().catch(() => false)),
       { timeout: 15_000, timeoutMsg: 'expected vector selection to close after Apply' },
     );
-    const moved = await $('.page-vector-edit-overlay:not(.page-vector-draft)');
-    await moved.waitForDisplayed({ timeout: 15_000 });
-    const after = await moved.getLocation();
-    expect(after.x - before.x).toBeGreaterThan(30);
-    expect(after.y - before.y).toBeGreaterThan(20);
+    await browser.waitUntil(() => browser.execute(({ x, y }) =>
+      Array.from(document.querySelectorAll<HTMLElement>('.page-vector-edit-overlay:not(.page-vector-draft)')).some((node) => {
+        const style = getComputedStyle(node);
+        return Math.abs(Number.parseFloat(style.left) - x) < 1 && Math.abs(Number.parseFloat(style.top) - y) < 1;
+      }), movedNatural), {
+      timeout: 15_000,
+      timeoutMsg: 'expected moved vector placement to persist after Apply',
+    });
   });
 });

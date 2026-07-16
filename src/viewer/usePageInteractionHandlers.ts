@@ -235,11 +235,16 @@ export function usePageInteractionHandlers(opts: PageInteractionHandlerOptions) 
           toast: 'Image inserted',
         });
       } else if (opts.vectorEditMode) {
-        void opts.runEdit({
+        void opts.runEdit<number>({
           command: 'add_page_vector_rect',
           args: { pageIndex: opts.currentPage, x: rect.x, y: rect.y, width: rect.w, height: rect.h },
           afterEdit: async () => { await opts.renderPage(opts.filePath, opts.currentPage); },
           toast: 'Vector shape added',
+          onSuccess: (index) => opts.pdfEdit.startEditingVector({
+            pageIndex: opts.currentPage,
+            index,
+            pageRect: rect,
+          }),
         });
       } else if (opts.formAddMode) {
         if (!opts.newFormFieldName.trim()) return;
@@ -373,11 +378,16 @@ export function usePageInteractionHandlers(opts: PageInteractionHandlerOptions) 
           toast: 'Image inserted',
         });
       } else if (opts.vectorEditMode) {
-        void opts.runEdit({
+        void opts.runEdit<number>({
           command: 'add_page_vector_rect',
           args: { pageIndex: opts.currentPage, x: rect.x, y: rect.y, width: rect.w, height: rect.h },
           afterEdit: async () => { await opts.renderPage(opts.filePath, opts.currentPage); },
           toast: 'Vector shape added',
+          onSuccess: (index) => opts.pdfEdit.startEditingVector({
+            pageIndex: opts.currentPage,
+            index,
+            pageRect: rect,
+          }),
         });
       } else if (opts.formAddMode) {
         if (!opts.newFormFieldName.trim()) return;

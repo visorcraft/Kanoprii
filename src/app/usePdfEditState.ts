@@ -77,6 +77,8 @@ export interface ImageEditDraft {
   pageRect: Rect;
   /** Rotation angle in degrees, counter-clockwise from upright. */
   rotation?: number;
+  /** Original geometry used to close unchanged selections without rewriting the PDF. */
+  original?: { pageRect: Rect; rotation: number };
 }
 
 export interface ParagraphEditDraft {
@@ -87,12 +89,18 @@ export interface ParagraphEditDraft {
   /** Rectangle in natural page coordinates (800x1132 viewer space) for the paragraph edit box. */
   pageRect: Rect;
   style: TextStyle;
+  /** Original values used to skip unchanged paragraph edits. */
+  original?: { text: string; pageRect: Rect; style: TextStyle };
+  /** Set only by explicit move/resize input, not automatic comfortable sizing. */
+  geometryModified?: boolean;
 }
 
 export interface VectorEditDraft {
   pageIndex: number;
   index: number;
   pageRect: Rect;
+  /** Original geometry used to skip unchanged Apply. */
+  original?: Rect;
 }
 
 export const DEFAULT_TEXT_STYLE: TextStyle = {
@@ -147,7 +155,10 @@ export function usePdfEditState() {
   }, []);
 
   const startEditingImage = useCallback((draft: ImageEditDraft) => {
-    setImageDraft(draft);
+    setImageDraft({
+      ...draft,
+      original: draft.original ?? { pageRect: { ...draft.pageRect }, rotation: draft.rotation ?? 0 },
+    });
     setTextDraft(null);
     setParagraphDraft(null);
     setVectorDraft(null);
@@ -155,7 +166,10 @@ export function usePdfEditState() {
   }, []);
 
   const startEditingParagraph = useCallback((draft: ParagraphEditDraft) => {
-    setParagraphDraft(draft);
+    setParagraphDraft({
+      ...draft,
+      original: draft.original ?? { text: draft.text, pageRect: { ...draft.pageRect }, style: draft.style },
+    });
     setParagraphEditing(false);
     setTextDraft(null);
     setImageDraft(null);
@@ -164,7 +178,7 @@ export function usePdfEditState() {
   }, []);
 
   const startEditingVector = useCallback((draft: VectorEditDraft) => {
-    setVectorDraft(draft);
+    setVectorDraft({ ...draft, original: draft.original ?? { ...draft.pageRect } });
     setTextDraft(null);
     setImageDraft(null);
     setParagraphDraft(null);

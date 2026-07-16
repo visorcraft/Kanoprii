@@ -1,11 +1,7 @@
 use crate::pdf::content::append_page_content;
-use crate::pdf::coords::viewer_rect_to_pdf;
-use crate::pdf::edit_object::{edit_text_region, validate_style_inputs};
+use crate::pdf::edit_object::{add_text_box, edit_text_region};
 use crate::pdf::edit_types::{PdfRect, RgbColor, TextStyle};
-use crate::pdf::fonts::{
-    ensure_font_family, ensure_full_font, font_has_glyphs_for, measure_text_width, style_supports_text,
-    uses_synthetic_font_style,
-};
+use crate::pdf::fonts::{ensure_full_font, font_has_glyphs_for};
 use crate::pdf::io::mutate_pdf;
 use crate::pdf::page_text::escape_pdf_literal_string;
 #[cfg(test)]
@@ -94,13 +90,7 @@ pub fn replace_text_line(path: &Path, page_index: u32, line_index: usize, new_te
     })
 }
 
-/// Replace a decoded text line with styled text (Phase 1 full editing).
-///
-/// 1. Validate glyph coverage for the requested style.
-/// 2. Ensure the page has the requested font family.
-/// 3. White-out the original line bbox.
-/// 4. Draw the replacement text inside `box_rect` with the style's font,
-///    size, color, and optional synthetic bold/italic/underline.
+/// White-out a decoded text line, then use the shared viewer-aligned text-box renderer.
 pub fn replace_text_line_styled(
     doc: &mut lopdf::Document,
     page_index: u32,
@@ -109,86 +99,15 @@ pub fn replace_text_line_styled(
     style: &TextStyle,
     box_rect: &PdfRect,
 ) -> Result<(), String> {
-    let trimmed = new_text.trim();
-    if trimmed.is_empty() {
-        return Err("Text cannot be empty".to_string());
-    }
-    if !(6.0..=72.0).contains(&style.font_size) {
-        return Err("Font size must be between 6 and 72".to_string());
-    }
-
-    validate_style_inputs(style, box_rect)?;
-    style_supports_text(style, trimmed)?;
-
     let page_id = *doc.get_pages().get(&(page_index + 1)).ok_or_else(|| "Page not found".to_string())?;
-    let font_name = ensure_font_family(doc, style, page_id)?;
-
     let lines = decode_page_text_lines(doc, page_id)?;
     let line = lines.get(line_index).ok_or_else(|| "Line not found".to_string())?;
-
-    // White-out the original line box.
     let [x1, y1, x2, y2] = line.bbox;
     let w = (x2 - x1).max(1.0);
     let h = (y2 - y1).max(1.0);
     let whiteout = format!("q 1 1 1 rg {x1} {y1} {w} {h} re f Q\n");
     append_page_content(doc, page_id, whiteout.as_bytes())?;
-
-    // Convert the viewer-pixel box to PDF user space.
-    let (px, py, pw, ph) = viewer_rect_to_pdf(doc, page_id, box_rect.x, box_rect.y, box_rect.width, box_rect.height)?;
-
-    // Measure rendered width and compute horizontal alignment offset.
-    let est_width = measure_text_width(trimmed, &style.font_family, style.font_size);
-    let align = style.align.to_lowercase();
-    let tx = match align.as_str() {
-        "center" => (px + (pw - est_width) / 2.0).max(px),
-        "right" => (px + pw - est_width).max(px),
-        _ => px,
-    };
-    let baseline = py + style.font_size * 0.2;
-    if baseline > py + ph {
-        return Err("Box rect is too short for the requested font size".to_string());
-    }
-
-    let escaped = escape_pdf_literal_string(trimmed);
-    let mut ops =
-        format!("q {r} {g} {b} rg {r} {g} {b} RG\n", r = style.color.r, g = style.color.g, b = style.color.b,);
-
-    let synthetic_style = uses_synthetic_font_style(style);
-    let text_matrix = if synthetic_style && style.italic {
-        format!("1 0 0.25 1 {tx} {baseline}")
-    } else {
-        format!("1 0 0 1 {tx} {baseline}")
-    };
-    ops.push_str(&format!(
-        "BT /{font_name} {font_size} Tf {text_matrix} Tm ({escaped}) Tj ET\n",
-        font_name = font_name,
-        font_size = style.font_size,
-    ));
-
-    if synthetic_style && style.bold {
-        let bold_tx = tx + 0.5;
-        let bold_matrix = if style.italic {
-            format!("1 0 0.25 1 {bold_tx} {baseline}")
-        } else {
-            format!("1 0 0 1 {bold_tx} {baseline}")
-        };
-        ops.push_str(&format!(
-            "BT /{font_name} {font_size} Tf {bold_matrix} Tm ({escaped}) Tj ET\n",
-            font_name = font_name,
-            font_size = style.font_size,
-        ));
-    }
-
-    if style.underline {
-        let uy = baseline - style.font_size * 0.15;
-        let line_width = style.font_size * 0.05;
-        let x_end = tx + est_width;
-        ops.push_str(&format!("{tx} {uy} m {x_end} {uy} l {line_width} w S\n"));
-    }
-
-    ops.push_str("Q\n");
-    append_page_content(doc, page_id, ops.as_bytes())?;
-    Ok(())
+    add_text_box(doc, page_index, new_text, style, box_rect)
 }
 
 /// Read page content as UTF-8 lossy string (test helper).
@@ -428,6 +347,15 @@ mod tests {
         let content = String::from_utf8_lossy(&read_page_content(&doc, page_id).unwrap()).into_owned();
         assert!(content.contains("rg"), "fill color operator missing");
         assert!(content.contains("RG"), "stroke color operator missing");
+    }
+
+    #[test]
+    fn replace_text_line_styled_uses_viewer_frame_on_rotated_page() {
+        let (mut doc, page_id) = build_doc_with_text("BT /F1 12 Tf 1 0 0 1 100 700 Tm (Hello) Tj ET");
+        doc.get_dictionary_mut(page_id).unwrap().set(b"Rotate", Object::Integer(90));
+        replace_text_line_styled(&mut doc, 0, 0, "World", &style_with_align("left"), &full_page_box()).unwrap();
+        let content = String::from_utf8_lossy(&read_page_content(&doc, page_id).unwrap()).into_owned();
+        assert!(content.contains("0 1 -1 0"), "expected a 90deg viewer frame: {content}");
     }
 
     #[test]

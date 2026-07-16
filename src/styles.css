@@ -2510,6 +2510,24 @@ body {
   cursor: text;
 }
 
+.text-layer.edit-targets span {
+  background: rgba(0, 102, 204, 0.055);
+  box-shadow: 0 0 0 1px rgba(0, 102, 204, 0.18);
+  border-radius: 2px;
+  transition: background-color 80ms ease, box-shadow 80ms ease;
+}
+
+.text-layer.edit-targets span:hover {
+  background: rgba(0, 102, 204, 0.16);
+  background: color-mix(in srgb, var(--pp-accent), transparent 84%);
+  box-shadow: 0 0 0 1px rgba(0, 102, 204, 0.75);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--pp-accent), transparent 25%);
+}
+
+.object-edit-cursor {
+  cursor: pointer;
+}
+
 .vector-edit-cursor {
   cursor: crosshair;
 }

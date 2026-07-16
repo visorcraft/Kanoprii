@@ -160,7 +160,7 @@ export function ModeToolbarExtras({
           <div className="pdf-edit-ribbon-hint" aria-live="polite">
             {editTextRunMode && 'Click existing text to edit.'}
             {pdfEdit.editMode && !pdfEdit.textDraft && !pdfEdit.paragraphDraft && !pdfEdit.imageDraft &&
-              'Click text or an image to edit. Click empty space to add text.'}
+              (addingText ? 'Click the page to place text.' : 'Click text or an image to select it.')}
             {vectorEditMode && !pdfEdit.vectorDraft && 'Click a vector to edit, or drag empty space to draw a rectangle.'}
             {!editTextRunMode && !pdfEdit.editMode && !vectorEditMode && 'Choose a tool, then click the page.'}
           </div>
@@ -192,7 +192,7 @@ export function ModeToolbarExtras({
               <ContextAction label="Edit Text" icon="text" onClick={pdfEdit.enterParagraphTextEdit} />
               <span className="pdf-edit-context-group-name">Content</span>
             </div>
-            <span className="pdf-edit-context-help">Drag the handles to move or resize the paragraph.</span>
+            <span className="pdf-edit-context-help">Drag to move/resize. Arrow keys nudge; Shift moves 10 px.</span>
             <div className="pdf-edit-context-actions">
               <ContextAction label="Delete" icon="delete" onClick={pdfEdit.onDeleteParagraph} tone="danger" />
               <ContextAction label="Done" icon="apply" onClick={pdfEdit.onCancel} tone="primary" />
@@ -214,7 +214,7 @@ export function ModeToolbarExtras({
               <ContextAction label="Replace" icon="replace" onClick={pdfEdit.onReplaceImage} />
               <span className="pdf-edit-context-group-name">Image</span>
             </div>
-            <span className="pdf-edit-context-help">Drag handles to move, resize, or rotate.</span>
+            <span className="pdf-edit-context-help">Drag to transform. Arrow keys nudge; Shift moves 10 px.</span>
             <div className="pdf-edit-context-actions">
               <ContextAction label="Delete" icon="delete" onClick={pdfEdit.onDeleteImage} tone="danger" />
               <ContextAction label="Cancel" icon="close" onClick={pdfEdit.onCancel} />
@@ -226,7 +226,7 @@ export function ModeToolbarExtras({
         {pdfEdit.vectorDraft && (
           <div className="pdf-edit-context" role="toolbar" aria-label="Vector editing toolbar">
             <span className="pdf-edit-context-label">Vector</span>
-            <span className="pdf-edit-context-help">Drag the shape or its handles to move and resize.</span>
+            <span className="pdf-edit-context-help">Drag to move/resize. Arrow keys nudge; Shift moves 10 px.</span>
             <div className="pdf-edit-context-actions">
               <ContextAction label="Delete" icon="delete" onClick={pdfEdit.onDeleteVector} tone="danger" />
               <ContextAction label="Cancel" icon="close" onClick={pdfEdit.onCancel} />
