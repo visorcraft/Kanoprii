@@ -92,11 +92,7 @@ fn wrap_text_to_width(text: &str, font_family: &str, font_size: f64, max_width: 
 ///
 /// For an upright page the `cm` is the identity (`1 0 0 1 e f`), so the laid
 /// out coordinates are page coordinates and existing behaviour is unchanged.
-fn viewer_text_frame(
-    doc: &Document,
-    page_id: lopdf::ObjectId,
-    rect: &PdfRect,
-) -> Result<(String, String, f64, f64), String> {
+fn viewer_frame(doc: &Document, page_id: lopdf::ObjectId, rect: &PdfRect) -> Result<([f64; 6], f64, f64), String> {
     let media = page_media_box(doc, page_id)?;
     let mw = (media[2] - media[0]).max(1.0);
     let mh = (media[3] - media[1]).max(1.0);
@@ -118,7 +114,16 @@ fn viewer_text_frame(
     let b = sanitize((bry - bly) / lw);
     let c = sanitize((tlx - blx) / lh);
     let d = sanitize((tly - bly) / lh);
-    Ok((format!("q {a} {b} {c} {d} {blx} {bly} cm\n"), "Q\n".to_string(), lw, lh))
+    Ok(([a, b, c, d, blx, bly], lw, lh))
+}
+
+fn viewer_text_frame(
+    doc: &Document,
+    page_id: lopdf::ObjectId,
+    rect: &PdfRect,
+) -> Result<(String, String, f64, f64), String> {
+    let ([a, b, c, d, e, f], lw, lh) = viewer_frame(doc, page_id, rect)?;
+    Ok((format!("q {a} {b} {c} {d} {e} {f} cm\n"), "Q\n".to_string(), lw, lh))
 }
 
 /// Add a new text box to a PDF page.
@@ -361,7 +366,8 @@ pub fn delete_text_region(doc: &mut Document, page_index: u32, source_rect: &Pdf
     whiteout_viewer_rect(doc, page_id, source_rect)
 }
 
-/// Move, resize, or rotate one page-level image occurrence.
+/// Move, resize, or rotate one page-level image occurrence in PDF space.
+#[cfg(test)]
 pub fn transform_page_image(
     doc: &mut Document,
     page_index: u32,
@@ -375,10 +381,6 @@ pub fn transform_page_image(
     let images = crate::pdf::page_images::list_page_images(doc, page_index)?;
     let target = images.get(image_index).ok_or_else(|| "image index out of range".to_string())?;
 
-    // Build the `cm` matrix that maps the unit image square onto a rectangle
-    // of size (w, h), rotated by theta about its center (cx, cy). The first
-    // two columns (a, b) and (c, d) are the transformed axes; (e, f) translate
-    // the result so the rectangle stays centered at (cx, cy).
     let theta = rotation_degrees.to_radians();
     let (sin, cos) = theta.sin_cos();
     let w = new_rect.width;
@@ -392,7 +394,49 @@ pub fn transform_page_image(
     let e = cx - (a + c) / 2.0;
     let f = cy - (b + d) / 2.0;
 
-    // Avoid negative zero in encoded content streams.
+    write_image_transform(doc, page_id, target, [a, b, c, d, e, f])
+}
+
+/// Move, resize, or rotate one page-level image occurrence using an
+/// 800x1132 viewer-space rectangle.
+pub fn transform_page_image_viewer(
+    doc: &mut Document,
+    page_index: u32,
+    image_index: usize,
+    new_rect: &PdfRect,
+    rotation_degrees: f64,
+) -> Result<(), String> {
+    validate_rect_finite(new_rect, "new rect")?;
+    finite_f64(rotation_degrees, "rotation")?;
+    let page_id = doc.page_iter().nth(page_index as usize).ok_or_else(|| "page index out of range".to_string())?;
+    let images = crate::pdf::page_images::list_page_images(doc, page_index)?;
+    let target = images.get(image_index).ok_or_else(|| "image index out of range".to_string())?;
+
+    let ([fa, fb, fc, fd, fe, ff], w, h) = viewer_frame(doc, page_id, new_rect)?;
+    let theta = rotation_degrees.to_radians();
+    let (sin, cos) = theta.sin_cos();
+    let la = w * cos;
+    let lb = w * sin;
+    let lc = -h * sin;
+    let ld = h * cos;
+    let le = w / 2.0 - (la + lc) / 2.0;
+    let lf = h / 2.0 - (lb + ld) / 2.0;
+    let a = fa * la + fc * lb;
+    let b = fb * la + fd * lb;
+    let c = fa * lc + fc * ld;
+    let d = fb * lc + fd * ld;
+    let e = fa * le + fc * lf + fe;
+    let f = fb * le + fd * lf + ff;
+
+    write_image_transform(doc, page_id, target, [a, b, c, d, e, f])
+}
+
+fn write_image_transform(
+    doc: &mut Document,
+    page_id: lopdf::ObjectId,
+    target: &crate::pdf::edit_types::PageImageInfo,
+    [a, b, c, d, e, f]: [f64; 6],
+) -> Result<(), String> {
     let sanitize = |v: f64| if v.abs() < 1e-12 { 0.0 } else { v };
     let a = sanitize(a);
     let b = sanitize(b);
@@ -817,6 +861,33 @@ mod tests {
         assert_real_eq(moved[0].rect.width, 100.0, 1e-4);
         assert_real_eq(moved[0].rect.height, 100.0, 1e-4);
         assert_real_eq(moved[0].rotation, 90.0, 1e-4);
+    }
+
+    #[test]
+    fn transform_page_image_uses_viewer_frame_on_rotated_page() {
+        let (mut doc, page_id, content_id) = build_doc_with_image();
+        doc.get_dictionary_mut(page_id).unwrap().set(b"Rotate", Object::Integer(90));
+
+        transform_page_image_viewer(&mut doc, 0, 0, &PdfRect { x: 0.0, y: 0.0, width: 800.0, height: 1132.0 }, 0.0)
+            .unwrap();
+
+        let decoded = doc.get_object(content_id).unwrap().as_stream().unwrap().decode_content().unwrap();
+        let cm = decoded
+            .operations
+            .iter()
+            .enumerate()
+            .find(|(i, op)| {
+                op.operator == "cm" && decoded.operations.get(i + 1).is_some_and(|next| next.operator == "Do")
+            })
+            .map(|(_, op)| op)
+            .unwrap();
+        let vals: Vec<f64> = cm.operands.iter().map(|value| value.as_float().map(f64::from).unwrap()).collect();
+        assert_real_eq(vals[0], 0.0, 1e-4);
+        assert_real_eq(vals[1], 792.0, 1e-4);
+        assert_real_eq(vals[2], -612.0, 1e-4);
+        assert_real_eq(vals[3], 0.0, 1e-4);
+        assert_real_eq(vals[4], 612.0, 1e-4);
+        assert_real_eq(vals[5], 0.0, 1e-4);
     }
 
     #[test]

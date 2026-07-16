@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { VIEWER_PAGE_H, VIEWER_PAGE_W } from '../app/constants';
 
 type TextEditTarget = {
   text: string;
@@ -40,9 +41,9 @@ export function TextEditOverlay({
         position: 'absolute',
         left: target.x,
         top: target.y,
-        width: Math.max(target.w, 120),
-        height: Math.max(target.h, 24),
-        fontSize: target.h * 0.85,
+        width: Math.max(40, Math.min(Math.max(target.w, 320), VIEWER_PAGE_W - target.x)),
+        height: Math.max(44, Math.min(Math.max(target.h, 44), VIEWER_PAGE_H - target.y)),
+        fontSize: Math.max(14, target.h * 0.85),
       }}
       onChange={(e) => onDraftChange(e.target.value)}
       onKeyDown={(e) => {

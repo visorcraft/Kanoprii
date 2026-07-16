@@ -86,8 +86,8 @@ export type PageInteractionHandlerOptions = {
 
 export function usePageInteractionHandlers(opts: PageInteractionHandlerOptions) {
   const getImageCoords: CoordFn = useCallback(
-    (clientX, clientY) => imageCoordsFromClick(opts.imgRef, opts.zoom, clientX, clientY),
-    [opts.imgRef, opts.zoom],
+    (clientX, clientY) => imageCoordsFromClick(opts.imgRef, clientX, clientY),
+    [opts.imgRef],
   );
 
   const dragStateRef = useRef<{ phase: 'idle' | 'armed' | 'dragging'; armedByThisDown: boolean }>({

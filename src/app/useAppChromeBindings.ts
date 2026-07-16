@@ -84,6 +84,7 @@ export function useAppChromeBindings(input: UseAppChromeBindingsInput) {
         redactMode: input.annotation.redactMode,
         imageInsertMode: input.annotation.imageInsertMode,
         textEditMode: input.annotation.textEditMode,
+        editTextRunMode: input.annotation.editTextRunMode,
         vectorEditMode: input.annotation.vectorEditMode,
         formAddMode: input.annotation.formAddMode,
         highlightMode: input.annotation.highlightMode,

@@ -18,6 +18,14 @@
   outline: none;
   caret-color: var(--pp-accent, #0066cc);
   -webkit-text-fill-color: #1a1a2e;
+  overflow: hidden;
+  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.22);
+}
+
+.rich-text-edit-textarea::selection {
+  color: #fff;
+  background: var(--pp-accent, #0066cc);
+  -webkit-text-fill-color: #fff;
 }
 
 .rich-text-edit-textarea:focus {

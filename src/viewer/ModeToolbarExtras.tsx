@@ -57,6 +57,11 @@ export function ModeToolbarExtras({
     const rotation = ((pdfEdit.imageDraft?.rotation ?? 0) + degrees + 360) % 360;
     pdfEdit.onUpdateImageRotation(rotation);
   };
+  const addingText =
+    pdfEdit.editMode &&
+    pdfEdit.mode === 'text' &&
+    (!pdfEdit.textDraft ||
+      (pdfEdit.textDraft.lineIndex === undefined && pdfEdit.textDraft.sourceRect === undefined));
 
   return (
     <div className="mode-toolbar-extras">
@@ -73,8 +78,8 @@ export function ModeToolbarExtras({
           </button>
           <button
             type="button"
-            className={pdfEdit.editMode && pdfEdit.mode !== 'text' && !pdfEdit.paragraphDraft ? 'btn btn-active' : 'btn'}
-            aria-pressed={pdfEdit.editMode && pdfEdit.mode !== 'text' && !pdfEdit.paragraphDraft}
+            className={pdfEdit.editMode && !addingText ? 'btn btn-active' : 'btn'}
+            aria-pressed={pdfEdit.editMode && !addingText}
             aria-label="Edit mode"
             title={pdfEdit.editMode ? 'Edit PDF content (on)' : 'Edit PDF content'}
             onClick={onToggleEditMode}
@@ -83,8 +88,8 @@ export function ModeToolbarExtras({
           </button>
           <button
             type="button"
-            className={pdfEdit.editMode && pdfEdit.mode === 'text' && !pdfEdit.textDraft ? 'btn btn-active' : 'btn'}
-            aria-pressed={pdfEdit.editMode && pdfEdit.mode === 'text' && !pdfEdit.textDraft}
+            className={addingText ? 'btn btn-active' : 'btn'}
+            aria-pressed={addingText}
             onClick={onBeginTextInsert}
           >
             Add Text

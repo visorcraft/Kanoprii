@@ -91,17 +91,6 @@ export function usePageInteractionEdit(deps: UsePageInteractionEditOptions) {
     [pageSizes, pdfEdit.style.fontSize],
   );
 
-  const viewerRectToPdf = useCallback(
-    async (pageIndex: number, rect: Rect): Promise<PdfRect> => {
-      return invoke<PdfRect>('viewer_rect_to_pdf', {
-        path: filePath,
-        pageIndex,
-        rect: rectToPdfRect(rect),
-      });
-    },
-    [filePath],
-  );
-
   const pdfRectToViewerPx = useCallback(
     async (pageIndex: number, rect: PdfRect): Promise<Rect> => {
       const result = await invoke<PdfRect>('pdf_rect_to_viewer_px', {
@@ -280,8 +269,8 @@ export function usePageInteractionEdit(deps: UsePageInteractionEditOptions) {
             x: point.x,
             // Place box so PDF baseline (box.y + fontPx) lands at the click y.
             y: point.y - fontPx,
-            w: 220,
-            h: fontPx + 6,
+            w: 320,
+            h: Math.max(44, fontPx + 12),
           });
         } else {
           // In idle mode, decide text vs. image by hit-testing.
@@ -302,8 +291,8 @@ export function usePageInteractionEdit(deps: UsePageInteractionEditOptions) {
             pdfEdit.startInsertingText(pageIndex, point, {
               x: point.x,
               y: point.y - fontPx,
-              w: 220,
-              h: fontPx + 6,
+              w: 320,
+              h: Math.max(44, fontPx + 12),
             });
           }
         }
@@ -464,14 +453,13 @@ export function usePageInteractionEdit(deps: UsePageInteractionEditOptions) {
     async (session: DocumentSessionData) => {
       if (!session?.filePath || !pdfEdit.imageDraft) return;
       const draft = pdfEdit.imageDraft;
-      const newRect = await viewerRectToPdf(draft.pageIndex, draft.pageRect);
       const result = await runStructuralEdit(deps, {
         command: 'transform_page_image',
         args: {
           path: session.filePath,
           pageIndex: draft.pageIndex,
           imageIndex: draft.index,
-          newRect,
+          newRect: rectToPdfRect(draft.pageRect),
           rotation: draft.rotation ?? 0,
         },
         reloadAt: draft.pageIndex,
@@ -479,7 +467,7 @@ export function usePageInteractionEdit(deps: UsePageInteractionEditOptions) {
       });
       if (result !== undefined) pdfEdit.onCancel();
     },
-    [deps, pdfEdit, viewerRectToPdf],
+    [deps, pdfEdit],
   );
 
   const deleteImage = useCallback(

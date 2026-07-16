@@ -8,7 +8,7 @@ export type BuildAppKeyboardSourceArgs = {
   doc: Pick<DocumentState, 'isDirty' | 'filePath' | 'pageCount' | 'currentPage' | 'viewMode' | 'cycleTab' | 'jumpToTab'>;
   annotation: Pick<AnnotationState,
     'noteMode' | 'drawMode' | 'shapeMode' | 'stampMode' | 'redactMode' | 'imageInsertMode'
-    | 'textEditMode' | 'vectorEditMode' | 'formAddMode' | 'highlightMode'>;
+    | 'textEditMode' | 'editTextRunMode' | 'vectorEditMode' | 'formAddMode' | 'highlightMode'>;
   history: { canUndo: boolean; canRedo: boolean; undo: () => void; redo: () => void };
   chrome: {
     anyModalOpen: boolean;
@@ -41,6 +41,7 @@ export function buildAppKeyboardSource(args: BuildAppKeyboardSourceArgs): BuildA
     redactMode: args.annotation.redactMode,
     imageInsertMode: args.annotation.imageInsertMode,
     textEditMode: args.annotation.textEditMode,
+    editTextRunMode: args.annotation.editTextRunMode,
     vectorEditMode: args.annotation.vectorEditMode,
     editMode: args.pdfEdit.editMode,
     formAddMode: args.annotation.formAddMode,
@@ -75,6 +76,7 @@ export function buildAppKeyboardSource(args: BuildAppKeyboardSourceArgs): BuildA
     exitShapeMode: args.pdfActions.exitShapeMode,
     exitStampMode: args.pdfActions.exitStampMode,
     exitTextEditMode: args.pdfActions.exitTextEditMode,
+    exitEditTextRunMode: args.pdfActions.exitEditTextRunMode,
     exitVectorEditMode: args.pdfActions.exitVectorEditMode,
     exitEditMode: args.pdfActions.exitEditMode,
     handleAddBlankPage: args.pdfActions.handleAddBlankPage,

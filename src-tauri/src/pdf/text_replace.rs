@@ -1,13 +1,12 @@
 use crate::pdf::content::append_page_content;
 use crate::pdf::coords::viewer_rect_to_pdf;
-use crate::pdf::edit_object::validate_style_inputs;
-use crate::pdf::edit_types::{PdfRect, TextStyle};
+use crate::pdf::edit_object::{edit_text_region, validate_style_inputs};
+use crate::pdf::edit_types::{PdfRect, RgbColor, TextStyle};
 use crate::pdf::fonts::{
     ensure_font_family, ensure_full_font, font_has_glyphs_for, measure_text_width, style_supports_text,
     uses_synthetic_font_style,
 };
 use crate::pdf::io::mutate_pdf;
-use crate::pdf::page_text::ensure_helvetica_font;
 use crate::pdf::page_text::escape_pdf_literal_string;
 #[cfg(test)]
 use crate::pdf::page_text::read_page_content;
@@ -33,26 +32,17 @@ pub fn replace_text_region(
     if !(6.0..=72.0).contains(&font_size) {
         return Err("Font size must be between 6 and 72".to_string());
     }
-    mutate_pdf(path, |doc| {
-        let page_id = *doc.get_pages().get(&(page_index + 1)).ok_or_else(|| "Page not found".to_string())?;
-        let (px, py, pw, ph) = viewer_rect_to_pdf(doc, page_id, x, y, w, h)?;
-        let whiteout = format!("q 1 1 1 rg {px} {py} {pw} {ph} re f Q\n");
-        append_page_content(doc, page_id, whiteout.as_bytes())?;
-
-        let font_name = ensure_helvetica_font(doc, page_id)?;
-        let escaped = escape_pdf_literal_string(trimmed);
-        let descent = font_size * 0.2;
-        let text_ops = format!(
-            "BT /{font_name} {font_size} Tf 1 0 0 1 {tx} {ty} Tm ({escaped}) Tj ET\n",
-            font_name = font_name,
-            font_size = font_size,
-            tx = px,
-            ty = py + descent,
-            escaped = escaped,
-        );
-        append_page_content(doc, page_id, text_ops.as_bytes())?;
-        Ok(())
-    })
+    let rect = PdfRect { x, y, width: w, height: h };
+    let style = TextStyle {
+        font_family: "Helvetica".to_string(),
+        font_size,
+        bold: false,
+        italic: false,
+        underline: false,
+        color: RgbColor { r: 0.0, g: 0.0, b: 0.0 },
+        align: "left".to_string(),
+    };
+    mutate_pdf(path, |doc| edit_text_region(doc, page_index, &rect, trimmed, &style, &rect))
 }
 
 /// Replace a decoded text line in-place (v2 editing).

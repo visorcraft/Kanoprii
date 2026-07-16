@@ -58,6 +58,7 @@ export function useAppKeyboard(
         if (a.redactMode && a.hasOpenPdf) { a.exitRedactMode(); return; }
         if (a.imageInsertMode && a.hasOpenPdf) { a.exitImageInsertMode(); return; }
         if (a.textEditMode && a.hasOpenPdf) { a.exitTextEditMode(); return; }
+        if (a.editTextRunMode && a.hasOpenPdf) { a.exitEditTextRunMode(); return; }
         if (a.vectorEditMode && a.hasOpenPdf) { a.exitVectorEditMode(); return; }
         if (a.editMode && a.hasOpenPdf) { a.exitEditMode(); return; }
         if (a.formAddMode && a.hasOpenPdf) { a.exitFormAddMode(); return; }
@@ -68,6 +69,7 @@ export function useAppKeyboard(
 
       if (isTextInput(e.target) && !isShortcutCapture(e.target)) return;
       if (isTextInput(document.activeElement) && !isShortcutCapture(document.activeElement)) return;
+      if (a.editMode || a.textEditMode || a.editTextRunMode) return;
 
       const shortcut = eventToShortcut(e);
       if (!shortcut) return;

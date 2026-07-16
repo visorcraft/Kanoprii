@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { ParagraphEditDraft, Rect, TextEditDraft, TextStyle } from '../app/usePdfEditState';
 import { VIEWER_PAGE_H, VIEWER_PAGE_W } from '../app/constants';
 import './RichTextEditOverlay.css';
@@ -9,6 +9,8 @@ type HandleKind = ResizeHandleKind | 'move';
 type RichTextEditOverlayProps = {
   draft: TextEditDraft | ParagraphEditDraft;
   zoom?: number;
+  /** Width of the edited page in PDF points along the viewer horizontal axis. */
+  pageWidthPt?: number;
   /** Height of the edited page in PDF points (viewer vertical axis). When
    *  omitted the font is rendered 1:1 (legacy behaviour). */
   pageHeightPt?: number;
@@ -19,9 +21,31 @@ type RichTextEditOverlayProps = {
 
 const MIN_W = 40;
 const MIN_H = 20;
+const COMFORTABLE_W = 320;
+const COMFORTABLE_H = 44;
 
 function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
+}
+
+function comfortableTextRect(rect: Rect, text: string, fontPx: number): Rect {
+  const x = clamp(rect.x, 0, VIEWER_PAGE_W - MIN_W);
+  const y = clamp(rect.y, 0, VIEWER_PAGE_H - MIN_H);
+  const lineHeight = fontPx * 1.25;
+  return {
+    x,
+    y,
+    w: clamp(Math.max(rect.w, COMFORTABLE_W), MIN_W, VIEWER_PAGE_W - x),
+    h: clamp(
+      Math.max(rect.h, COMFORTABLE_H, text.split('\n').length * lineHeight + 12),
+      MIN_H,
+      VIEWER_PAGE_H - y,
+    ),
+  };
+}
+
+function rectChanged(a: Rect, b: Rect): boolean {
+  return a.x !== b.x || a.y !== b.y || a.w !== b.w || a.h !== b.h;
 }
 
 function getFixedCorner(rect: Rect, kind: ResizeHandleKind): { x: number; y: number } {
@@ -81,13 +105,22 @@ function clampResize(rect: Rect, fixed: { x: number; y: number }, kind: ResizeHa
 export function RichTextEditOverlay({
   draft,
   zoom = 1,
+  pageWidthPt,
   pageHeightPt,
   onUpdate,
   onApply,
   onCancel,
 }: RichTextEditOverlayProps) {
+  const fontPx =
+    pageHeightPt && pageHeightPt > 0
+      ? draft.style.fontSize * (VIEWER_PAGE_H / pageHeightPt)
+      : draft.style.fontSize;
+  const fontScaleX =
+    pageWidthPt && pageHeightPt && pageWidthPt > 0 && pageHeightPt > 0
+      ? (VIEWER_PAGE_W / pageWidthPt) / (VIEWER_PAGE_H / pageHeightPt)
+      : 1;
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const [rect, setRect] = useState<Rect>(draft.pageRect);
+  const [rect, setRect] = useState<Rect>(() => comfortableTextRect(draft.pageRect, draft.text, fontPx));
   const [dragging, setDragging] = useState<HandleKind | null>(null);
   const dragStartPosRef = useRef<{ x: number; y: number } | null>(null);
   const dragStartRectRef = useRef<Rect | null>(null);
@@ -99,13 +132,26 @@ export function RichTextEditOverlay({
   }, []);
 
   useEffect(() => {
-    updateRect(draft.pageRect);
-  }, [draft.pageRect, updateRect]);
+    const next = comfortableTextRect(draft.pageRect, draft.text, fontPx);
+    if (rectChanged(rectRef.current, next)) updateRect(next);
+    if (rectChanged(draft.pageRect, next)) onUpdate({ pageRect: next });
+  }, [draft.pageRect, draft.text, fontPx, onUpdate, updateRect]);
 
   useEffect(() => {
     textareaRef.current?.focus();
     textareaRef.current?.select();
   }, []);
+
+  useLayoutEffect(() => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+    const current = rectRef.current;
+    const height = clamp(Math.max(current.h, textarea.scrollHeight + 4), MIN_H, VIEWER_PAGE_H - current.y);
+    if (height === current.h) return;
+    const next = { ...current, h: height };
+    updateRect(next);
+    onUpdate({ pageRect: next });
+  }, [draft.text, fontPx, onUpdate, rect.h, rect.w, rect.y, updateRect]);
 
   const handleMouseDown = useCallback((e: React.MouseEvent, kind: HandleKind) => {
     e.stopPropagation();
@@ -281,15 +327,11 @@ export function RichTextEditOverlay({
   }, [dragging, onUpdate, updateRect, zoom]);
 
   const { style } = draft;
-
-  // `style.fontSize` is in PDF points (written straight to the PDF `Tf`
-  // operator), but this textarea lives in 800x1132 viewer space. Scale points
-  // to viewer px so the preview matches the committed glyph size and the
-  // baseline lands where `render_wrapped_text_box` will draw it.
-  const fontPx =
-    pageHeightPt && pageHeightPt > 0
-      ? style.fontSize * (VIEWER_PAGE_H / pageHeightPt)
-      : style.fontSize;
+  const textColor = `rgb(${style.color.r}, ${style.color.g}, ${style.color.b})`;
+  const textShadow =
+    style.color.r * 0.299 + style.color.g * 0.587 + style.color.b * 0.114 > 180
+      ? '0 0 2px rgba(0, 0, 0, 0.8)'
+      : '0 0 1px rgba(255, 255, 255, 0.8)';
 
   const handleLabels: Record<ResizeHandleKind, string> = {
     tl: 'Resize text box top-left',
@@ -355,8 +397,13 @@ export function RichTextEditOverlay({
           fontWeight: style.bold ? 'bold' : 'normal',
           fontStyle: style.italic ? 'italic' : 'normal',
           textDecoration: style.underline ? 'underline' : 'none',
-          color: `rgb(${style.color.r}, ${style.color.g}, ${style.color.b})`,
+          color: textColor,
+          WebkitTextFillColor: textColor,
+          textShadow,
           textAlign: style.align,
+          width: `${100 / fontScaleX}%`,
+          transform: `scaleX(${fontScaleX})`,
+          transformOrigin: 'top left',
         }}
       />
       <div

@@ -1,7 +1,7 @@
-import { memo } from 'react';
+import { memo, useCallback, useLayoutEffect, useRef, useState } from 'react';
 import type React from 'react';
 import type { ShapeKind } from '../app/constants';
-import { pageHeightPtFor } from '../app/constants';
+import { pageHeightPtFor, pageWidthPtFor, VIEWER_PAGE_H, VIEWER_PAGE_W } from '../app/constants';
 import type {
   AnnotationData,
   FormFieldData,
@@ -122,6 +122,23 @@ function PdfPageViewInner({
   onCancelTextEdit,
   pdfEdit,
 }: PdfPageViewProps) {
+  const localImgRef = useRef<HTMLImageElement | null>(null);
+  const [fitScale, setFitScale] = useState(1);
+  const setImageRef = useCallback((node: HTMLImageElement | null) => {
+    localImgRef.current = node;
+    if (imgRef) imgRef.current = node;
+  }, [imgRef]);
+
+  useLayoutEffect(() => {
+    const image = localImgRef.current;
+    if (!image) return;
+    const update = () => setFitScale(image.clientWidth > 0 ? image.clientWidth / VIEWER_PAGE_W : 1);
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(image);
+    return () => observer.disconnect();
+  }, [imageSrc]);
+
   const cursorClass = [
     highlightMode ? 'highlight-cursor' : '',
     noteMode ? 'note-cursor' : '',
@@ -156,16 +173,29 @@ function PdfPageViewInner({
         >
           <div
             ref={pageContainerRef}
+            className="page-render-surface"
             style={{ position: 'relative', display: 'inline-block' }}
           >
             <img
-              ref={imgRef}
+              ref={setImageRef}
               src={imageSrc}
               alt="PDF Page"
               className="page-image"
               draggable={false}
               onLoad={onImageLoad}
             />
+            <div
+              className="page-overlay-scale"
+              style={{
+                position: 'absolute',
+                left: 0,
+                top: 0,
+                width: VIEWER_PAGE_W,
+                height: VIEWER_PAGE_H,
+                transform: `scale(${fitScale})`,
+                transformOrigin: 'top left',
+              }}
+            >
             <TextLayer runs={textRuns} interactive={textLayerInteractive} />
             {(textEditActiveRun || textEditActiveLine) &&
               onTextEditDraftChange &&
@@ -183,7 +213,8 @@ function PdfPageViewInner({
               pdfEdit.textDraft.pageIndex === currentPage && (
                 <RichTextEditOverlay
                   draft={pdfEdit.textDraft}
-                  zoom={zoom}
+                  zoom={zoom * fitScale}
+                  pageWidthPt={pageWidthPtFor(pageSizes?.[currentPage])}
                   pageHeightPt={pageHeightPtFor(pageSizes?.[currentPage])}
                   onUpdate={pdfEdit.onUpdate}
                   onApply={pdfEdit.onApply}
@@ -195,7 +226,7 @@ function PdfPageViewInner({
               !pdfEdit.paragraphEditing && (
                 <ParagraphSelectionOverlay
                   draft={pdfEdit.paragraphDraft}
-                  zoom={zoom}
+                  zoom={zoom * fitScale}
                   onUpdate={pdfEdit.onUpdateParagraph}
                   onEnterEdit={pdfEdit.enterParagraphTextEdit}
                   onDelete={pdfEdit.onDeleteParagraph}
@@ -207,7 +238,8 @@ function PdfPageViewInner({
               pdfEdit.paragraphEditing && (
                 <RichTextEditOverlay
                   draft={pdfEdit.paragraphDraft}
-                  zoom={zoom}
+                  zoom={zoom * fitScale}
+                  pageWidthPt={pageWidthPtFor(pageSizes?.[currentPage])}
                   pageHeightPt={pageHeightPtFor(pageSizes?.[currentPage])}
                   onUpdate={pdfEdit.onUpdateParagraph}
                   onApply={pdfEdit.onApply}
@@ -218,7 +250,7 @@ function PdfPageViewInner({
               pdfEdit.imageDraft.pageIndex === currentPage && (
                 <ImageSelectionOverlay
                   draft={pdfEdit.imageDraft}
-                  zoom={zoom}
+                  zoom={zoom * fitScale}
                   onUpdate={({ rect, rotation }) => {
                     pdfEdit.onUpdateImageRect(rect);
                     pdfEdit.onUpdateImageRotation(rotation);
@@ -258,6 +290,7 @@ function PdfPageViewInner({
               onRemoveInkStroke={onRemoveInkStroke}
               onRemoveTextNote={onRemoveTextNote}
             />
+            </div>
           </div>
         </div>
       ) : (

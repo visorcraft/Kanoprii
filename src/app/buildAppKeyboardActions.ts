@@ -12,6 +12,7 @@ export type AppKeyboardActions = {
   redactMode: boolean;
   imageInsertMode: boolean;
   textEditMode: boolean;
+  editTextRunMode: boolean;
   vectorEditMode: boolean;
   editMode: boolean;
   formAddMode: boolean;
@@ -30,6 +31,7 @@ export type AppKeyboardActions = {
   exitRedactMode: () => void;
   exitImageInsertMode: () => void;
   exitTextEditMode: () => void;
+  exitEditTextRunMode: () => void;
   exitVectorEditMode: () => void;
   exitEditMode: () => void;
   exitFormAddMode: () => void;
@@ -88,6 +90,7 @@ export type BuildAppKeyboardActionsInput = {
   redactMode: boolean;
   imageInsertMode: boolean;
   textEditMode: boolean;
+  editTextRunMode: boolean;
   vectorEditMode: boolean;
   editMode: boolean;
   formAddMode: boolean;
@@ -106,6 +109,7 @@ export type BuildAppKeyboardActionsInput = {
   exitRedactMode: () => void;
   exitImageInsertMode: () => void;
   exitTextEditMode: () => void;
+  exitEditTextRunMode: () => void;
   exitVectorEditMode: () => void;
   exitEditMode: () => void;
   exitFormAddMode: () => void;
@@ -166,6 +170,7 @@ export function buildAppKeyboardActions(input: BuildAppKeyboardActionsInput): Ap
     redactMode: input.redactMode,
     imageInsertMode: input.imageInsertMode,
     textEditMode: input.textEditMode,
+    editTextRunMode: input.editTextRunMode,
     vectorEditMode: input.vectorEditMode,
     editMode: input.editMode,
     formAddMode: input.formAddMode,
@@ -184,6 +189,7 @@ export function buildAppKeyboardActions(input: BuildAppKeyboardActionsInput): Ap
     exitRedactMode: input.exitRedactMode,
     exitImageInsertMode: input.exitImageInsertMode,
     exitTextEditMode: input.exitTextEditMode,
+    exitEditTextRunMode: input.exitEditTextRunMode,
     exitVectorEditMode: input.exitVectorEditMode,
     exitEditMode: input.exitEditMode,
     exitFormAddMode: input.exitFormAddMode,

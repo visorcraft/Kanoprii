@@ -72,7 +72,7 @@ fn transform_page_image(
     rotation: f64,
 ) -> Result<(), String> {
     crate::pdf::io::mutate_pdf(&PathBuf::from(path), |doc| {
-        crate::pdf::edit_object::transform_page_image(doc, page_index, image_index, &new_rect, rotation)
+        crate::pdf::edit_object::transform_page_image_viewer(doc, page_index, image_index, &new_rect, rotation)
     })
 }
 

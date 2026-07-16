@@ -879,7 +879,9 @@ body {
   border: 2px solid var(--pp-accent);
   background: #fff;
   color: #1a1a2e;
-  padding: 0 4px;
+  padding: 6px 8px;
+  border-radius: 4px;
+  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.22);
   margin: 0;
   outline: none;
   z-index: 20;
@@ -2081,9 +2083,13 @@ body {
 .page-image {
   display: block;
   max-width: 100%;
-  box-shadow: 0 4px 16px var(--pp-page-shadow);
   background: #fff;
   user-select: none;
+}
+
+.page-render-surface {
+  overflow: hidden;
+  box-shadow: 0 4px 16px var(--pp-page-shadow);
 }
 
 .markdown-viewer {

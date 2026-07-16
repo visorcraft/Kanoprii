@@ -6,6 +6,7 @@ import {
   fixturePdfParagraph,
   openPdfViaPathModal,
   resetToWelcome,
+  rotateCurrentPage,
   waitForPageRendered,
   waitForPdfOpen,
   waitForShell,
@@ -56,6 +57,127 @@ describe('PDF Edit Mode', () => {
     await $('[data-testid="menu-annotate"]').click();
     expect(await $('[data-testid="pdf-edit"]').isDisplayed().catch(() => false)).toBe(false);
     expect(await $('[data-testid="edit-text"]').isDisplayed().catch(() => false)).toBe(false);
+  });
+
+  it('keeps Add Text active, readable, roomy, and isolated from app shortcuts', async () => {
+    await openPdfViaPathModal(fixturePdf);
+    await waitForPdfOpen();
+    await waitForPageRendered();
+
+    const addText = await $('button=Add Text');
+    const editObjects = await $('[aria-label="Edit mode"]');
+    await addText.click();
+    await expect(addText).toHaveAttribute('aria-pressed', 'true');
+    await expect(editObjects).toHaveAttribute('aria-pressed', 'false');
+
+    const { cx, cy } = await browser.execute(() => {
+      const page = document.querySelector('.page-image')!.getBoundingClientRect();
+      return { cx: Math.round(page.left + page.width * 0.45), cy: Math.round(page.top + page.height * 0.35) };
+    });
+    await browser.action('pointer').move({ x: cx, y: cy }).down({ button: 0 }).up({ button: 0 }).perform();
+
+    const textarea = await $('.rich-text-edit-textarea');
+    await textarea.waitForDisplayed({ timeout: 10_000 });
+    const typed = 'test Approved text stays visible\nwhile typing and shortcut letters never steal focus';
+    await browser.keys('test Approved text stays visible while typing and shortcut letters never steal focus');
+    await browser.execute((value) => {
+      const input = document.querySelector('.rich-text-edit-textarea') as HTMLTextAreaElement;
+      Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')!.set!.call(input, value);
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+    }, typed);
+    await expect(textarea).toHaveValue(typed);
+    await expect(addText).toHaveAttribute('aria-pressed', 'true');
+    await expect(editObjects).toHaveAttribute('aria-pressed', 'false');
+    await browser.waitUntil(
+      () => browser.execute(() => {
+        const input = document.querySelector('.rich-text-edit-textarea') as HTMLTextAreaElement;
+        return input.getBoundingClientRect().height > 44 && input.scrollHeight <= input.clientHeight + 1;
+      }),
+      { timeout: 5_000, timeoutMsg: 'expected the Add Text box to grow for wrapped text' },
+    );
+
+    const layout = await browser.execute(() => {
+      const input = document.querySelector('.rich-text-edit-textarea') as HTMLTextAreaElement;
+      const rect = input.getBoundingClientRect();
+      return {
+        width: rect.width,
+        height: rect.height,
+        scrollHeight: input.scrollHeight,
+        clientHeight: input.clientHeight,
+        color: getComputedStyle(input).color,
+        stampToolbar: Boolean(document.querySelector('.stamp-toolbar')),
+      };
+    });
+    expect(layout.width).toBeGreaterThanOrEqual(300);
+    expect(layout.height).toBeGreaterThan(44);
+    expect(layout.scrollHeight).toBeLessThanOrEqual(layout.clientHeight + 1);
+    expect(layout.color).not.toBe('rgba(0, 0, 0, 0)');
+    expect(layout.stampToolbar).toBe(false);
+
+    await $('.edit-toolbar-cancel').click();
+  });
+
+  it('matches Add Text preview proportions on a rotated page', async () => {
+    await openPdfViaPathModal(fixturePdf);
+    await waitForPdfOpen();
+    await rotateCurrentPage();
+    await waitForPageRendered();
+
+    await $('button=Add Text').click();
+    const { cx, cy } = await browser.execute(() => {
+      const page = document.querySelector('.page-image')!.getBoundingClientRect();
+      return { cx: Math.round(page.left + page.width * 0.45), cy: Math.round(page.top + page.height * 0.35) };
+    });
+    await browser.action('pointer').move({ x: cx, y: cy }).down({ button: 0 }).up({ button: 0 }).perform();
+
+    const textarea = await $('.rich-text-edit-textarea');
+    await textarea.waitForDisplayed({ timeout: 10_000 });
+    await browser.keys('Rotated preview');
+    const scaleX = await browser.execute(() => {
+      const transform = getComputedStyle(document.querySelector('.rich-text-edit-textarea')!).transform;
+      return Number(transform.match(/^matrix\(([^,]+)/)?.[1] ?? 1);
+    });
+    expect(scaleX).toBeLessThan(0.6);
+    expect(scaleX).toBeGreaterThan(0.4);
+  });
+
+  it('commits Add Text at the preview baseline', async () => {
+    await openPdfViaPathModal(fixturePdf);
+    await waitForPdfOpen();
+    await waitForPageRendered();
+
+    await $('button=Add Text').click();
+    const { cx, cy } = await browser.execute(() => {
+      const hello = Array.from(document.querySelectorAll('.text-layer span')).find((el) => el.textContent === 'Hello')!.getBoundingClientRect();
+      return { cx: Math.round(hello.left), cy: Math.round(hello.bottom + 24) };
+    });
+    await browser.action('pointer').move({ x: cx, y: cy }).down({ button: 0 }).up({ button: 0 }).perform();
+
+    const textarea = await $('.rich-text-edit-textarea');
+    await textarea.waitForDisplayed({ timeout: 10_000 });
+    await browser.keys('Position probe');
+    const preview = await browser.execute(() => {
+      const page = document.querySelector('.page-image')!.getBoundingClientRect();
+      const input = document.querySelector('.rich-text-edit-textarea')!.getBoundingClientRect();
+      const fontSize = Number.parseFloat(getComputedStyle(document.querySelector('.rich-text-edit-textarea')!).fontSize);
+      const transform = getComputedStyle(document.querySelector('.page-overlay-scale')!).transform;
+      const scale = Number(transform.match(/^matrix\(([^,]+)/)?.[1] ?? 1);
+      return { x: input.left - page.left, baseline: input.top - page.top + fontSize * scale, scale, expectedScale: page.width / 800 };
+    });
+    await $('.edit-toolbar-apply').click();
+    await browser.waitUntil(
+      () => browser.execute(() => Array.from(document.querySelectorAll('.text-layer span')).some((el) => el.textContent === 'Position probe')),
+      { timeout: 15_000, timeoutMsg: 'expected committed Position probe text layer run' },
+    );
+    await $('.page-image').waitForDisplayed({ timeout: 15_000 });
+    const committed = await browser.execute(() => {
+      const page = document.querySelector('.page-image')!.getBoundingClientRect();
+      const span = Array.from(document.querySelectorAll('.text-layer span')).find((el) => el.textContent === 'Position probe')!.getBoundingClientRect();
+      return { x: span.left - page.left, baseline: span.bottom - page.top };
+    });
+    expect(Math.abs(preview.scale - preview.expectedScale)).toBeLessThan(0.01);
+    expect(Math.abs(committed.x - preview.x)).toBeLessThan(3);
+    expect(Math.abs(committed.baseline - preview.baseline)).toBeLessThan(5);
   });
 
   it('enters edit mode, resizes the rich-text edit box, and applies', async () => {

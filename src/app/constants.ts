@@ -28,6 +28,13 @@ export function pageHeightPtFor(
   return size.rotation % 180 === 0 ? size.height : size.width;
 }
 
+export function pageWidthPtFor(
+  size: { width: number; height: number; rotation: number } | undefined,
+): number | undefined {
+  if (!size || !(size.width > 0)) return undefined;
+  return size.rotation % 180 === 0 ? size.width : size.height;
+}
+
 export const RECENT_PDFS_KEY = 'kanoprii:recent-pdfs';
 export const LAST_BROWSER_DIR_KEY = 'kanoprii:last-browser-dir';
 export const TESSERACT_REMIND_DISMISSED_KEY =
