@@ -4118,3 +4118,17 @@ select.modal-input {
   font-size: 11px;
   font-style: italic;
 }
+
+/* Edit ribbon tab */
+.edit-ribbon-tab {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+
+.edit-ribbon-tools {
+  display: flex;
+  align-items: stretch;
+  gap: 4px;
+}
