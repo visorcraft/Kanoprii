@@ -16,7 +16,7 @@ export type BuildAppChromeSourceInput = {
   setShowLicenses: (open: boolean) => void;
   setShowCredits: (open: boolean) => void;
   setShowAbout: (open: boolean) => void;
-  modeExtras: BuildChromeContextInput['modeExtras'];
+  ribbonExtras: BuildChromeContextInput['ribbonExtras'];
   tabs: BuildChromeContextInput['tabs'];
   activeTabId: BuildChromeContextInput['activeTabId'];
   onSelectTab: BuildChromeContextInput['onSelectTab'];
@@ -40,7 +40,7 @@ export function buildAppChromeSource(input: BuildAppChromeSourceInput): BuildChr
     onCloseLicenses: () => input.setShowLicenses(false),
     onCloseCredits: () => input.setShowCredits(false),
     onCloseAbout: () => input.setShowAbout(false),
-    modeExtras: input.modeExtras,
+    ribbonExtras: input.ribbonExtras,
     tabs: input.tabs,
     activeTabId: input.activeTabId,
     onSelectTab: input.onSelectTab,

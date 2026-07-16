@@ -46,6 +46,7 @@ export type BuildAppShellViewerInputArgs = {
     | 'showFormsPanel'
     | 'showPdfUaPanel'
     | 'showHiddenLayers'
+    | 'showSidebar'
     | 'formFields'
     | 'formDrafts'
     | 'setFormDrafts'

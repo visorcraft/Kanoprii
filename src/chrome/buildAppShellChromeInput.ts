@@ -17,7 +17,7 @@ export type BuildAppShellChromeInputArgs = {
     setShowCredits: (open: boolean) => void;
     setShowAbout: (open: boolean) => void;
   };
-  modeExtras: BuildAppChromeSourceInput['modeExtras'];
+  ribbonExtras: BuildAppChromeSourceInput['ribbonExtras'];
   tabs: BuildAppChromeSourceInput['tabs'];
   activeTabId: BuildAppChromeSourceInput['activeTabId'];
   onSelectTab: BuildAppChromeSourceInput['onSelectTab'];
@@ -32,7 +32,7 @@ export function buildAppShellChromeInput(args: BuildAppShellChromeInputArgs): Bu
   return {
     menus: args.menus,
     ...args.help,
-    modeExtras: args.modeExtras,
+    ribbonExtras: args.ribbonExtras,
     tabs: args.tabs,
     activeTabId: args.activeTabId,
     onSelectTab: args.onSelectTab,

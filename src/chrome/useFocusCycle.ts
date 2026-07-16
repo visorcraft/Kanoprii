@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 
-const PANES = ['.menu-bar', '.quick-toolbar', '.sidebar', '.viewer-main'];
+const PANES = ['.ribbon-tabs', '.ribbon-body', '.sidebar', '.viewer-main'];
 
 export function useFocusCycle(enabled: boolean) {
   useEffect(() => {

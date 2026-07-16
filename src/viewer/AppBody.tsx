@@ -9,12 +9,13 @@ import { ViewerMain } from './ViewerMain';
 type AppBodyProps = {
   filePath: string;
   sidebar: React.ComponentProps<typeof PdfSidebar>;
+  sidebarVisible: boolean;
   viewer: Omit<React.ComponentProps<typeof ViewerMain>, 'filePath'>;
   workspaceView: WorkspaceViewMode;
   birdsEye: BirdsEyeWorkspace;
 };
 
-export function AppBody({ filePath, sidebar, viewer, workspaceView, birdsEye }: AppBodyProps) {
+export function AppBody({ filePath, sidebar, sidebarVisible, viewer, workspaceView, birdsEye }: AppBodyProps) {
   if (workspaceView === 'birdseye') {
     return (
       <div className="app-body app-body-birdseye">
@@ -26,7 +27,7 @@ export function AppBody({ filePath, sidebar, viewer, workspaceView, birdsEye }: 
 
   return (
     <div className="app-body">
-      {filePath && viewer.viewMode === 'pdf' && <PdfSidebar {...sidebar} />}
+      {filePath && viewer.viewMode === 'pdf' && sidebarVisible && <PdfSidebar {...sidebar} />}
       <div className="viewer-main" tabIndex={-1} aria-label="Document viewer">
         <ViewerMain {...viewer} filePath={filePath} />
       </div>

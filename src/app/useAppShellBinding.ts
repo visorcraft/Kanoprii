@@ -37,7 +37,7 @@ export type UseAppShellBindingInput = {
   pdfActions: AppPdfActions;
   windowTitle: string;
   appMenus: AppMenus;
-  modeToolbarExtras: BuildAppChromeSourceInput['modeExtras'];
+  ribbonExtras: BuildAppChromeSourceInput['ribbonExtras'];
   modalCtx: AppModalsRuntime;
   slices: Slices;
   viewerWorkflow: ViewerWorkflow;
@@ -79,7 +79,7 @@ export function useAppShellBinding(input: UseAppShellBindingInput) {
     pdfActions: input.pdfActions,
     windowTitle: input.windowTitle,
     appMenus: input.appMenus,
-    modeExtras: input.modeToolbarExtras,
+    ribbonExtras: input.ribbonExtras,
     modalCtx: input.modalCtx,
     printPages: viewer.printPages,
     activeSurface: input.surface.activeSurface,

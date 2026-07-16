@@ -1,6 +1,6 @@
 import { exit } from '@tauri-apps/plugin-process';
 import { buildAppMenuInput } from '../menu/buildAppMenuInput';
-import { buildModeToolbarExtras } from '../viewer/buildModeToolbarExtras';
+import { buildRibbonTabExtras } from '../viewer/buildRibbonTabExtras';
 import { buildAppKeyboardActions } from './buildAppKeyboardActions';
 import { buildAppKeyboardSource } from './buildAppKeyboardSource';
 import { buildModalDismissInput } from './buildModalDismissInput';
@@ -179,8 +179,7 @@ export function useAppChromeBindings(input: UseAppChromeBindingsInput) {
     pdfActions: input.pdfActions,
   });
 
-  const modeToolbarExtras = buildModeToolbarExtras({
-    filePath: input.doc.filePath,
+  const ribbonExtras = buildRibbonTabExtras({
     pdfEdit: input.pdfEdit,
     onToggleEditMode: input.pdfActions.toggleEditMode,
     editTextRunMode: input.annotation.editTextRunMode,
@@ -198,6 +197,7 @@ export function useAppChromeBindings(input: UseAppChromeBindingsInput) {
     imageInsertMode: input.annotation.imageInsertMode,
     imageSourcePath: input.annotation.imageSourcePath,
     onOpenImageInsertModal: input.pdfActions.openImageInsertModal,
+    onOpenPageEditsModal: () => input.annotation.setShowPageEditsModal(true),
     stampMode: input.annotation.stampMode,
     stampKind: input.annotation.stampKind,
     stampPreset: input.annotation.stampPreset,
@@ -208,5 +208,5 @@ export function useAppChromeBindings(input: UseAppChromeBindingsInput) {
     onShapeKindChange: input.annotation.setShapeKind,
   });
 
-  return { dismissModals, anyModalOpen, appMenus, modeToolbarExtras };
+  return { dismissModals, anyModalOpen, appMenus, ribbonExtras };
 }

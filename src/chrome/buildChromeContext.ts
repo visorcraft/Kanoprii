@@ -1,10 +1,11 @@
-import type { ComponentProps, ReactNode } from 'react';
+import type { ComponentProps } from 'react';
 import type { AppChrome } from './AppChrome';
 import type { AppMenus } from '../menu/types';
 import type { DocumentTabInfo } from '../app/documentSessionTypes';
 import type { TabMenuApi } from './useTabContextMenu';
 import type { ShortcutBindings } from '../app/useShortcutBindingsState';
 import type { WorkspaceViewMode } from '../app/types';
+import type { RibbonTabExtras } from '../viewer/buildRibbonTabExtras';
 
 export type BuildChromeContextInput = {
   menus: AppMenus;
@@ -18,7 +19,7 @@ export type BuildChromeContextInput = {
   onCloseLicenses: () => void;
   onCloseCredits: () => void;
   onCloseAbout: () => void;
-  modeExtras: ReactNode;
+  ribbonExtras: RibbonTabExtras;
   tabs: DocumentTabInfo[];
   activeTabId: string | null;
   onSelectTab: (id: string) => void;

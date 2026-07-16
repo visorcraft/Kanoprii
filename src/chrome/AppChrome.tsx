@@ -1,6 +1,6 @@
-import type { ReactNode } from 'react';
 import { MenuChrome } from '../menu/MenuChrome';
 import type { AppMenus } from '../menu/types';
+import type { RibbonTabExtras } from '../viewer/buildRibbonTabExtras';
 import type { DocumentTabInfo } from '../app/documentSessionTypes';
 import type { TabMenuApi } from './useTabContextMenu';
 import type { ShortcutBindings } from '../app/useShortcutBindingsState';
@@ -8,6 +8,7 @@ import type { WorkspaceViewMode } from '../app/types';
 
 type AppChromeProps = {
   menus: AppMenus;
+  ribbonExtras: RibbonTabExtras;
   showCommandPalette: boolean;
   showShortcutsHelp: boolean;
   showLicenses: boolean;
@@ -18,7 +19,6 @@ type AppChromeProps = {
   onCloseLicenses: () => void;
   onCloseCredits: () => void;
   onCloseAbout: () => void;
-  modeExtras: ReactNode;
   tabs: DocumentTabInfo[];
   activeTabId: string | null;
   onSelectTab: (id: string) => void;
@@ -31,6 +31,7 @@ type AppChromeProps = {
 
 export function AppChrome({
   menus,
+  ribbonExtras,
   showCommandPalette,
   showShortcutsHelp,
   showLicenses,
@@ -41,7 +42,6 @@ export function AppChrome({
   onCloseLicenses,
   onCloseCredits,
   onCloseAbout,
-  modeExtras,
   tabs,
   activeTabId,
   onSelectTab,
@@ -54,9 +54,8 @@ export function AppChrome({
   return (
     <div className="app-chrome">
       <MenuChrome
-        menus={menus.menus}
-        quickAccess={menus.quickAccess}
-        allActions={menus.allActions}
+        menus={menus}
+        ribbonExtras={ribbonExtras}
         showCommandPalette={showCommandPalette}
         showShortcutsHelp={showShortcutsHelp}
         showLicenses={showLicenses}
@@ -67,7 +66,6 @@ export function AppChrome({
         onCloseLicenses={onCloseLicenses}
         onCloseCredits={onCloseCredits}
         onCloseAbout={onCloseAbout}
-        modeExtras={modeExtras}
         tabs={tabs}
         activeTabId={activeTabId}
         onSelectTab={onSelectTab}

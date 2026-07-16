@@ -45,7 +45,7 @@ export type BuildAppShellRenderInputArgs = {
   pdfActions: AppPdfActions;
   windowTitle: string;
   appMenus: AppMenus;
-  modeExtras: BuildAppChromeSourceInput['modeExtras'];
+  ribbonExtras: BuildAppChromeSourceInput['ribbonExtras'];
   modalCtx: AppModalsRuntime;
   printPages: string[];
   activeSurface: AppSurface;
@@ -108,7 +108,7 @@ export function buildAppShellRenderInput(args: BuildAppShellRenderInputArgs) {
     chrome: buildAppShellChromeInput({
       menus: args.appMenus,
       help: buildHelpChromeInput(args.help),
-      modeExtras: args.modeExtras,
+      ribbonExtras: args.ribbonExtras,
       tabs: args.doc.tabs,
       activeTabId: args.doc.activeId,
       onSelectTab: args.onSelectTab,
@@ -164,6 +164,7 @@ export function buildAppShellRenderInput(args: BuildAppShellRenderInputArgs) {
         showFormsPanel: args.panels.showFormsPanel,
         showPdfUaPanel: args.panels.showPdfUaPanel,
         showHiddenLayers: args.panels.showHiddenLayers,
+        showSidebar: args.panels.showSidebar,
         formFields: args.panels.formFields,
         formDrafts: args.panels.formDrafts,
         setFormDrafts: args.panels.setFormDrafts,

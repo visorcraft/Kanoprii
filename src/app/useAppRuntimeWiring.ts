@@ -114,7 +114,7 @@ export function useAppRuntimeWiring(bootstrap: Bootstrap) {
     },
   });
 
-  const { appMenus, modeToolbarExtras } = useAppChromeBindings({
+  const { appMenus, ribbonExtras } = useAppChromeBindings({
     doc,
     modal,
     security,
@@ -335,7 +335,7 @@ export function useAppRuntimeWiring(bootstrap: Bootstrap) {
         pdfActions,
         windowTitle,
         appMenus,
-        modeToolbarExtras,
+        ribbonExtras,
         modalCtx,
         slices,
         viewerWorkflow,
@@ -362,7 +362,7 @@ export function useAppRuntimeWiring(bootstrap: Bootstrap) {
       pdfActions,
       windowTitle,
       appMenus,
-      modeToolbarExtras,
+      ribbonExtras,
       modalCtx,
       slices,
       viewerWorkflow,

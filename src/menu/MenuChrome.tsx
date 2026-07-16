@@ -9,20 +9,22 @@ import { AboutModal } from '../about/AboutModal';
 import { CreditsModal } from '../credits/CreditsModal';
 import { LicensesModal } from '../licenses/LicensesModal';
 import { TabBar } from '../chrome/TabBar';
+import { Ribbon } from '../chrome/Ribbon';
+import { buildRibbonTabs } from '../chrome/ribbonModel';
 import { useTabContextMenu, type TabMenuApi } from '../chrome/useTabContextMenu';
 import type { DocumentTabInfo } from '../app/documentSessionTypes';
-import type { FlatMenuAction, MenuAction, MenuRoot } from './types';
-import { MenuDropdownItem, runAction } from './MenuDropdownItem';
+import type { AppMenus, FlatMenuAction } from './types';
+import { runAction } from './MenuDropdownItem';
 import { buildKeyboardShortcuts } from './buildMenuShortcuts';
 import type { ShortcutBindings } from '../app/useShortcutBindingsState';
 import type { WorkspaceViewMode } from '../app/types';
 import { useEscapeClose } from '../legal/useEscapeClose';
 import { FocusTrap } from '../ui/FocusTrap';
+import type { RibbonTabExtras } from '../viewer/buildRibbonTabExtras';
 
 type MenuChromeProps = {
-  menus: MenuRoot[];
-  quickAccess: MenuAction[];
-  allActions: FlatMenuAction[];
+  menus: AppMenus;
+  ribbonExtras: RibbonTabExtras;
   showCommandPalette: boolean;
   showShortcutsHelp: boolean;
   showLicenses: boolean;
@@ -33,7 +35,6 @@ type MenuChromeProps = {
   onCloseLicenses: () => void;
   onCloseCredits: () => void;
   onCloseAbout: () => void;
-  modeExtras?: React.ReactNode;
   tabs: DocumentTabInfo[];
   activeTabId: string | null;
   onSelectTab: (id: string) => void;
@@ -43,108 +44,6 @@ type MenuChromeProps = {
   workspaceView: WorkspaceViewMode;
   shortcutBindings: ShortcutBindings;
 };
-
-function MenuBar({ menus }: { menus: MenuRoot[] }) {
-  const [openId, setOpenId] = useState<string | null>(null);
-  const barRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    document.body.classList.toggle('kanoprii-menu-open', openId !== null);
-    return () => document.body.classList.remove('kanoprii-menu-open');
-  }, [openId]);
-
-  useEffect(() => {
-    if (!openId) return;
-    const onPointerDown = (event: MouseEvent) => {
-      const target = event.target as Element;
-      if (!barRef.current?.contains(target) && !target.closest('.menu-dropdown-nested')) setOpenId(null);
-    };
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setOpenId(null);
-    };
-    window.addEventListener('mousedown', onPointerDown);
-    window.addEventListener('keydown', onKeyDown);
-    return () => {
-      window.removeEventListener('mousedown', onPointerDown);
-      window.removeEventListener('keydown', onKeyDown);
-    };
-  }, [openId]);
-
-  return (
-    <nav className="menu-bar" ref={barRef} aria-label="Application menu">
-      {menus.map((menu) => (
-        <div
-          key={menu.id}
-          className="menu-bar-entry"
-          onMouseEnter={() => {
-            if (openId !== null && openId !== menu.id && !menu.disabled) {
-              setOpenId(menu.id);
-            }
-          }}
-        >
-          <button
-            type="button"
-            className={`menu-bar-trigger${openId === menu.id ? ' open' : ''}`}
-            disabled={menu.disabled}
-            data-testid={`menu-${menu.id}`}
-            aria-haspopup="menu"
-            aria-expanded={openId === menu.id}
-            onMouseDown={(e) => e.preventDefault()}
-            onClick={() =>
-              setOpenId((prev) => (prev === menu.id ? null : menu.id))
-            }
-          >
-            {menu.label}
-          </button>
-          {openId === menu.id && !menu.disabled && (
-            <div className="menu-dropdown" role="menu">
-              {menu.items.map((entry, index) => (
-                <MenuDropdownItem
-                  key={`${menu.id}-${index}`}
-                  entry={entry}
-                  onClose={() => setOpenId(null)}
-                />
-              ))}
-            </div>
-          )}
-        </div>
-      ))}
-    </nav>
-  );
-}
-
-function QuickToolbar({ items }: { items: MenuAction[] }) {
-  if (items.length === 0) return null;
-  return (
-    <div className="quick-toolbar" role="toolbar" aria-label="Quick access">
-      {items.map((item) => (
-        <button
-          key={item.id}
-          type="button"
-          className={`btn${item.active ? ' btn-active' : ''}`}
-          disabled={item.disabled}
-          title={
-            item.shortcut ? `${item.label} (${item.shortcut})` : item.label
-          }
-          data-testid={
-            item.id === 'qa-save'
-              ? 'save-pdf'
-              : item.id === 'qa-rotate'
-                ? 'rotate-page'
-                : item.id === 'qa-undo'
-                  ? 'undo-btn'
-                  : item.id === 'qa-find'
-                    ? 'find-btn'
-                    : undefined
-          }
-          onClick={() => runAction(item)}
-        >
-          {item.label}
-        </button>
-      ))}
-    </div>
-  );
-}
 
 function CommandPalette({
   actions,
@@ -294,8 +193,7 @@ function ShortcutsModal({
 
 export function MenuChrome({
   menus,
-  quickAccess,
-  allActions,
+  ribbonExtras,
   showCommandPalette,
   showShortcutsHelp,
   showLicenses,
@@ -306,7 +204,6 @@ export function MenuChrome({
   onCloseLicenses,
   onCloseCredits,
   onCloseAbout,
-  modeExtras,
   tabs,
   activeTabId,
   onSelectTab,
@@ -318,10 +215,20 @@ export function MenuChrome({
 }: MenuChromeProps) {
   const { onTabContextMenu, overlay: tabMenuOverlay } = useTabContextMenu({ tabs, ...tabMenuApi });
   const showTabChrome = documentChromeVisible && workspaceView === 'tabs';
+  const ribbonTabs = useMemo(
+    () =>
+      buildRibbonTabs({
+        menus: menus.menus,
+        quickAccess: menus.quickAccess,
+        editTabContent: ribbonExtras.editTab,
+        annotateOptions: ribbonExtras.annotateOptions,
+      }),
+    [menus, ribbonExtras],
+  );
   return (
     <>
       <div className="menu-chrome">
-        <MenuBar menus={menus} />
+        <Ribbon tabs={ribbonTabs} />
         {showTabChrome && (
           <>
             <TabBar
@@ -332,17 +239,11 @@ export function MenuChrome({
               onTabContextMenu={onTabContextMenu}
             />
             {tabMenuOverlay}
-            {(quickAccess.length > 0 || modeExtras) && (
-              <div className="quick-toolbar-row">
-                <QuickToolbar items={quickAccess} />
-                {modeExtras}
-              </div>
-            )}
           </>
         )}
       </div>
       {showCommandPalette && (
-        <CommandPalette actions={allActions} onClose={onCloseCommandPalette} />
+        <CommandPalette actions={menus.allActions} onClose={onCloseCommandPalette} />
       )}
       {showShortcutsHelp && (
         <ShortcutsModal

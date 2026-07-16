@@ -20,6 +20,7 @@ type PageControlsProps = ComponentProps<typeof PageControls>;
 type BuildViewerContextInput = {
   filePath: string;
   sidebar: SidebarProps;
+  sidebarVisible: boolean;
   viewer: Omit<ViewerMainProps, 'filePath'> & { pdfPage: PdfPageProps };
   workspaceView: WorkspaceViewMode;
   birdsEye: BirdsEyeWorkspace;
@@ -54,6 +55,7 @@ export type BuildAppViewerSourceInput = {
   showFormsPanel: SidebarProps['showFormsPanel'];
   showPdfUaPanel: SidebarProps['showPdfUaPanel'];
   showHiddenLayers: boolean;
+  showSidebar: boolean;
   formFields: SidebarProps['formFields'];
   formDrafts: SidebarProps['formDrafts'];
   setFormDrafts: Dispatch<SetStateAction<Record<string, string>>>;
@@ -279,6 +281,7 @@ export function buildAppViewerSource(
   return {
     filePath: input.filePath,
     sidebar,
+    sidebarVisible: input.showSidebar,
     viewer,
     workspaceView: input.workspaceView,
     birdsEye: input.birdsEye,
