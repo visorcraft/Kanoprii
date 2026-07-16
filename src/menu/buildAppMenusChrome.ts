@@ -25,6 +25,9 @@ export function buildViewMenu(ctx: AppMenuContext): MenuRoot {
       ctx.toggleContinuousScroll,
       { active: ctx.scrollViewMode === 'continuous', disabled: ctx.workspaceView !== 'tabs' || ctx.viewMode !== 'pdf' },
     ),
+    act('thumbnails', ctx.showSidebar ? 'Thumbnails (on)' : 'Thumbnails', ctx.toggleSidebar, {
+      active: ctx.showSidebar,
+    }),
     act('bookmarks', ctx.showBookmarksPanel ? 'Bookmarks panel (on)' : 'Bookmarks panel', ctx.toggleBookmarksPanel, {
       active: ctx.showBookmarksPanel,
     }),

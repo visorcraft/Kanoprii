@@ -32,7 +32,9 @@ export function menuContextDocAnnotFields(source: AppMenuContextSource): Pick<
   | 'showPdfUaPanel'
   | 'togglePdfUaPanel'
   | 'showHiddenLayers'
+  | 'showSidebar'
   | 'toggleShowHiddenLayers'
+  | 'toggleSidebar'
   | 'tesseractInstalled'
   | 'openPdf'
   | 'quitApp'
@@ -135,7 +137,9 @@ export function menuContextDocAnnotFields(source: AppMenuContextSource): Pick<
     showPdfUaPanel: source.showPdfUaPanel,
     togglePdfUaPanel: source.togglePdfUaPanel,
     showHiddenLayers: source.showHiddenLayers,
+    showSidebar: source.showSidebar,
     toggleShowHiddenLayers: source.toggleShowHiddenLayers,
+    toggleSidebar: source.toggleSidebar,
     tesseractInstalled: source.tesseractInstalled,
     openPdf: source.openPdf,
     quitApp: source.quitApp,

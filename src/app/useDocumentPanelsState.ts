@@ -11,6 +11,7 @@ export function useDocumentPanelsState() {
   const [showFormsPanel, setShowFormsPanel] = useState(false);
   const [showPdfUaPanel, setShowPdfUaPanel] = useState(false);
   const [showHiddenLayers, setShowHiddenLayers] = useState(false);
+  const [showSidebar, setShowSidebar] = useState(true);
   const [formFields, setFormFields] = useState<FormFieldData[]>([]);
   const [formDrafts, setFormDrafts] = useState<Record<string, string>>({});
 
@@ -24,6 +25,7 @@ export function useDocumentPanelsState() {
     showFormsPanel, setShowFormsPanel,
     showPdfUaPanel, setShowPdfUaPanel,
     showHiddenLayers, setShowHiddenLayers,
+    showSidebar, setShowSidebar,
     formFields, setFormFields,
     formDrafts, setFormDrafts,
   };

@@ -60,6 +60,8 @@ export interface AppMenuContext {
   showSignaturesPanel: boolean;
   showPdfUaPanel: boolean;
   togglePdfUaPanel: () => void;
+  showSidebar: boolean;
+  toggleSidebar: () => void;
   showHiddenLayers: boolean;
   toggleShowHiddenLayers: () => void;
   tesseractInstalled: boolean;
@@ -259,6 +261,8 @@ export type AppMenuContextSource = {
   showSignaturesPanel: boolean;
   showPdfUaPanel: boolean;
   togglePdfUaPanel: () => void;
+  showSidebar: boolean;
+  toggleSidebar: () => void;
   showHiddenLayers: boolean;
   toggleShowHiddenLayers: () => void;
   tesseractInstalled: boolean;

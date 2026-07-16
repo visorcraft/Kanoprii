@@ -18,6 +18,7 @@ export type BuildAppMenuSourceInput = Omit<
   | 'toggleBookmarksPanel'
   | 'toggleAnnotationsPanel'
   | 'togglePdfUaPanel'
+  | 'toggleSidebar'
   | 'toggleShowHiddenLayers'
   | 'toggleContinuousScroll'
   | 'openPageEditsModal'
@@ -46,6 +47,7 @@ export type BuildAppMenuSourceInput = Omit<
   setShowBookmarksPanel: (fn: (prev: boolean) => boolean) => void;
   setShowAnnotationsPanel: (fn: (prev: boolean) => boolean) => void;
   setShowPdfUaPanel: (fn: (prev: boolean) => boolean) => void;
+  setShowSidebar: (fn: (prev: boolean) => boolean) => void;
   setShowHiddenLayers: (fn: (prev: boolean) => boolean) => void;
   setShowPageEditsModal: (open: boolean) => void;
   setShowShortcutsHelp: (open: boolean) => void;
@@ -73,6 +75,7 @@ export function buildAppMenuSource(input: BuildAppMenuSourceInput): AppMenuConte
     setShowBookmarksPanel,
     setShowAnnotationsPanel,
     setShowPdfUaPanel,
+    setShowSidebar,
     setShowHiddenLayers,
     setShowPageEditsModal,
     setShowShortcutsHelp,
@@ -107,6 +110,7 @@ export function buildAppMenuSource(input: BuildAppMenuSourceInput): AppMenuConte
     toggleBookmarksPanel: () => setShowBookmarksPanel((prev) => !prev),
     toggleAnnotationsPanel: () => setShowAnnotationsPanel((prev) => !prev),
     togglePdfUaPanel: () => setShowPdfUaPanel((prev) => !prev),
+    toggleSidebar: () => setShowSidebar((prev) => !prev),
     toggleShowHiddenLayers: () => setShowHiddenLayers((prev) => !prev),
     openPageEditsModal: () => setShowPageEditsModal(true),
     openShortcutsHelp: () => setShowShortcutsHelp(true),
