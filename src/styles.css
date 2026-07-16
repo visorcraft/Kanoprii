@@ -1185,12 +1185,6 @@ body {
   stroke-linejoin: round;
 }
 
-.pdf-edit-tool-group-label {
-  padding-top: 2px;
-  color: var(--pp-text-muted);
-  text-align: center;
-}
-
 .pdf-edit-context {
   display: flex;
   flex-wrap: wrap;

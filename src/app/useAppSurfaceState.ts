@@ -29,7 +29,7 @@ export function useAppSurfaceState(): SurfaceState {
       target.focus();
     } else {
       document
-        .querySelector<HTMLElement>('.menu-bar .menu-bar-trigger')
+        .querySelector<HTMLElement>('.ribbon-tabs .ribbon-tab')
         ?.focus();
     }
   }, []);
