@@ -10,7 +10,6 @@ type TextEditTarget = {
 
 type TextEditOverlayProps = {
   target: TextEditTarget;
-  zoom: number;
   draft: string;
   onDraftChange: (value: string) => void;
   onApply: () => void;
@@ -19,7 +18,6 @@ type TextEditOverlayProps = {
 
 export function TextEditOverlay({
   target,
-  zoom,
   draft,
   onDraftChange,
   onApply,
@@ -45,8 +43,6 @@ export function TextEditOverlay({
         width: Math.max(target.w, 120),
         height: Math.max(target.h, 24),
         fontSize: target.h * 0.85,
-        transform: `scale(${zoom})`,
-        transformOrigin: 'top left',
       }}
       onChange={(e) => onDraftChange(e.target.value)}
       onKeyDown={(e) => {

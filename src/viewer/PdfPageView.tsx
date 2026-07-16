@@ -173,7 +173,6 @@ function PdfPageViewInner({
               onCancelTextEdit && (
                 <TextEditOverlay
                   target={textEditActiveLine ?? textEditActiveRun!}
-                  zoom={zoom}
                   draft={textEditDraft}
                   onDraftChange={onTextEditDraftChange}
                   onApply={onApplyTextEdit}
