@@ -81,23 +81,33 @@ export function buildHelpMenu(ctx: AppMenuContext): MenuRoot {
 }
 
 export function buildQuickAccessActions(ctx: AppMenuContext): MenuAction[] {
-  return ctx.hasPdf
-    ? [
-        act('qa-save', ctx.isDirty ? 'Save •' : 'Save', ctx.handleSave, {
-          shortcutCommandId: 'save',
-          disabled: !ctx.isDirty,
-        }),
-        act('qa-undo', 'Undo', ctx.undo, { shortcutCommandId: 'undo', disabled: !ctx.canUndo }),
-        act('qa-redo', 'Redo', ctx.redo, { shortcutCommandId: 'redo', disabled: !ctx.canRedo }),
-        act('qa-find', 'Find', ctx.openSearchModal, { shortcutCommandId: 'find' }),
-        act('qa-highlight', 'Highlight', ctx.toggleHighlightMode, {
-          shortcutCommandId: 'toggle-highlight',
-          active: ctx.highlightMode,
-        }),
-        act('qa-note', 'Note', ctx.toggleNoteMode, { shortcutCommandId: 'toggle-note', active: ctx.noteMode }),
-        act('qa-draw', 'Draw', ctx.toggleDrawMode, { shortcutCommandId: 'toggle-draw', active: ctx.drawMode }),
-        act('qa-rotate', 'Rotate', ctx.openRotateModal, { shortcutCommandId: 'rotate-page' }),
-        act('qa-dup', 'Duplicate', ctx.handleDuplicatePage, { shortcutCommandId: 'duplicate-page' }),
-      ]
-    : [];
+  const off = !ctx.hasPdf;
+  const noToolActive =
+    !ctx.highlightMode && !ctx.noteMode && !ctx.drawMode && !ctx.shapeMode &&
+    !ctx.stampMode && !ctx.redactMode && !ctx.imageInsertMode &&
+    !ctx.textEditMode && !ctx.editTextRunMode && !ctx.vectorEditMode && !ctx.editMode;
+  return [
+    act('qa-save', ctx.isDirty ? 'Save •' : 'Save', ctx.handleSave, {
+      shortcutCommandId: 'save',
+      disabled: off || !ctx.isDirty,
+    }),
+    act('qa-undo', 'Undo', ctx.undo, { shortcutCommandId: 'undo', disabled: off || !ctx.canUndo }),
+    act('qa-redo', 'Redo', ctx.redo, { shortcutCommandId: 'redo', disabled: off || !ctx.canRedo }),
+    act('qa-select', 'Select', () => {
+      if (ctx.highlightMode) ctx.toggleHighlightMode();
+      if (ctx.noteMode) ctx.toggleNoteMode();
+      if (ctx.drawMode) ctx.toggleDrawMode();
+      if (ctx.shapeMode) ctx.toggleShapeMode();
+      if (ctx.stampMode) ctx.toggleStampMode();
+      if (ctx.redactMode) ctx.toggleRedactMode();
+      if (ctx.imageInsertMode) ctx.toggleImageInsertMode();
+      if (ctx.textEditMode) ctx.toggleTextEditMode();
+      if (ctx.editTextRunMode) ctx.toggleEditTextRunMode();
+      if (ctx.vectorEditMode) ctx.toggleVectorEditMode();
+      if (ctx.editMode) ctx.toggleEditMode();
+    }, { disabled: off, active: ctx.hasPdf && noToolActive }),
+    act('qa-find', 'Find', ctx.openSearchModal, { shortcutCommandId: 'find', disabled: off }),
+    act('qa-rotate', 'Rotate', ctx.openRotateModal, { shortcutCommandId: 'rotate-page', disabled: off }),
+    act('qa-dup', 'Duplicate', ctx.handleDuplicatePage, { shortcutCommandId: 'duplicate-page', disabled: off }),
+  ];
 }
