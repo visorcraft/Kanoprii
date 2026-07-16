@@ -105,10 +105,11 @@ describe('PDF Edit Mode', () => {
         scrollHeight: input.scrollHeight,
         clientHeight: input.clientHeight,
         color: getComputedStyle(input).color,
+        scale: Number(getComputedStyle(document.querySelector('.page-overlay-scale')!).transform.match(/^matrix\(([^,]+)/)?.[1] ?? 1),
         stampToolbar: Boolean(document.querySelector('.stamp-toolbar')),
       };
     });
-    expect(layout.width).toBeGreaterThanOrEqual(300);
+    expect(layout.width / layout.scale).toBeGreaterThanOrEqual(300);
     expect(layout.height).toBeGreaterThan(44);
     expect(layout.scrollHeight).toBeLessThanOrEqual(layout.clientHeight + 1);
     expect(layout.color).not.toBe('rgba(0, 0, 0, 0)');
@@ -355,6 +356,32 @@ describe('PDF Edit Mode', () => {
       async () => !(await $('.rich-text-edit-textarea').isDisplayed().catch(() => false)),
       { timeout: 15_000, timeoutMsg: 'expected rich-text edit overlay to disappear after apply' },
     );
+
+    const undo = await $('[data-testid="undo-btn"]');
+    await undo.waitForEnabled({ timeout: 10_000 });
+    await browser.keys(['\uE009', 'z']);
+    await browser.waitUntil(() => undo.isEnabled().then((enabled) => !enabled), {
+      timeout: 15_000,
+      timeoutMsg: 'expected Ctrl+Z to work while Edit Objects mode remains active',
+    });
+  });
+
+  it('closes an unchanged Edit Text field without creating an edit', async () => {
+    await openPdfViaPathModal(fixturePdf);
+    await waitForPdfOpen();
+    await waitForPageRendered();
+
+    await $('button=Edit Text').click();
+    const { cx, cy } = await getCenterOfTextSpan('Hello');
+    await browser.action('pointer').move({ x: cx, y: cy }).down({ button: 0 }).up({ button: 0 }).perform();
+    await $('.text-edit-overlay-input').waitForDisplayed({ timeout: 10_000 });
+
+    await browser.execute(() => (document.querySelector('.text-edit-overlay-input') as HTMLInputElement).blur());
+    await browser.waitUntil(
+      async () => !(await $('.text-edit-overlay-input').isDisplayed().catch(() => false)),
+      { timeout: 5_000, timeoutMsg: 'expected unchanged Edit Text field to close' },
+    );
+    await expect($('[data-testid="undo-btn"]')).toBeDisabled();
   });
 
   it('enters edit mode, deletes an existing text line, and the overlay disappears', async () => {

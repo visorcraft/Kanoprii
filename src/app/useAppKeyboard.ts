@@ -69,8 +69,6 @@ export function useAppKeyboard(
 
       if (isTextInput(e.target) && !isShortcutCapture(e.target)) return;
       if (isTextInput(document.activeElement) && !isShortcutCapture(document.activeElement)) return;
-      if (a.editMode || a.textEditMode || a.editTextRunMode) return;
-
       const shortcut = eventToShortcut(e);
       if (!shortcut) return;
 

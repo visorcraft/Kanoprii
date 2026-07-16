@@ -119,6 +119,10 @@ export function useTextEditRun(opts: UseTextEditRunOptions) {
     }
     const text = draft.trim();
     const target = activeTarget;
+    if (text === target.data.text.trim()) {
+      cancelEdit();
+      return;
+    }
     cancelEdit();
 
     if (target.kind === 'line') {
