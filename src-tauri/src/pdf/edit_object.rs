@@ -1,9 +1,10 @@
 use crate::pdf::content::append_page_content;
-use crate::pdf::coords::{finite_f64, viewer_rect_to_pdf};
+use crate::pdf::coords::{finite_f64, page_media_box, viewer_point_to_pdf_with_rotation};
 use crate::pdf::edit_types::{PdfRect, TextStyle};
 use crate::pdf::fonts::{ensure_font_family, measure_text_width, style_supports_text, uses_synthetic_font_style};
 use crate::pdf::page_images::page_resources;
 use crate::pdf::page_text::escape_pdf_literal_string;
+use crate::pdf::rotation::page_rotation;
 use crate::pdf::text_lines::decode_page_text_lines;
 use crate::pdf::text_replace::replace_text_line_styled;
 use lopdf::{Document, Object};
@@ -79,6 +80,47 @@ fn wrap_text_to_width(text: &str, font_family: &str, font_size: f64, max_width: 
     lines
 }
 
+/// Build the content-stream wrapper that establishes a local (y-up) frame
+/// aligned with a viewer-space `rect` on a possibly-rotated page.
+///
+/// Returns `(open_ops, close_ops, local_w, local_h)` where `open_ops` is
+/// `q a b c d e f cm\n`, `close_ops` is `Q\n`, and `local_w`/`local_h` are the
+/// box extents in local page units. Operators emitted between them use local
+/// coordinates whose origin is the box's bottom-left and whose axes run along
+/// the viewer-box edges, so text laid out horizontally in local space renders
+/// upright and correctly wrapped once PDFium applies `/Rotate`.
+///
+/// For an upright page the `cm` is the identity (`1 0 0 1 e f`), so the laid
+/// out coordinates are page coordinates and existing behaviour is unchanged.
+fn viewer_text_frame(
+    doc: &Document,
+    page_id: lopdf::ObjectId,
+    rect: &PdfRect,
+) -> Result<(String, String, f64, f64), String> {
+    let media = page_media_box(doc, page_id)?;
+    let mw = (media[2] - media[0]).max(1.0);
+    let mh = (media[3] - media[1]).max(1.0);
+    let rot = page_rotation(doc, page_id);
+    let (vx, vy, w, h) = (rect.x, rect.y, rect.width, rect.height);
+    if w <= 0.0 || h <= 0.0 {
+        return Err("Text box must have positive width and height".to_string());
+    }
+    // Page-space positions of the viewer box's bottom-left, bottom-right, and
+    // top-left corners. From these three points we recover the local frame's
+    // origin and its +x (viewer-right) / +y (viewer-up) axis directions.
+    let (blx, bly) = viewer_point_to_pdf_with_rotation(mw, mh, vx, vy + h, rot);
+    let (brx, bry) = viewer_point_to_pdf_with_rotation(mw, mh, vx + w, vy + h, rot);
+    let (tlx, tly) = viewer_point_to_pdf_with_rotation(mw, mh, vx, vy, rot);
+    let lw = (brx - blx).hypot(bry - bly).max(1.0);
+    let lh = (tlx - blx).hypot(tly - bly).max(1.0);
+    let sanitize = |v: f64| if v.abs() < 1e-12 { 0.0 } else { v };
+    let a = sanitize((brx - blx) / lw);
+    let b = sanitize((bry - bly) / lw);
+    let c = sanitize((tlx - blx) / lh);
+    let d = sanitize((tly - bly) / lh);
+    Ok((format!("q {a} {b} {c} {d} {blx} {bly} cm\n"), "Q\n".to_string(), lw, lh))
+}
+
 /// Add a new text box to a PDF page.
 ///
 /// The caller is responsible for loading/saving the document; this helper is
@@ -104,8 +146,14 @@ pub fn add_text_box(
     let page_id = *doc.get_pages().get(&(page_index + 1)).ok_or_else(|| "Page not found".to_string())?;
     let font_name = ensure_font_family(doc, style, page_id)?;
 
-    let (px, py, pw, ph) = viewer_rect_to_pdf(doc, page_id, box_rect.x, box_rect.y, box_rect.width, box_rect.height)?;
-    let ops = render_wrapped_text_box(trimmed, style, &font_name, px, py, pw, ph)?;
+    // Lay the text out in a local frame aligned with the viewer box so it
+    // renders upright and correctly wrapped on rotated pages. The frame is an
+    // identity cm on upright pages, leaving the laid-out coords unchanged.
+    let (open, close, lw, lh) = viewer_text_frame(doc, page_id, box_rect)?;
+    let body = render_wrapped_text_box(trimmed, style, &font_name, 0.0, 0.0, lw, lh)?;
+    let mut ops = open;
+    ops.push_str(&body);
+    ops.push_str(&close);
     append_page_content(doc, page_id, ops.as_bytes())?;
     Ok(())
 }
@@ -222,8 +270,11 @@ pub fn edit_paragraph(
 
     whiteout_paragraph_lines(doc, page_id, &lines, &sorted_indices)?;
 
-    let (px, py, pw, ph) = viewer_rect_to_pdf(doc, page_id, box_rect.x, box_rect.y, box_rect.width, box_rect.height)?;
-    let ops = render_wrapped_text_box(trimmed, style, &font_name, px, py, pw, ph)?;
+    let (open, close, lw, lh) = viewer_text_frame(doc, page_id, box_rect)?;
+    let body = render_wrapped_text_box(trimmed, style, &font_name, 0.0, 0.0, lw, lh)?;
+    let mut ops = open;
+    ops.push_str(&body);
+    ops.push_str(&close);
     append_page_content(doc, page_id, ops.as_bytes())?;
     Ok(())
 }
@@ -284,8 +335,11 @@ pub fn delete_text_line(doc: &mut Document, page_index: u32, line_index: usize) 
 
 fn whiteout_viewer_rect(doc: &mut Document, page_id: lopdf::ObjectId, rect: &PdfRect) -> Result<(), String> {
     validate_rect_finite(rect, "source rect")?;
-    let (x, y, width, height) = viewer_rect_to_pdf(doc, page_id, rect.x, rect.y, rect.width, rect.height)?;
-    append_page_content(doc, page_id, format!("q 1 1 1 rg {x} {y} {width} {height} re f Q\n").as_bytes())
+    // Fill the box's local frame with white so the whiteout tracks the page
+    // rotation the same way the replacement text does.
+    let (open, close, lw, lh) = viewer_text_frame(doc, page_id, rect)?;
+    let ops = format!("{open}1 1 1 rg 0 0 {lw} {lh} re f\n{close}");
+    append_page_content(doc, page_id, ops.as_bytes())
 }
 
 /// Replace text located by PDFium when the content-stream decoder cannot address a line.
@@ -704,14 +758,14 @@ mod tests {
         let content = String::from_utf8_lossy(&crate::pdf::page_text::read_page_content(&edited, edited_page).unwrap())
             .into_owned();
         assert!(content.contains("(Replacement)"));
-        assert!(content.contains("re f Q"));
+        assert!(content.contains("re f"));
 
         let (mut deleted, deleted_page) = build_doc_with_text("BT /F1 12 Tf 1 0 0 1 100 700 Tm (Hidden) Tj ET");
         delete_text_region(&mut deleted, 0, &source).unwrap();
         let content =
             String::from_utf8_lossy(&crate::pdf::page_text::read_page_content(&deleted, deleted_page).unwrap())
                 .into_owned();
-        assert!(content.contains("re f Q"));
+        assert!(content.contains("re f"));
     }
 
     #[test]

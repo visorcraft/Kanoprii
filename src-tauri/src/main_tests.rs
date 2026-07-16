@@ -19757,6 +19757,32 @@ fn add_text_box_wraps_text_and_appends_to_page() {
     std::fs::remove_file(&path).ok();
 }
 
+#[test]
+fn add_text_box_on_rotated_page_wraps_in_rotation_frame() {
+    use pdf::rotation::set_page_rotation;
+
+    let path = save(&mut build_pdf(1), "add_text_box_rotated");
+    let mut doc = Document::load(&path).unwrap();
+    let page_id = *doc.get_pages().get(&1).unwrap();
+    set_page_rotation(&mut doc, page_id, 90).unwrap();
+
+    add_text_box(
+        &mut doc,
+        0,
+        "Rotated",
+        &text_box_style(),
+        &PdfRect { x: 100.0, y: 100.0, width: 200.0, height: 60.0 },
+    )
+    .unwrap();
+
+    let content = String::from_utf8_lossy(&read_page_content(&doc, page_id).unwrap()).into_owned();
+    // The rotation frame must carry the 90deg rotation matrix, not an identity cm.
+    assert!(content.contains("0 1 -1 0"), "expected a 90deg cm frame: {content}");
+    assert!(content.contains("(Rotated)"), "replacement text missing: {content}");
+
+    std::fs::remove_file(&path).ok();
+}
+
 fn text_box_style() -> TextStyle {
     TextStyle {
         font_family: "Helvetica".to_string(),
