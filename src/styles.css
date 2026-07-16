@@ -4099,6 +4099,7 @@ select.modal-input {
 .ribbon-dropdown-wrap .ribbon-dropdown {
   top: 100%;
   left: 0;
+  border-radius: 6px;
 }
 
 .ribbon-extras {

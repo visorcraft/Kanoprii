@@ -141,6 +141,7 @@ export function Ribbon({ tabs }: { tabs: RibbonTabDef[] }) {
     const index = focusables.indexOf(document.activeElement as HTMLElement);
     if (index === -1) return;
     const delta = event.key === 'ArrowLeft' || event.key === 'ArrowUp' ? -1 : 1;
+    event.stopPropagation();
     event.preventDefault();
     focusables[(index + delta + focusables.length) % focusables.length].focus();
   };
@@ -170,6 +171,8 @@ export function Ribbon({ tabs }: { tabs: RibbonTabDef[] }) {
               key={tab.id}
               type="button"
               role="tab"
+              id={`ribbon-tab-${tab.id}`}
+              aria-controls="ribbon-panel"
               aria-selected={activeTab === tab.id && !collapsed}
               className={`ribbon-tab${activeTab === tab.id && !collapsed ? ' active' : ''}`}
               disabled={tab.disabled}
@@ -194,7 +197,13 @@ export function Ribbon({ tabs }: { tabs: RibbonTabDef[] }) {
         </button>
       </div>
       {!collapsed && active && (
-        <div className="ribbon-body" role="tabpanel" onKeyDown={onBodyKeyDown}>
+        <div
+          className="ribbon-body"
+          role="tabpanel"
+          id="ribbon-panel"
+          aria-labelledby={active ? `ribbon-tab-${active.id}` : undefined}
+          onKeyDown={onBodyKeyDown}
+        >
           {active.groups.filter((group) => group.controls.length > 0).map((group) => (
             <RibbonGroupView
               key={group.id}
