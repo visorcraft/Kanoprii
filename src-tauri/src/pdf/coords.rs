@@ -84,3 +84,22 @@ pub fn viewer_rect_to_pdf(
     let py = mh - (y * mh / VIEWER_PAGE_H) - ph;
     Ok((px, py, pw, ph))
 }
+
+/// Map a viewer-space point (top-left origin, 800x1132) to a PDF user-space
+/// point (bottom-left origin), honouring `/Rotate` (clockwise 0/90/180/270).
+/// `mw`/`mh` are the unrotated MediaBox dimensions. Rotation 0 and any
+/// non-canonical value reproduce the legacy mapping, so upright pages are
+/// bit-for-bit unchanged.
+///
+/// The viewer bitmap is the page rendered with `/Rotate` applied, so on a
+/// 90/270 page the viewer axes map to the swapped MediaBox axes. Only the
+/// location is rotated; callers still draw glyphs in page space, so text
+/// continues to rotate with the page as before.
+pub fn viewer_point_to_pdf_with_rotation(mw: f64, mh: f64, vx: f64, vy: f64, rotation: i64) -> (f64, f64) {
+    match rotation.rem_euclid(360) {
+        90 => (vy * mw / VIEWER_PAGE_H, vx * mh / VIEWER_PAGE_W),
+        180 => (mw - vx * mw / VIEWER_PAGE_W, vy * mh / VIEWER_PAGE_H),
+        270 => (mw - vy * mw / VIEWER_PAGE_H, mh - vx * mh / VIEWER_PAGE_W),
+        _ => (vx * mw / VIEWER_PAGE_W, mh - vy * mh / VIEWER_PAGE_H),
+    }
+}

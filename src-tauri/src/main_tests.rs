@@ -568,6 +568,63 @@ fn pdf_rect_to_viewer_px_maps_origin_and_scale() {
 }
 
 #[test]
+fn viewer_point_to_pdf_rotation_maps_corners() {
+    use pdf::coords::{viewer_point_to_pdf_with_rotation, VIEWER_PAGE_H, VIEWER_PAGE_W};
+
+    // A4 portrait, unrotated MediaBox 595 x 842.
+    let (mw, mh) = (595.0_f64, 842.0_f64);
+    let (w, h) = (VIEWER_PAGE_W, VIEWER_PAGE_H);
+    let close = |a: f64, b: f64, label: &str| {
+        assert!((a - b).abs() < 1e-6, "{label}: got {a}, want {b}");
+    };
+
+    // R=0 reproduces the legacy mapping: viewer top-left -> page top-left.
+    let (px, py) = viewer_point_to_pdf_with_rotation(mw, mh, 0.0, 0.0, 0);
+    close(px, 0.0, "r0 top-left x");
+    close(py, mh, "r0 top-left y");
+    let (px, py) = viewer_point_to_pdf_with_rotation(mw, mh, w, h, 0);
+    close(px, mw, "r0 bottom-right x");
+    close(py, 0.0, "r0 bottom-right y");
+    let (px, py) = viewer_point_to_pdf_with_rotation(mw, mh, w / 2.0, h / 2.0, 0);
+    close(px, mw / 2.0, "r0 center x");
+    close(py, mh / 2.0, "r0 center y");
+
+    // R=90 clockwise: viewer top-left -> page bottom-left.
+    let (px, py) = viewer_point_to_pdf_with_rotation(mw, mh, 0.0, 0.0, 90);
+    close(px, 0.0, "r90 top-left x");
+    close(py, 0.0, "r90 top-left y");
+    let (px, py) = viewer_point_to_pdf_with_rotation(mw, mh, w, h, 90);
+    close(px, mw, "r90 bottom-right x");
+    close(py, mh, "r90 bottom-right y");
+    // Viewer center maps to page center.
+    let (px, py) = viewer_point_to_pdf_with_rotation(mw, mh, w / 2.0, h / 2.0, 90);
+    close(px, mw / 2.0, "r90 center x");
+    close(py, mh / 2.0, "r90 center y");
+
+    // R=180: viewer top-left -> page bottom-right.
+    let (px, py) = viewer_point_to_pdf_with_rotation(mw, mh, 0.0, 0.0, 180);
+    close(px, mw, "r180 top-left x");
+    close(py, 0.0, "r180 top-left y");
+    let (px, py) = viewer_point_to_pdf_with_rotation(mw, mh, w, h, 180);
+    close(px, 0.0, "r180 bottom-right x");
+    close(py, mh, "r180 bottom-right y");
+
+    // R=270: viewer top-left -> page top-right.
+    let (px, py) = viewer_point_to_pdf_with_rotation(mw, mh, 0.0, 0.0, 270);
+    close(px, mw, "r270 top-left x");
+    close(py, mh, "r270 top-left y");
+    let (px, py) = viewer_point_to_pdf_with_rotation(mw, mh, w, h, 270);
+    close(px, 0.0, "r270 bottom-right x");
+    close(py, 0.0, "r270 bottom-right y");
+
+    // Non-canonical rotations fall back to the R=0 mapping.
+    let (px0, py0) = viewer_point_to_pdf_with_rotation(mw, mh, 123.0, 456.0, 0);
+    let (pxn, pyn) = viewer_point_to_pdf_with_rotation(mw, mh, 123.0, 456.0, 45);
+    close(pxn, px0, "non-canonical x");
+    close(pyn, py0, "non-canonical y");
+}
+
+#[test]
 fn search_pdf_text_rejects_empty_query() {
     let path = save(&mut build_pdf(1), "search_empty_query");
     let err = search_pdf_text(path.clone(), "   ".to_string(), false, false).unwrap_err();

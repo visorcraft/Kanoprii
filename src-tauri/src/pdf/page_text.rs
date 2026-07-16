@@ -1,4 +1,4 @@
-use super::coords::{page_media_box, viewer_rect_to_pdf, VIEWER_PAGE_H, VIEWER_PAGE_W};
+use super::coords::{page_media_box, viewer_rect_to_pdf};
 use crate::pdf::content::append_page_content;
 use lopdf::{Dictionary, Document, Object, ObjectId, Stream};
 use serde::Serialize;
@@ -79,9 +79,8 @@ pub fn viewer_point_to_pdf(doc: &Document, page_id: ObjectId, x: f64, y: f64) ->
     if mw <= 0.0 || mh <= 0.0 {
         return Err("Invalid page size".to_string());
     }
-    let px = x * mw / VIEWER_PAGE_W;
-    let py = mh - y * mh / VIEWER_PAGE_H;
-    Ok((px, py))
+    let rotation = crate::pdf::rotation::page_rotation(doc, page_id);
+    Ok(crate::pdf::coords::viewer_point_to_pdf_with_rotation(mw, mh, x, y, rotation))
 }
 
 pub fn escape_pdf_literal_string(text: &str) -> String {
