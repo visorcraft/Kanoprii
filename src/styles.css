@@ -1169,7 +1169,7 @@ body {
 }
 
 .pdf-edit-tool.active {
-  color: var(--pp-accent);
+  color: var(--pp-text);
   border-color: color-mix(in srgb, var(--pp-accent), var(--pp-border) 45%);
   background: color-mix(in srgb, var(--pp-accent), var(--pp-surface) 86%);
   box-shadow: inset 0 -2px 0 var(--pp-accent);
@@ -3794,6 +3794,12 @@ select.modal-input {
   min-height: 30px;
 }
 
+.ribbon-tablist {
+  display: flex;
+  align-items: stretch;
+  gap: 2px;
+}
+
 .ribbon-tab {
   height: 100%;
   padding: 5px 12px;
@@ -3813,7 +3819,7 @@ select.modal-input {
 
 .ribbon-tab.active {
   background: var(--pp-menu-bg);
-  color: var(--pp-accent);
+  color: var(--pp-text);
   box-shadow: inset 0 -2px 0 var(--pp-accent);
 }
 
@@ -3824,7 +3830,7 @@ select.modal-input {
 
 .ribbon-tab-menu.open {
   background: var(--pp-menu-bg);
-  color: var(--pp-accent);
+  color: var(--pp-text);
 }
 
 .ribbon-tabs-spacer {
@@ -3926,7 +3932,7 @@ select.modal-input {
 
 .ribbon-btn.active,
 .ribbon-btn.open {
-  color: var(--pp-accent);
+  color: var(--pp-text);
   border-color: color-mix(in srgb, var(--pp-accent), var(--pp-border) 45%);
   background: color-mix(in srgb, var(--pp-accent), var(--pp-menu-bg) 86%);
   box-shadow: inset 0 -2px 0 var(--pp-accent);

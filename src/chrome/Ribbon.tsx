@@ -150,23 +150,38 @@ export function Ribbon({ tabs }: { tabs: RibbonTabDef[] }) {
     | Extract<RibbonTabDef, { kind: 'tab' }>
     | undefined;
 
+  /**
+   * Partition so the tablist contains only role="tab" buttons
+   * (aria-required-children): leading menu tabs, body tabs, trailing menu tabs.
+   */
+  type MenuTab = Extract<RibbonTabDef, { kind: 'menu' }>;
+  type BodyTab = Extract<RibbonTabDef, { kind: 'tab' }>;
+  const firstTabIndex = tabs.findIndex((t) => t.kind === 'tab');
+  const splitAt = firstTabIndex === -1 ? tabs.length : firstTabIndex;
+  const leadingMenus = tabs.slice(0, splitAt).filter((t): t is MenuTab => t.kind === 'menu');
+  const bodyTabs = tabs.filter((t): t is BodyTab => t.kind === 'tab');
+  const trailingMenus = tabs.slice(splitAt).filter((t): t is MenuTab => t.kind === 'menu');
+
+  const renderMenuTab = (tab: MenuTab) => (
+    <RibbonDropdown
+      key={tab.id}
+      variant="tab"
+      id={tab.id}
+      label={tab.label}
+      items={tab.items}
+      disabled={tab.disabled}
+      open={openDropdown === tab.id}
+      onToggle={() => setOpenDropdown((prev) => (prev === tab.id ? null : tab.id))}
+      onClose={() => setOpenDropdown(null)}
+    />
+  );
+
   return (
     <div className="ribbon" ref={rootRef}>
-      <div className="ribbon-tabs" role="tablist" aria-label="Ribbon">
-        {tabs.map((tab) =>
-          tab.kind === 'menu' ? (
-            <RibbonDropdown
-              key={tab.id}
-              variant="tab"
-              id={tab.id}
-              label={tab.label}
-              items={tab.items}
-              disabled={tab.disabled}
-              open={openDropdown === tab.id}
-              onToggle={() => setOpenDropdown((prev) => (prev === tab.id ? null : tab.id))}
-              onClose={() => setOpenDropdown(null)}
-            />
-          ) : (
+      <nav className="ribbon-tabs" aria-label="Ribbon">
+        {leadingMenus.map(renderMenuTab)}
+        <div className="ribbon-tablist" role="tablist" aria-label="Ribbon">
+          {bodyTabs.map((tab) => (
             <button
               key={tab.id}
               type="button"
@@ -181,8 +196,9 @@ export function Ribbon({ tabs }: { tabs: RibbonTabDef[] }) {
             >
               {tab.label}
             </button>
-          ),
-        )}
+          ))}
+        </div>
+        {trailingMenus.map(renderMenuTab)}
         <span className="ribbon-tabs-spacer" />
         <button
           type="button"
@@ -195,7 +211,7 @@ export function Ribbon({ tabs }: { tabs: RibbonTabDef[] }) {
         >
           <RibbonIcon name={collapsed ? 'chevron-down' : 'chevron-up'} className="ribbon-collapse-icon" />
         </button>
-      </div>
+      </nav>
       {!collapsed && active && (
         <div
           className="ribbon-body"
