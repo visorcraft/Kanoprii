@@ -2,6 +2,7 @@ import type { FormFieldKind } from '../modals/AddFormFieldModal';
 import type { ShapeKind, StampKind } from '../app/constants';
 import type { DocumentSessionData } from '../app/documentSessionTypes';
 import type { PdfEditState } from '../app/usePdfEditState';
+import type { PageVectorEdit } from '../app/types';
 import type { createStructuralEditRunner } from '../pdf/runStructuralEdit';
 import { usePageInteractionAnnot } from './usePageInteractionAnnot';
 import { usePageInteractionHandlers } from './usePageInteractionHandlers';
@@ -20,6 +21,7 @@ type UsePageInteractionOptions = {
   editTextRunMode?: boolean;
   handleEditTextRunClick?: (x: number, y: number) => boolean;
   vectorEditMode: boolean;
+  pageVectorEdits: PageVectorEdit[];
   formAddMode: boolean;
   imageInsertMode: boolean;
   redactMode: boolean;
@@ -53,6 +55,7 @@ type UsePageInteractionOptions = {
       width?: number;
       height?: number;
     } | null>,
+    textOnly?: boolean,
   ) => void | Promise<void>;
   hitTestImage?: (pageIndex: number, x: number, y: number) => Promise<{
     index: number;

@@ -3,6 +3,7 @@ import type { FormFieldKind } from '../modals/AddFormFieldModal';
 import type { ShapeKind, StampKind } from '../app/constants';
 import type { DocumentSessionData } from '../app/documentSessionTypes';
 import type { PdfEditState } from '../app/usePdfEditState';
+import type { PageVectorEdit } from '../app/types';
 import type { createStructuralEditRunner } from '../pdf/runStructuralEdit';
 import { getImageCoords as imageCoordsFromClick } from './getImageCoords';
 
@@ -21,6 +22,7 @@ export type PageInteractionHandlerOptions = {
   editTextRunMode?: boolean;
   handleEditTextRunClick?: (x: number, y: number) => boolean;
   vectorEditMode: boolean;
+  pageVectorEdits: PageVectorEdit[];
   formAddMode: boolean;
   imageInsertMode: boolean;
   redactMode: boolean;
@@ -54,6 +56,7 @@ export type PageInteractionHandlerOptions = {
       width?: number;
       height?: number;
     } | null>,
+    textOnly?: boolean,
   ) => void | Promise<void>;
   hitTestImage?: (pageIndex: number, x: number, y: number) => Promise<{
     index: number;
@@ -111,6 +114,27 @@ export function usePageInteractionHandlers(opts: PageInteractionHandlerOptions) 
       return;
     }
 
+    if (opts.vectorEditMode) {
+      e.preventDefault();
+      if (opts.pdfEdit.vectorDraft) {
+        opts.pdfEdit.onCancel();
+        return;
+      }
+      const point = getImageCoords(e.clientX, e.clientY);
+      const hit = [...opts.pageVectorEdits].reverse().find((vector) =>
+        point.x >= vector.x && point.x <= vector.x + vector.width &&
+        point.y >= vector.y && point.y <= vector.y + vector.height
+      );
+      if (hit) {
+        opts.pdfEdit.startEditingVector({
+          pageIndex: opts.currentPage,
+          index: hit.index,
+          pageRect: { x: hit.x, y: hit.y, w: hit.width, h: hit.height },
+        });
+        return;
+      }
+    }
+
     const isRectMode = opts.highlightMode || opts.shapeMode || opts.redactMode || opts.imageInsertMode || opts.vectorEditMode || opts.formAddMode;
     if (!isRectMode) return;
 
@@ -129,8 +153,7 @@ export function usePageInteractionHandlers(opts: PageInteractionHandlerOptions) 
       }
       opts.setDrawing(true);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional: stable option object / destructured deps
-  }, [opts.drawMode, opts.highlightMode, opts.shapeMode, opts.redactMode, opts.imageInsertMode, opts.vectorEditMode, opts.formAddMode, opts.shapeKind, getImageCoords, opts.setHighlightStart, opts.setShapeLineEnd, opts.setHighlightRect, opts.setDrawing, opts.setInkDrawing, opts.setInkDraft]);
+  }, [opts, getImageCoords]);
 
   const handleDrawMouseUp = useCallback((e: React.MouseEvent) => {
     if (opts.drawMode && opts.inkDrawing) {
@@ -266,7 +289,7 @@ export function usePageInteractionHandlers(opts: PageInteractionHandlerOptions) 
   const handlePageClick = useCallback((e: React.MouseEvent) => {
     if (opts.drawMode) return;
 
-    if (opts.pdfEdit.editMode) {
+    if (opts.pdfEdit.editMode || opts.editTextRunMode) {
       if (!opts.session) return;
       e.preventDefault();
       const coords = getImageCoords(e.clientX, e.clientY);
@@ -274,14 +297,10 @@ export function usePageInteractionHandlers(opts: PageInteractionHandlerOptions) 
         opts.currentPage,
         coords,
         opts.session,
-        opts.hitTestImage,
+        opts.editTextRunMode ? undefined : opts.hitTestImage,
+        opts.editTextRunMode,
       );
       return;
-    }
-
-    if (opts.editTextRunMode && opts.handleEditTextRunClick) {
-      const coords = getImageCoords(e.clientX, e.clientY);
-      if (opts.handleEditTextRunClick(coords.x, coords.y)) return;
     }
     if (opts.textEditMode) {
       const coords = getImageCoords(e.clientX, e.clientY);

@@ -18737,6 +18737,9 @@ fn page_vector_rect_roundtrip() {
     let vectors = list_page_vectors(path.clone(), 0).unwrap();
     assert_eq!(vectors.len(), 1);
     assert_eq!(vectors[0].index, index);
+    update_page_vector_rect(path.clone(), 0, index, 70.0, 90.0, 160.0, 100.0).unwrap();
+    let vectors = list_page_vectors(path.clone(), 0).unwrap();
+    assert_eq!((vectors[0].x, vectors[0].y, vectors[0].width, vectors[0].height), (70.0, 90.0, 160.0, 100.0));
     remove_page_vector(path.clone(), 0, index).unwrap();
     assert!(list_page_vectors(path.clone(), 0).unwrap().is_empty());
     let _ = std::fs::remove_file(&path);

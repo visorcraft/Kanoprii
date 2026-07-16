@@ -1,4 +1,4 @@
-import { TextStyle } from '../app/usePdfEditState';
+import type { TextStyle } from '../app/usePdfEditState';
 import './EditToolbar.css';
 
 export interface EditToolbarProps {
@@ -42,29 +42,31 @@ export function EditToolbar({
 }: EditToolbarProps) {
   return (
     <div className="edit-toolbar" aria-label="Text editing toolbar">
-      <select
-        className="edit-toolbar-select"
-        value={style.fontFamily}
-        onChange={(e) =>
-          onChange({ fontFamily: e.target.value as TextStyle['fontFamily'] })
-        }
-        aria-label="Font family"
-      >
-        <option value="Helvetica">Helvetica</option>
-        <option value="LiberationSans">Liberation Sans</option>
-        <option value="Times">Times</option>
-        <option value="Courier">Courier</option>
-      </select>
+      <div className="edit-toolbar-font" role="group" aria-label="Font">
+        <select
+          className="edit-toolbar-select"
+          value={style.fontFamily}
+          onChange={(e) =>
+            onChange({ fontFamily: e.target.value as TextStyle['fontFamily'] })
+          }
+          aria-label="Font family"
+        >
+          <option value="Helvetica">Helvetica</option>
+          <option value="LiberationSans">Liberation Sans</option>
+          <option value="Times">Times</option>
+          <option value="Courier">Courier</option>
+        </select>
 
-      <input
-        className="edit-toolbar-number"
-        type="number"
-        min={6}
-        max={72}
-        value={style.fontSize}
-        onChange={(e) => onChange({ fontSize: Number(e.target.value) })}
-        aria-label="Font size"
-      />
+        <input
+          className="edit-toolbar-number"
+          type="number"
+          min={6}
+          max={72}
+          value={style.fontSize}
+          onChange={(e) => onChange({ fontSize: Number(e.target.value) })}
+          aria-label="Font size"
+        />
+      </div>
 
       <div
         className="edit-toolbar-group"
@@ -103,14 +105,15 @@ export function EditToolbar({
         </button>
       </div>
 
-      <input
-        className="edit-toolbar-color"
-        type="color"
-        value={rgbToHex(style.color)}
-        onChange={(e) => onChange({ color: hexToRgb(e.target.value) })}
-        aria-label="Text color"
-        title="Text color"
-      />
+      <label className="edit-toolbar-color" title="Text color">
+        <span aria-hidden="true">A</span>
+        <input
+          type="color"
+          value={rgbToHex(style.color)}
+          onChange={(e) => onChange({ color: hexToRgb(e.target.value) })}
+          aria-label="Text color"
+        />
+      </label>
 
       <div
         className="edit-toolbar-group"
@@ -125,7 +128,7 @@ export function EditToolbar({
           aria-label="Align left"
           title="Align left"
         >
-          Left
+          <span className="alignment-icon align-left" aria-hidden="true"><i /><i /><i /></span>
         </button>
         <button
           type="button"
@@ -135,7 +138,7 @@ export function EditToolbar({
           aria-label="Align center"
           title="Align center"
         >
-          Center
+          <span className="alignment-icon align-center" aria-hidden="true"><i /><i /><i /></span>
         </button>
         <button
           type="button"
@@ -145,7 +148,7 @@ export function EditToolbar({
           aria-label="Align right"
           title="Align right"
         >
-          Right
+          <span className="alignment-icon align-right" aria-hidden="true"><i /><i /><i /></span>
         </button>
       </div>
 

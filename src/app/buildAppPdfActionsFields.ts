@@ -41,6 +41,7 @@ export function annotationPdfActionFields(a: AnnotationState) {
     noteDraft: a.noteDraft,
     noteMode: a.noteMode,
     pageTextDraft: a.pageTextDraft,
+    pageVectorEdits: a.pageVectorEdits,
     pageTextFontSize: a.pageTextFontSize,
     pendingNotePos: a.pendingNotePos,
     pendingTextPos: a.pendingTextPos,

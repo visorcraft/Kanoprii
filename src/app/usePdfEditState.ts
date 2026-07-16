@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
 
-export type EditMode = 'idle' | 'text' | 'image' | 'paragraph';
+export type EditMode = 'idle' | 'text' | 'image' | 'paragraph' | 'vector';
 
 export type TextAlignment = 'left' | 'center' | 'right';
 
@@ -12,6 +12,8 @@ export type PdfEditCallbacks = {
   onApplyImage?: () => void | Promise<void>;
   onDeleteImage?: () => void | Promise<void>;
   onReplaceImage?: () => void | Promise<void>;
+  onApplyVector?: () => void | Promise<void>;
+  onDeleteVector?: () => void | Promise<void>;
 };
 
 /** Base font families. Bold/italic variants are selected at invoke time. */
@@ -57,6 +59,10 @@ export interface TextEditDraft {
   lineIndex?: number;
   /** Original viewer rectangle to white out when PDFium found text the content decoder could not address. */
   sourceRect?: Rect;
+  /** Original values used to skip unchanged edits. */
+  original?: { text: string; style: TextStyle };
+  /** Set only by explicit move/resize input, not automatic comfortable sizing. */
+  geometryModified?: boolean;
 }
 
 export interface ImageEditDraft {
@@ -83,6 +89,12 @@ export interface ParagraphEditDraft {
   style: TextStyle;
 }
 
+export interface VectorEditDraft {
+  pageIndex: number;
+  index: number;
+  pageRect: Rect;
+}
+
 export const DEFAULT_TEXT_STYLE: TextStyle = {
   fontFamily: 'Helvetica',
   fontSize: 12,
@@ -98,6 +110,7 @@ export function usePdfEditState() {
   const [textDraft, setTextDraft] = useState<TextEditDraft | null>(null);
   const [imageDraft, setImageDraft] = useState<ImageEditDraft | null>(null);
   const [paragraphDraft, setParagraphDraft] = useState<ParagraphEditDraft | null>(null);
+  const [vectorDraft, setVectorDraft] = useState<VectorEditDraft | null>(null);
   /** Whether the paragraph draft is in text-edit mode (textarea) vs selection/move/resize mode. */
   const [paragraphEditing, setParagraphEditing] = useState(false);
   /** Default style applied to newly created text edits. */
@@ -109,6 +122,7 @@ export function usePdfEditState() {
     setTextDraft(draft);
     setImageDraft(null);
     setParagraphDraft(null);
+    setVectorDraft(null);
     setMode('text');
   }, []);
 
@@ -117,6 +131,7 @@ export function usePdfEditState() {
       setTextDraft({ pageIndex, point, text: '', pageRect, style });
       setImageDraft(null);
       setParagraphDraft(null);
+      setVectorDraft(null);
       setMode('text');
     },
     [style]
@@ -126,6 +141,7 @@ export function usePdfEditState() {
     setTextDraft(null);
     setImageDraft(null);
     setParagraphDraft(null);
+    setVectorDraft(null);
     setParagraphEditing(false);
     setMode('text');
   }, []);
@@ -134,6 +150,7 @@ export function usePdfEditState() {
     setImageDraft(draft);
     setTextDraft(null);
     setParagraphDraft(null);
+    setVectorDraft(null);
     setMode('image');
   }, []);
 
@@ -142,7 +159,16 @@ export function usePdfEditState() {
     setParagraphEditing(false);
     setTextDraft(null);
     setImageDraft(null);
+    setVectorDraft(null);
     setMode('paragraph');
+  }, []);
+
+  const startEditingVector = useCallback((draft: VectorEditDraft) => {
+    setVectorDraft(draft);
+    setTextDraft(null);
+    setImageDraft(null);
+    setParagraphDraft(null);
+    setMode('vector');
   }, []);
 
   const enterParagraphTextEdit = useCallback(() => {
@@ -162,6 +188,7 @@ export function usePdfEditState() {
     setTextDraft(null);
     setImageDraft(null);
     setParagraphDraft(null);
+    setVectorDraft(null);
     setParagraphEditing(false);
     setStyle(DEFAULT_TEXT_STYLE);
   }, []);
@@ -184,6 +211,8 @@ export function usePdfEditState() {
       await callbacksRef.current.onApplyParagraph();
     } else if (mode === 'image' && callbacksRef.current.onApplyImage) {
       await callbacksRef.current.onApplyImage();
+    } else if (mode === 'vector' && callbacksRef.current.onApplyVector) {
+      await callbacksRef.current.onApplyVector();
     } else {
       onCancel();
     }
@@ -195,6 +224,10 @@ export function usePdfEditState() {
 
   const onUpdateImageRotation = useCallback((rotation: number) => {
     setImageDraft((prev) => (prev ? { ...prev, rotation } : null));
+  }, []);
+
+  const onUpdateVectorRect = useCallback((pageRect: Rect) => {
+    setVectorDraft((prev) => (prev ? { ...prev, pageRect } : null));
   }, []);
 
   const onDeleteParagraph = useCallback(async () => {
@@ -225,6 +258,11 @@ export function usePdfEditState() {
     await callbacksRef.current.onReplaceImage?.();
   }, []);
 
+  const onDeleteVector = useCallback(async () => {
+    if (callbacksRef.current.onDeleteVector) await callbacksRef.current.onDeleteVector();
+    else onCancel();
+  }, [onCancel]);
+
   const updateStyle = useCallback((patch: Partial<TextStyle>) => {
     setStyle((prev) => ({ ...prev, ...patch }));
   }, []);
@@ -236,6 +274,7 @@ export function usePdfEditState() {
       textDraft,
       imageDraft,
       paragraphDraft,
+      vectorDraft,
       paragraphEditing,
       style,
       startEditingText,
@@ -244,6 +283,7 @@ export function usePdfEditState() {
       startEditingParagraph,
       enterParagraphTextEdit,
       startEditingImage,
+      startEditingVector,
       updateStyle,
       onUpdate,
       onUpdateParagraph,
@@ -253,10 +293,12 @@ export function usePdfEditState() {
       clearEditMode,
       onUpdateImageRect,
       onUpdateImageRotation,
+      onUpdateVectorRect,
       onDeleteText,
       onDeleteParagraph,
       onDeleteImage,
       onReplaceImage,
+      onDeleteVector,
       bindEditCallbacks,
     }),
     [
@@ -265,6 +307,7 @@ export function usePdfEditState() {
       textDraft,
       imageDraft,
       paragraphDraft,
+      vectorDraft,
       paragraphEditing,
       style,
       startEditingText,
@@ -273,6 +316,7 @@ export function usePdfEditState() {
       startEditingParagraph,
       enterParagraphTextEdit,
       startEditingImage,
+      startEditingVector,
       updateStyle,
       onUpdate,
       onUpdateParagraph,
@@ -282,10 +326,12 @@ export function usePdfEditState() {
       clearEditMode,
       onUpdateImageRect,
       onUpdateImageRotation,
+      onUpdateVectorRect,
       onDeleteText,
       onDeleteParagraph,
       onDeleteImage,
       onReplaceImage,
+      onDeleteVector,
       bindEditCallbacks,
     ]
   );

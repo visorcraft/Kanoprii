@@ -14,7 +14,7 @@ type RichTextEditOverlayProps = {
   /** Height of the edited page in PDF points (viewer vertical axis). When
    *  omitted the font is rendered 1:1 (legacy behaviour). */
   pageHeightPt?: number;
-  onUpdate: (patch: { text?: string; style?: TextStyle; pageRect?: Rect }) => void;
+  onUpdate: (patch: { text?: string; style?: TextStyle; pageRect?: Rect; geometryModified?: boolean }) => void;
   onApply: () => void;
   onCancel: () => void;
 };
@@ -186,7 +186,7 @@ export function RichTextEditOverlay({
       }
       const clamped = clampMove({ ...current, x, y });
       updateRect(clamped);
-      onUpdate({ pageRect: clamped });
+      onUpdate({ pageRect: clamped, geometryModified: true });
     },
     [onUpdate, updateRect],
   );
@@ -251,7 +251,7 @@ export function RichTextEditOverlay({
       const fixed = getFixedCorner(current, kind);
       const clamped = clampResize(next, fixed, kind);
       updateRect(clamped);
-      onUpdate({ pageRect: clamped });
+      onUpdate({ pageRect: clamped, geometryModified: true });
     },
     [onUpdate, updateRect],
   );
@@ -311,7 +311,7 @@ export function RichTextEditOverlay({
       const finalRect =
         (lastEvent ? computeNext(lastEvent) : null) ?? rectRef.current;
       setDragging(null);
-      onUpdate({ pageRect: finalRect });
+      onUpdate({ pageRect: finalRect, geometryModified: true });
       dragStartPosRef.current = null;
       dragStartRectRef.current = null;
       // Restore focus + caret to the textarea so typing continues where it left off.

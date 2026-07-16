@@ -290,6 +290,7 @@ export function useAppPdfActions(input: UseAppPdfActionsInput) {
     session: activeSession,
     handleEditPageClick: editInteraction.handlePageClick,
     hitTestImage: editInteraction.hitTestImage,
+    pageVectorEdits: input.pageVectorEdits,
     editTextRunMode: input.editTextRunMode ?? false,
     handleEditTextRunClick: textLayerFlow.handleEditTextRunClick,
   });
@@ -365,6 +366,8 @@ export function useAppPdfActions(input: UseAppPdfActionsInput) {
     pdfEditApplyImage: editInteraction.applyImageEdit,
     pdfEditDeleteImage: editInteraction.deleteImage,
     pdfEditReplaceImage: replaceEditImage,
+    pdfEditApplyVector: editInteraction.applyVectorEdit,
+    pdfEditDeleteVector: editInteraction.deleteVector,
     insertEditImage,
     ...annotationModes,
     ...pageTextEdits,

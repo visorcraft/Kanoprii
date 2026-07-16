@@ -126,6 +126,8 @@ export function useAppPdfActionsBinding(input: UseAppPdfActionsBindingInput) {
     pdfEditApplyImage,
     pdfEditDeleteImage,
     pdfEditReplaceImage,
+    pdfEditApplyVector,
+    pdfEditDeleteVector,
   } = pdfActions;
 
   const onApplyText = useCallback(() => {
@@ -160,6 +162,16 @@ export function useAppPdfActionsBinding(input: UseAppPdfActionsBindingInput) {
 
   const onReplaceImage = useCallback(() => pdfEditReplaceImage(), [pdfEditReplaceImage]);
 
+  const onApplyVector = useCallback(() => {
+    if (!activeSession) return Promise.resolve();
+    return pdfEditApplyVector(activeSession);
+  }, [activeSession, pdfEditApplyVector]);
+
+  const onDeleteVector = useCallback(() => {
+    if (!activeSession) return Promise.resolve();
+    return pdfEditDeleteVector(activeSession);
+  }, [activeSession, pdfEditDeleteVector]);
+
   useEffect(() => {
     pdfEdit.bindEditCallbacks({
       onApplyText,
@@ -169,8 +181,10 @@ export function useAppPdfActionsBinding(input: UseAppPdfActionsBindingInput) {
       onApplyImage,
       onDeleteImage,
       onReplaceImage,
+      onApplyVector,
+      onDeleteVector,
     });
-  }, [pdfEdit, onApplyText, onApplyParagraph, onDeleteText, onDeleteParagraph, onApplyImage, onDeleteImage, onReplaceImage]);
+  }, [pdfEdit, onApplyText, onApplyParagraph, onDeleteText, onDeleteParagraph, onApplyImage, onDeleteImage, onReplaceImage, onApplyVector, onDeleteVector]);
 
   return pdfActions;
 }

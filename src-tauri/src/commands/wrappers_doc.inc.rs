@@ -58,6 +58,18 @@ fn add_page_vector_rect(path: String, page_index: u32, x: f64, y: f64, width: f6
     pdf::page_text::add_page_vector_rect(&PathBuf::from(path), page_index, x, y, width, height)
 }
 #[tauri::command]
+fn update_page_vector_rect(
+    path: String,
+    page_index: u32,
+    index: u32,
+    x: f64,
+    y: f64,
+    width: f64,
+    height: f64,
+) -> Result<(), String> {
+    pdf::page_text::update_page_vector_rect(&PathBuf::from(path), page_index, index, x, y, width, height)
+}
+#[tauri::command]
 fn list_page_vectors(path: String, page_index: u32) -> Result<Vec<pdf::page_text::PageVectorEdit>, String> {
     pdf::page_text::list_page_vectors(&PathBuf::from(path), page_index)
 }

@@ -1,17 +1,18 @@
 import { useEffect, useRef, useState } from 'react';
-import type { ParagraphEditDraft, Rect } from '../app/usePdfEditState';
+import type { Rect } from '../app/usePdfEditState';
 import { VIEWER_PAGE_H, VIEWER_PAGE_W } from '../app/constants';
 import './ParagraphSelectionOverlay.css';
 
 type HandleDir = 'nw' | 'n' | 'ne' | 'w' | 'e' | 'sw' | 's' | 'se';
 
 type ParagraphSelectionOverlayProps = {
-  draft: ParagraphEditDraft;
+  draft: { pageRect: Rect };
   zoom: number;
-  onUpdate: (patch: Partial<ParagraphEditDraft>) => void;
-  onEnterEdit: () => void;
+  onUpdate: (patch: { pageRect: Rect }) => void;
+  onEnterEdit?: () => void;
   onDelete: () => void;
   onCancel: () => void;
+  ariaLabel?: string;
 };
 
 const MIN_SIZE = 20;
@@ -20,7 +21,7 @@ function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
 }
 
-export function ParagraphSelectionOverlay({ draft, zoom, onUpdate, onEnterEdit, onDelete, onCancel }: ParagraphSelectionOverlayProps) {
+export function ParagraphSelectionOverlay({ draft, zoom, onUpdate, onEnterEdit, onDelete, onCancel, ariaLabel = 'Paragraph selection' }: ParagraphSelectionOverlayProps) {
   const { pageRect } = draft;
   const [dragging, setDragging] = useState<{ kind: 'move' | HandleDir; start: Rect; pointerX: number; pointerY: number } | null>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
@@ -99,7 +100,7 @@ export function ParagraphSelectionOverlay({ draft, zoom, onUpdate, onEnterEdit, 
       onMouseDown={startDrag('move')}
       onClick={(e) => e.stopPropagation()}
       onKeyDown={(e) => {
-        if (e.key === 'Enter') {
+        if (e.key === 'Enter' && onEnterEdit) {
           e.preventDefault();
           onEnterEdit();
         } else if (e.key === 'Delete' || e.key === 'Backspace') {
@@ -112,7 +113,7 @@ export function ParagraphSelectionOverlay({ draft, zoom, onUpdate, onEnterEdit, 
       }}
       tabIndex={0}
       role="region"
-      aria-label="Paragraph selection"
+      aria-label={ariaLabel}
     >
       <div className="paragraph-selection-frame" />
       {(['nw', 'n', 'ne', 'w', 'e', 'sw', 's', 'se'] as HandleDir[]).map((handle) => (

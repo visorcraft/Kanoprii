@@ -233,6 +233,17 @@ function PdfPageViewInner({
                   onCancel={pdfEdit.onCancel}
                 />
               )}
+            {pdfEdit?.vectorDraft &&
+              pdfEdit.vectorDraft.pageIndex === currentPage && (
+                <ParagraphSelectionOverlay
+                  draft={pdfEdit.vectorDraft}
+                  zoom={zoom * fitScale}
+                  onUpdate={({ pageRect }) => pdfEdit.onUpdateVectorRect(pageRect)}
+                  onDelete={pdfEdit.onDeleteVector}
+                  onCancel={pdfEdit.onCancel}
+                  ariaLabel="Vector selection"
+                />
+              )}
             {pdfEdit?.paragraphDraft &&
               pdfEdit.paragraphDraft.pageIndex === currentPage &&
               pdfEdit.paragraphEditing && (

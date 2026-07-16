@@ -190,6 +190,7 @@ export function usePageInteractionEdit(deps: UsePageInteractionEditOptions) {
       point: { x: number; y: number },
       session: DocumentSessionData,
       hitTestImageFn?: (pageIndex: number, x: number, y: number) => Promise<PageImageHit | null>,
+      textOnly = false,
     ) => {
       if (!session?.filePath) return;
 
@@ -251,6 +252,10 @@ export function usePageInteractionEdit(deps: UsePageInteractionEditOptions) {
               pageRect: hitLine.bbox,
               style: sourceTextStyle(pdfEdit.style, hitRun ?? hitLine),
               lineIndex: hitLine.lineIndex,
+              original: {
+                text: hitLine.text,
+                style: sourceTextStyle(pdfEdit.style, hitRun ?? hitLine),
+              },
             });
           }
         } else if (hitRun) {
@@ -262,7 +267,13 @@ export function usePageInteractionEdit(deps: UsePageInteractionEditOptions) {
             pageRect: rect,
             sourceRect: rect,
             style: sourceTextStyle(pdfEdit.style, hitRun),
+            original: {
+              text: hitRun.text,
+              style: sourceTextStyle(pdfEdit.style, hitRun),
+            },
           });
+        } else if (textOnly) {
+          return;
         } else if (pdfEdit.mode === 'text' || pdfEdit.mode === 'paragraph') {
           const fontPx = fontPxAt(pageIndex);
           pdfEdit.startInsertingText(pageIndex, point, {
@@ -319,6 +330,15 @@ export function usePageInteractionEdit(deps: UsePageInteractionEditOptions) {
     async (session: DocumentSessionData) => {
       if (!session?.filePath || !pdfEdit.textDraft) return;
       const draft = pdfEdit.textDraft;
+      if (
+        draft.original &&
+        !draft.geometryModified &&
+        draft.text === draft.original.text &&
+        JSON.stringify(draft.style) === JSON.stringify(draft.original.style)
+      ) {
+        pdfEdit.onCancel();
+        return;
+      }
       const boxRect = rectToPdfRect(draft.pageRect);
       const style = toBackendStyle(draft.style);
       let result: unknown;
@@ -489,6 +509,44 @@ export function usePageInteractionEdit(deps: UsePageInteractionEditOptions) {
     [deps, pdfEdit],
   );
 
+  const applyVectorEdit = useCallback(
+    async (session: DocumentSessionData) => {
+      if (!session?.filePath || !pdfEdit.vectorDraft) return;
+      const draft = pdfEdit.vectorDraft;
+      const result = await runStructuralEdit(deps, {
+        command: 'update_page_vector_rect',
+        args: {
+          path: session.filePath,
+          pageIndex: draft.pageIndex,
+          index: draft.index,
+          x: draft.pageRect.x,
+          y: draft.pageRect.y,
+          width: draft.pageRect.w,
+          height: draft.pageRect.h,
+        },
+        reloadAt: draft.pageIndex,
+        toast: 'Vector updated',
+      });
+      if (result !== undefined) pdfEdit.onCancel();
+    },
+    [deps, pdfEdit],
+  );
+
+  const deleteVector = useCallback(
+    async (session: DocumentSessionData) => {
+      if (!session?.filePath || !pdfEdit.vectorDraft) return;
+      const draft = pdfEdit.vectorDraft;
+      const result = await runStructuralEdit(deps, {
+        command: 'remove_page_vector',
+        args: { path: session.filePath, pageIndex: draft.pageIndex, index: draft.index },
+        reloadAt: draft.pageIndex,
+        toast: 'Vector removed',
+      });
+      if (result !== undefined) pdfEdit.onCancel();
+    },
+    [deps, pdfEdit],
+  );
+
   return {
     handlePageClick,
     applyTextEdit,
@@ -497,6 +555,8 @@ export function usePageInteractionEdit(deps: UsePageInteractionEditOptions) {
     deleteParagraph,
     applyImageEdit,
     deleteImage,
+    applyVectorEdit,
+    deleteVector,
     hitTestImage,
   };
 }

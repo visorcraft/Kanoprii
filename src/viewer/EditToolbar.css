@@ -1,95 +1,151 @@
 .edit-toolbar {
   display: flex;
+  flex: 1;
   flex-wrap: wrap;
-  gap: 8px;
   align-items: center;
-  background: var(--pp-surface, #fff);
-  border: 1px solid var(--pp-border, #ccc);
-  border-radius: 6px;
-  padding: 6px 10px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  gap: 6px;
+  min-width: 0;
+}
+
+.edit-toolbar-font,
+.edit-toolbar-group {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding-right: 7px;
+  border-right: 1px solid var(--pp-border);
 }
 
 .edit-toolbar select,
 .edit-toolbar input[type='number'],
-.edit-toolbar input[type='color'],
-.edit-toolbar button {
-  font: inherit;
+.edit-toolbar button,
+.edit-toolbar-color {
+  height: 30px;
+  box-sizing: border-box;
   color: var(--pp-text, #1a1a2e);
-  background: var(--pp-surface, #fff);
+  font: inherit;
   border: 1px solid var(--pp-border, #ccc);
   border-radius: 4px;
-  padding: 4px 8px;
+  background: var(--pp-surface, #fff);
 }
 
 .edit-toolbar select {
-  padding-right: 28px;
+  width: 138px;
+  padding: 3px 28px 3px 8px;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23888' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
   background-position: right 8px center;
-  -webkit-appearance: none;
   appearance: none;
 }
 
-.edit-toolbar button {
-  cursor: pointer;
-  min-width: 28px;
+.edit-toolbar input[type='number'] {
+  width: 54px;
+  padding: 3px 4px 3px 7px;
 }
 
-.edit-toolbar button:hover {
+.edit-toolbar button {
+  min-width: 30px;
+  padding: 3px 8px;
+  cursor: pointer;
+}
+
+.edit-toolbar button:hover,
+.edit-toolbar-color:hover {
   background: var(--pp-btn-hover, #f5f5f5);
 }
 
 .edit-toolbar button.active {
-  background: color-mix(in srgb, var(--pp-accent, #0066cc), black 20%);
-  color: #fff;
-  border-color: color-mix(in srgb, var(--pp-accent, #0066cc), black 20%);
+  color: var(--pp-accent);
+  border-color: color-mix(in srgb, var(--pp-accent), var(--pp-border) 40%);
+  background: color-mix(in srgb, var(--pp-accent), var(--pp-surface) 86%);
 }
 
-.edit-toolbar button.active:hover {
-  background: color-mix(in srgb, var(--pp-accent, #0066cc), black 35%);
-  border-color: color-mix(in srgb, var(--pp-accent, #0066cc), black 35%);
+.edit-toolbar-group[aria-label='Text decoration'] button:nth-child(1) {
+  font-weight: 800;
 }
 
-.edit-toolbar-group {
-  display: flex;
-  gap: 2px;
+.edit-toolbar-group[aria-label='Text decoration'] button:nth-child(2) {
+  font-family: serif;
+  font-style: italic;
+}
+
+.edit-toolbar-group[aria-label='Text decoration'] button:nth-child(3) {
+  text-decoration: underline;
+}
+
+.edit-toolbar-color {
+  position: relative;
+  display: inline-flex;
+  width: 34px;
+  flex-direction: column;
   align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.edit-toolbar-color input {
+  position: absolute;
+  inset: auto 5px 2px;
+  width: 22px;
+  height: 4px;
+  padding: 0;
+  border: 0;
+  opacity: 1;
+  cursor: pointer;
+}
+
+.alignment-icon {
+  display: flex;
+  width: 15px;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.alignment-icon i {
+  display: block;
+  width: 15px;
+  height: 1.5px;
+  border-radius: 1px;
+  background: currentColor;
+}
+
+.alignment-icon i:nth-child(2) {
+  width: 10px;
+}
+
+.align-center i:nth-child(2) {
+  align-self: center;
+}
+
+.align-right i:nth-child(2) {
+  align-self: flex-end;
 }
 
 .edit-toolbar-actions {
-  margin-left: 0;
+  margin-left: auto;
+  padding-right: 0;
+  border-right: 0;
 }
 
-.edit-toolbar-apply {
-  background: var(--pp-accent, #0066cc);
+.edit-toolbar .edit-toolbar-apply {
   color: #fff;
   border-color: var(--pp-accent, #0066cc);
+  background: var(--pp-accent, #0066cc);
 }
 
-.edit-toolbar-apply:hover {
-  background: var(--pp-accent-hover, #005bb5);
+.edit-toolbar .edit-toolbar-apply:hover {
   border-color: var(--pp-accent-hover, #005bb5);
+  background: var(--pp-accent-hover, #005bb5);
 }
 
-.edit-toolbar-cancel {
-  background: var(--pp-btn-secondary-bg, #eee);
-  border-color: var(--pp-btn-secondary-border, #ddd);
-}
-
-.edit-toolbar-cancel:hover {
-  background: var(--pp-border, #ccc);
-  border-color: var(--pp-border, #ccc);
-}
-
-.edit-toolbar-delete {
+.edit-toolbar .edit-toolbar-delete {
   color: var(--pp-danger, #d32f2f);
-  border-color: var(--pp-danger, #d32f2f);
+  border-color: transparent;
   background: transparent;
 }
 
-.edit-toolbar-delete:hover {
-  background: var(--pp-danger, #d32f2f);
-  color: #fff;
-  border-color: var(--pp-danger, #d32f2f);
+.edit-toolbar .edit-toolbar-delete:hover {
+  border-color: color-mix(in srgb, var(--pp-danger, #d32f2f), var(--pp-border) 50%);
+  background: color-mix(in srgb, var(--pp-danger, #d32f2f), transparent 90%);
 }

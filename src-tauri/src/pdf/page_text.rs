@@ -379,6 +379,30 @@ pub fn add_page_vector_rect(
     Ok(index)
 }
 
+pub fn update_page_vector_rect(
+    path: &Path,
+    page_index: u32,
+    index: u32,
+    x: f64,
+    y: f64,
+    width: f64,
+    height: f64,
+) -> Result<(), String> {
+    if width < 2.0 || height < 2.0 {
+        return Err("Vector shape is too small".to_string());
+    }
+    let path = path.to_path_buf();
+    let mut doc = Document::load(&path).map_err(|e| e.to_string())?;
+    let page_id = *doc.get_pages().get(&(page_index + 1)).ok_or("Page not found".to_string())?;
+    let content = String::from_utf8_lossy(&read_page_content(&doc, page_id)?).into_owned();
+    let mut content = remove_panda_block(&content, "%PP-VEC", index)?;
+    let (px, py, pw, ph) = viewer_rect_to_pdf(&doc, page_id, x, y, width, height)?;
+    content.push_str(&format!("%PP-VEC {index} {x} {y} {width} {height} stroke\nq 1 w {px} {py} {pw} {ph} re S Q\n"));
+    write_page_content(&mut doc, page_id, content.into_bytes())?;
+    crate::pdf::io::save_atomic(&mut doc, &path)?;
+    Ok(())
+}
+
 pub fn list_page_vectors(path: &Path, page_index: u32) -> Result<Vec<PageVectorEdit>, String> {
     let path = path.to_path_buf();
     let doc = Document::load(&path).map_err(|e| e.to_string())?;

@@ -2024,6 +2024,7 @@ tauri::generate_handler![
             update_page_text,
             remove_page_text,
             add_page_vector_rect,
+            update_page_vector_rect,
             list_page_vectors,
             remove_page_vector,
             get_pdf_form_fields,
