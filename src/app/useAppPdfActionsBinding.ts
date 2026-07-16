@@ -92,6 +92,7 @@ export function useAppPdfActionsBinding(input: UseAppPdfActionsBindingInput) {
 
   const pdfActions = useAppPdfActions({
     ...modalPdfActionFields(m),
+    pageSizes: m.pageSizes,
     ...securityPdfActionFields(s),
     ...panelsPdfActionFields(p),
     ...annotationPdfActionFields(a),

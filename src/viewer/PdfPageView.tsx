@@ -1,11 +1,13 @@
 import { memo } from 'react';
 import type React from 'react';
 import type { ShapeKind } from '../app/constants';
+import { pageHeightPtFor } from '../app/constants';
 import type {
   AnnotationData,
   FormFieldData,
   PageTextEdit,
   PageVectorEdit,
+  PdfPageSize,
 } from '../app/types';
 import type { PageTextRun } from '../pdf/useTextLayerLoader';
 import type { TextLineInfo } from './useTextEditRun';
@@ -53,6 +55,7 @@ type PdfPageViewProps = {
   showFormsPanel: boolean;
   formFields: FormFieldData[];
   currentPage: number;
+  pageSizes?: PdfPageSize[];
   onRemoveHighlight: (index: number) => void;
   onRemoveRedaction: (index: number) => void;
   onRemoveStamp: (kind: 'text' | 'image', index: number) => void;
@@ -104,6 +107,7 @@ function PdfPageViewInner({
   showFormsPanel,
   formFields,
   currentPage,
+  pageSizes,
   onRemoveHighlight,
   onRemoveRedaction,
   onRemoveStamp,
@@ -181,6 +185,7 @@ function PdfPageViewInner({
                 <RichTextEditOverlay
                   draft={pdfEdit.textDraft}
                   zoom={zoom}
+                  pageHeightPt={pageHeightPtFor(pageSizes?.[currentPage])}
                   onUpdate={pdfEdit.onUpdate}
                   onApply={pdfEdit.onApply}
                   onCancel={pdfEdit.onCancel}
@@ -204,6 +209,7 @@ function PdfPageViewInner({
                 <RichTextEditOverlay
                   draft={pdfEdit.paragraphDraft}
                   zoom={zoom}
+                  pageHeightPt={pageHeightPtFor(pageSizes?.[currentPage])}
                   onUpdate={pdfEdit.onUpdateParagraph}
                   onApply={pdfEdit.onApply}
                   onCancel={pdfEdit.onCancel}

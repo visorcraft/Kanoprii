@@ -876,13 +876,15 @@ body {
 }
 
 .text-edit-overlay-input {
-  border: 1px solid var(--pp-accent);
-  background: var(--pp-surface);
-  color: var(--pp-text);
-  padding: 0 2px;
+  border: 2px solid var(--pp-accent);
+  background: #fff;
+  color: #1a1a2e;
+  padding: 0 4px;
   margin: 0;
   outline: none;
   z-index: 20;
+  caret-color: var(--pp-accent);
+  -webkit-text-fill-color: #1a1a2e;
 }
 
 /* Window title bar (custom decorations) */

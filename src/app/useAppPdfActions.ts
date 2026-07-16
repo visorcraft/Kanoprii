@@ -49,6 +49,7 @@ import {
 } from './constants';
 import type { DocumentSessionData } from './documentSessionTypes';
 import type { PdfEditState, Rect } from './usePdfEditState';
+import type { PdfPageSize } from './types';
 
 const IMAGE_DIALOG_FILTERS = [
   ...PNG_DIALOG_FILTER,
@@ -128,6 +129,7 @@ export type UseAppPdfActionsInput = Omit<
     pdfEdit: PdfEditState;
     sessions: DocumentSessionData[];
     activeId: string | null;
+    pageSizes: PdfPageSize[];
   };
 
 function call<H extends (opts: never) => unknown>(
@@ -275,6 +277,7 @@ export function useAppPdfActions(input: UseAppPdfActionsInput) {
     pdfEdit: input.pdfEdit,
     filePath: input.filePath,
     currentPage: input.currentPage,
+    pageSizes: input.pageSizes,
     withLoading: input.withLoading,
     markPdfEdited: input.markPdfEdited,
     reloadOpenPdf: input.reloadOpenPdf,

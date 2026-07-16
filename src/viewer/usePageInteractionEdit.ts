@@ -2,6 +2,8 @@ import { useCallback } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import type { DocumentSessionData } from '../app/documentSessionTypes';
 import type { PdfEditState, Rect, TextStyle } from '../app/usePdfEditState';
+import { VIEWER_PAGE_H, pageHeightPtFor } from '../app/constants';
+import type { PdfPageSize } from '../app/types';
 import { runStructuralEdit, type StructuralEditDeps } from '../pdf/runStructuralEdit';
 import type { PageTextRun } from '../pdf/useTextLayerLoader';
 
@@ -41,6 +43,7 @@ type TextLine = {
 
 type UsePageInteractionEditOptions = {
   pdfEdit: PdfEditState;
+  pageSizes?: PdfPageSize[];
 } & StructuralEditDeps;
 
 function toBackendStyle(style: TextStyle): TextStyle & { color: { r: number; g: number; b: number } } {
@@ -75,7 +78,18 @@ function sourceTextStyle(
 }
 
 export function usePageInteractionEdit(deps: UsePageInteractionEditOptions) {
-  const { pdfEdit, filePath } = deps;
+  const { pdfEdit, filePath, pageSizes } = deps;
+
+  // Font size is carried in PDF points but box geometry is viewer px. Scale so
+  // a click lands the committed baseline at the cursor and the insert box is
+  // tall enough to hold the (correctly sized) preview glyph.
+  const fontPxAt = useCallback(
+    (pageIndex: number) => {
+      const pt = pageHeightPtFor(pageSizes?.[pageIndex]);
+      return pt && pt > 0 ? pdfEdit.style.fontSize * (VIEWER_PAGE_H / pt) : pdfEdit.style.fontSize;
+    },
+    [pageSizes, pdfEdit.style.fontSize],
+  );
 
   const viewerRectToPdf = useCallback(
     async (pageIndex: number, rect: Rect): Promise<PdfRect> => {
@@ -190,6 +204,18 @@ export function usePageInteractionEdit(deps: UsePageInteractionEditOptions) {
     ) => {
       if (!session?.filePath) return;
 
+      // If the user clicks outside an in-progress text draft that has content,
+// commit it (same as hitting Apply) and exit edit mode. Don't auto-start a
+// new draft at the click point — that risks overlapping the previous text
+// and surprising the user. They click Add Text again to add more.
+      if (
+        pdfEdit.textDraft &&
+        pdfEdit.textDraft.text.trim().length > 0
+      ) {
+        await pdfEdit.onApply();
+        return;
+      }
+
       if (pdfEdit.mode === 'text' || pdfEdit.mode === 'paragraph' || pdfEdit.mode === 'idle') {
         const lines = await loadPageTextLines(session, pageIndex);
         let hitLine: TextLine | null = null;
@@ -249,11 +275,13 @@ export function usePageInteractionEdit(deps: UsePageInteractionEditOptions) {
             style: sourceTextStyle(pdfEdit.style, hitRun),
           });
         } else if (pdfEdit.mode === 'text' || pdfEdit.mode === 'paragraph') {
+          const fontPx = fontPxAt(pageIndex);
           pdfEdit.startInsertingText(pageIndex, point, {
-            x: point.x - 50,
-            y: point.y - 10,
-            w: 100,
-            h: 20,
+            x: point.x,
+            // Place box so PDF baseline (box.y + fontPx) lands at the click y.
+            y: point.y - fontPx,
+            w: 220,
+            h: fontPx + 6,
           });
         } else {
           // In idle mode, decide text vs. image by hit-testing.
@@ -270,11 +298,12 @@ export function usePageInteractionEdit(deps: UsePageInteractionEditOptions) {
               rotation: image.rotation,
             });
           } else {
+            const fontPx = fontPxAt(pageIndex);
             pdfEdit.startInsertingText(pageIndex, point, {
-              x: point.x - 50,
-              y: point.y - 10,
-              w: 100,
-              h: 20,
+              x: point.x,
+              y: point.y - fontPx,
+              w: 220,
+              h: fontPx + 6,
             });
           }
         }
@@ -294,7 +323,7 @@ export function usePageInteractionEdit(deps: UsePageInteractionEditOptions) {
         }
       }
     },
-    [hitTestPdfiumText, pdfEdit, loadPageTextLines],
+    [hitTestPdfiumText, pdfEdit, loadPageTextLines, fontPxAt],
   );
 
   const applyTextEdit = useCallback(

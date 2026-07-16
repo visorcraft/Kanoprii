@@ -216,6 +216,7 @@ export function buildAppViewerSource(
     showFormsPanel: input.showFormsPanel,
     formFields: input.formFields,
     currentPage: input.currentPage,
+    pageSizes: input.pageSizes,
     onRemoveHighlight: input.removeHighlight,
     onRemoveRedaction: input.removeRedaction,
     onRemoveStamp: input.removeStamp,

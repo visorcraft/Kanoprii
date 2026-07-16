@@ -13,11 +13,11 @@
   resize: none;
   border: 2px dashed var(--pp-accent, #0066cc);
   border-radius: 4px;
-  padding: 0 3px;
-  background: var(--pp-surface, #fff);
-  color: var(--pp-text, #1a1a2e);
-  line-height: 1.25;
+  background: #fff;
+  color: #1a1a2e;
   outline: none;
+  caret-color: var(--pp-accent, #0066cc);
+  -webkit-text-fill-color: #1a1a2e;
 }
 
 .rich-text-edit-textarea:focus {

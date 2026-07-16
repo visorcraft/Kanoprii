@@ -9,6 +9,9 @@ type HandleKind = ResizeHandleKind | 'move';
 type RichTextEditOverlayProps = {
   draft: TextEditDraft | ParagraphEditDraft;
   zoom?: number;
+  /** Height of the edited page in PDF points (viewer vertical axis). When
+   *  omitted the font is rendered 1:1 (legacy behaviour). */
+  pageHeightPt?: number;
   onUpdate: (patch: { text?: string; style?: TextStyle; pageRect?: Rect }) => void;
   onApply: () => void;
   onCancel: () => void;
@@ -78,6 +81,7 @@ function clampResize(rect: Rect, fixed: { x: number; y: number }, kind: ResizeHa
 export function RichTextEditOverlay({
   draft,
   zoom = 1,
+  pageHeightPt,
   onUpdate,
   onApply,
   onCancel,
@@ -106,6 +110,8 @@ export function RichTextEditOverlay({
   const handleMouseDown = useCallback((e: React.MouseEvent, kind: HandleKind) => {
     e.stopPropagation();
     e.preventDefault();
+    // Keep focus on the textarea so typed text isn't lost when the user grabs the move handle.
+    textareaRef.current?.focus();
     setDragging(kind);
     dragStartPosRef.current = { x: e.clientX, y: e.clientY };
     dragStartRectRef.current = rectRef.current;
@@ -211,20 +217,19 @@ export function RichTextEditOverlay({
     const startRect = dragStartRectRef.current;
     if (!startPos || !startRect) return;
 
-    const onMouseMove = (e: MouseEvent) => {
+    let lastEvent: MouseEvent | null = null;
+
+    const computeNext = (e: MouseEvent): Rect | null => {
       const dx = (e.clientX - startPos.x) / zoom;
       const dy = (e.clientY - startPos.y) / zoom;
 
       if (dragging === 'move') {
-        updateRect(
-          clampMove({
-            x: startRect.x + dx,
-            y: startRect.y + dy,
-            w: startRect.w,
-            h: startRect.h,
-          }),
-        );
-        return;
+        return clampMove({
+          x: startRect.x + dx,
+          y: startRect.y + dy,
+          w: startRect.w,
+          h: startRect.h,
+        });
       }
 
       let next: Rect;
@@ -242,17 +247,29 @@ export function RichTextEditOverlay({
           next = { x: startRect.x + dx, y: startRect.y + dy, w: startRect.w - dx, h: startRect.h - dy };
           break;
         default:
-          return;
+          return null;
       }
       const fixed = getFixedCorner(startRect, dragging);
-      updateRect(clampResize(next, fixed, dragging));
+      return clampResize(next, fixed, dragging);
+    };
+
+    const onMouseMove = (e: MouseEvent) => {
+      lastEvent = e;
+      const next = computeNext(e);
+      if (next) updateRect(next);
     };
 
     const onMouseUp = () => {
+      // Compute the final rect from the last known mouse position so the drop
+      // lands exactly where the cursor is, even if no final mousemove fired.
+      const finalRect =
+        (lastEvent ? computeNext(lastEvent) : null) ?? rectRef.current;
       setDragging(null);
-      onUpdate({ pageRect: rectRef.current });
+      onUpdate({ pageRect: finalRect });
       dragStartPosRef.current = null;
       dragStartRectRef.current = null;
+      // Restore focus + caret to the textarea so typing continues where it left off.
+      textareaRef.current?.focus();
     };
 
     window.addEventListener('mousemove', onMouseMove);
@@ -264,6 +281,15 @@ export function RichTextEditOverlay({
   }, [dragging, onUpdate, updateRect, zoom]);
 
   const { style } = draft;
+
+  // `style.fontSize` is in PDF points (written straight to the PDF `Tf`
+  // operator), but this textarea lives in 800x1132 viewer space. Scale points
+  // to viewer px so the preview matches the committed glyph size and the
+  // baseline lands where `render_wrapped_text_box` will draw it.
+  const fontPx =
+    pageHeightPt && pageHeightPt > 0
+      ? style.fontSize * (VIEWER_PAGE_H / pageHeightPt)
+      : style.fontSize;
 
   const handleLabels: Record<ResizeHandleKind, string> = {
     tl: 'Resize text box top-left',
@@ -294,6 +320,7 @@ export function RichTextEditOverlay({
         width: rect.w,
         height: rect.h,
       }}
+      onClick={(e) => e.stopPropagation()}
     >
       <textarea
         ref={textareaRef}
@@ -316,7 +343,15 @@ export function RichTextEditOverlay({
               : style.fontFamily === 'Times'
                 ? 'Times New Roman, Times, serif'
                 : style.fontFamily,
-          fontSize: style.fontSize,
+          fontSize: `${fontPx}px`,
+          lineHeight: `${fontPx}px`,
+          // PDF baseline sits at box.y + fontPx. Push the textarea text down by
+          // the descent (~20% of em) so its baseline lands at the same y as the
+          // applied PDF text.
+          paddingTop: `${Math.round(fontPx * 0.2)}px`,
+          paddingBottom: 0,
+          paddingLeft: 4,
+          paddingRight: 4,
           fontWeight: style.bold ? 'bold' : 'normal',
           fontStyle: style.italic ? 'italic' : 'normal',
           textDecoration: style.underline ? 'underline' : 'none',

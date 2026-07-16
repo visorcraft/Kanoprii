@@ -73,8 +73,8 @@ export function ModeToolbarExtras({
           </button>
           <button
             type="button"
-            className={pdfEdit.editMode ? 'btn btn-active' : 'btn'}
-            aria-pressed={pdfEdit.editMode}
+            className={pdfEdit.editMode && pdfEdit.mode !== 'text' && !pdfEdit.paragraphDraft ? 'btn btn-active' : 'btn'}
+            aria-pressed={pdfEdit.editMode && pdfEdit.mode !== 'text' && !pdfEdit.paragraphDraft}
             aria-label="Edit mode"
             title={pdfEdit.editMode ? 'Edit PDF content (on)' : 'Edit PDF content'}
             onClick={onToggleEditMode}
