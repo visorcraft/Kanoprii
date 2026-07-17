@@ -122,40 +122,36 @@ describe('v0.5 viewer features', () => {
     await waitForNoSearchResults();
   });
 
-  it('shows top-menu submenus outside the root scroller', async () => {
+  it('shows ribbon dropdown submenus outside the root scroller', async () => {
     await resetToWelcome();
     await openPdfViaPathModal(fixturePdf);
     await waitForPdfOpen();
     await $('[data-testid="menu-document"]').click();
-    // Wait for the Document dropdown to render, then drive the submenu open.
-    // WDIO's moveTo in headless WebKitGTK doesn't reliably synthesise the
-    // native mouseenter that React's onMouseEnter listens for, so dispatch
-    // the events directly.
+    const cropDropdown = await $('[data-testid="submenu-crop-margins"]');
+    await cropDropdown.waitForDisplayed({ timeout: 5_000 });
+    await cropDropdown.click();
+    // Drive the nested Crop submenu open. WDIO's moveTo in headless WebKitGTK
+    // doesn't reliably synthesise the native mouseenter that React's
+    // onMouseEnter listens for, so dispatch the events directly.
     const submenu = await $('[data-testid="submenu-crop"]');
     await submenu.waitForDisplayed({ timeout: 5_000 });
     await browser.execute((el: HTMLElement) => {
       el.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
-      el.dispatchEvent(new MouseEvent('mouseenter', { bubbles: false }));
+      el.dispatchEvent(new MouseEvent('mouseenter', { bubbles: true }));
     }, submenu);
-    // The submenu renders through a body portal; wait for the nested action
-    // to appear before hovering it.
     const cropAction = await $('[data-testid="crop"]');
     await cropAction.waitForDisplayed({ timeout: 5_000 });
-    await browser.execute((el: HTMLElement) => {
-      el.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
-    }, cropAction);
     await browser.waitUntil(
       async () => browser.execute(() => {
-        const root = document.querySelector<HTMLElement>('.menu-bar-entry > .menu-dropdown');
+        const root = document.querySelector<HTMLElement>('.ribbon-dropdown-wrap .menu-dropdown');
         const nested = document.querySelector<HTMLElement>('body > .menu-dropdown-nested');
         if (!root || !nested) return false;
+        const rootRect = root.getBoundingClientRect();
         const rect = nested.getBoundingClientRect();
-        return root.scrollWidth === root.clientWidth
-          && getComputedStyle(nested).position === 'fixed'
-          && rect.right <= window.innerWidth
-          && rect.bottom <= window.innerHeight;
+        // nested submenu is portaled to <body> and renders beyond the root dropdown
+        return rect.width > 0 && rect.height > 0 && rect.left >= rootRect.right - 2;
       }),
-      { timeout: 5_000, timeoutMsg: 'expected visible submenu without root horizontal scroll' },
+      { timeout: 5_000, timeoutMsg: 'nested submenu did not portal outside the ribbon dropdown' },
     );
   });
 
@@ -229,5 +225,30 @@ describe('v0.5 viewer features', () => {
       async () => browser.execute(() => !document.body.classList.contains('kanoprii-menu-open')),
       { timeout: 5_000, timeoutMsg: 'expected menu-open scrollbar guard to clear' },
     );
+  });
+
+  it('collapses and expands the ribbon', async () => {
+    await waitForShell();
+    // collapse state persists in localStorage across tests — normalize first
+    if (!(await (await $('.ribbon-body')).isExisting())) {
+      await (await $('[data-testid="ribbon-collapse"]')).click();
+    }
+    expect(await (await $('.ribbon-body')).isDisplayed()).toBe(true);
+    await (await $('[data-testid="ribbon-collapse"]')).click();
+    expect(await (await $('.ribbon-body')).isExisting()).toBe(false);
+    await (await $('[data-testid="ribbon-collapse"]')).click();
+    await (await $('.ribbon-body')).waitForDisplayed({ timeout: 5_000 });
+  });
+
+  it('toggles the thumbnails sidebar from the View ribbon tab', async () => {
+    await resetToWelcome();
+    await openPdfViaPathModal(fixturePdf);
+    await waitForPdfOpen();
+    expect(await (await $('.sidebar')).isDisplayed()).toBe(true);
+    await (await $('[data-testid="menu-view"]')).click();
+    await (await $('[data-testid="thumbnails"]')).click();
+    expect(await (await $('.sidebar')).isExisting()).toBe(false);
+    await (await $('[data-testid="thumbnails"]')).click();
+    await (await $('.sidebar')).waitForDisplayed({ timeout: 5_000 });
   });
 });

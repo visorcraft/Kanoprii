@@ -145,7 +145,14 @@ export async function waitForPdfOpen() {
   await browser.waitUntil(
     async () => {
       const btn = await $('[data-testid="save-pdf"]');
-      return btn.isDisplayed().catch(() => false);
+      if (await btn.isDisplayed().catch(() => false)) return true;
+      // Save lives on the Home ribbon tab; a previous test may have left
+      // another tab active, so switch back to Home before retrying.
+      const homeTab = await $('[data-testid="menu-home"]');
+      if (await homeTab.isDisplayed().catch(() => false)) {
+        await homeTab.click().catch(() => {});
+      }
+      return false;
     },
     { timeout: 90_000, timeoutMsg: 'expected PDF viewer toolbar' },
   );
@@ -198,6 +205,14 @@ export async function clickMenuAction(menuId: string, actionId: string) {
 
 export async function clickQuickAction(testId: string) {
   const btn = await $(`[data-testid="${testId}"]`);
+  // Quick actions (Save/Undo/Find/Rotate) live on the Home ribbon tab; a
+  // previous menu action may have left another tab active, so switch back.
+  if (!(await btn.isDisplayed().catch(() => false))) {
+    const homeTab = await $('[data-testid="menu-home"]');
+    if (await homeTab.isDisplayed().catch(() => false)) {
+      await homeTab.click().catch(() => {});
+    }
+  }
   await btn.waitForDisplayed({ timeout: 10_000 });
   await btn.click();
 }

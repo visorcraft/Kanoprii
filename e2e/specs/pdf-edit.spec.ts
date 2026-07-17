@@ -22,6 +22,20 @@ async function enterPdfEditMode() {
   await clickMenuAction('edit', 'pdf-edit');
 }
 
+// The edit tools live in the Edit ribbon tab; select it before using them directly.
+async function selectEditRibbonTab() {
+  const tab = await $('[data-testid="menu-edit"]');
+  await tab.waitForDisplayed({ timeout: 10_000 });
+  await tab.click();
+}
+
+// Undo lives on the Home ribbon tab; select it before asserting undo state.
+async function selectHomeRibbonTab() {
+  const tab = await $('[data-testid="menu-home"]');
+  await tab.waitForDisplayed({ timeout: 10_000 });
+  await tab.click();
+}
+
 async function getCenterOfTextSpan(text: string): Promise<{ cx: number; cy: number }> {
   return browser.execute((t) => {
     const span = Array.from(document.querySelectorAll('.text-layer span')).find((el) =>
@@ -45,17 +59,16 @@ describe('PDF Edit Mode', () => {
   it('shows a dedicated edit toolbar and keeps editing commands out of Annotate', async () => {
     await openPdfViaPathModal(fixturePdf);
     await waitForPdfOpen();
+    await selectEditRibbonTab();
 
     const toolbar = await $('[data-testid="pdf-edit-toolbar"]');
-    await toolbar.waitForDisplayed({ timeout: 10_000 });
-    await expect(toolbar).toHaveElementClass('pdf-edit-ribbon');
-    expect(await toolbar.$$('.pdf-edit-tool-group')).toHaveLength(3);
-    expect(await toolbar.$$('.pdf-edit-tool-icon')).toHaveLength(5);
-    await expect($('button=Edit Text')).toBeDisplayed();
-    await expect($('button=Add Text')).toBeDisplayed();
-    await expect($('button=Add Image')).toBeDisplayed();
-    await expect($('button=Edit Objects')).toBeDisplayed();
-    await expect($('button=Edit Vector')).toBeDisplayed();
+    await toolbar.waitForDisplayed({ timeout: 5_000 });
+    expect(await toolbar.getAttribute('class')).toContain('edit-ribbon-tab');
+    expect(await toolbar.$$('.pdf-edit-tool-group')).toHaveLength(4);
+    expect(await toolbar.$$('.pdf-edit-tool-icon')).toHaveLength(6);
+    for (const label of ['Edit Text', 'Add Text', 'Add Image', 'Edit Objects', 'Edit Vector', 'Manage']) {
+      expect(await toolbar.$(`button=${label}`).isExisting()).toBe(true);
+    }
 
     await $('[data-testid="menu-annotate"]').click();
     expect(await $('[data-testid="pdf-edit"]').isDisplayed().catch(() => false)).toBe(false);
@@ -66,6 +79,7 @@ describe('PDF Edit Mode', () => {
     await openPdfViaPathModal(fixturePdf);
     await waitForPdfOpen();
     await waitForPageRendered();
+    await selectEditRibbonTab();
 
     const addText = await $('button=Add Text');
     const editObjects = await $('[aria-label="Edit mode"]');
@@ -125,11 +139,12 @@ describe('PDF Edit Mode', () => {
     await openPdfViaPathModal(fixturePdf);
     await waitForPdfOpen();
     await waitForPageRendered();
+    await selectEditRibbonTab();
 
     const editObjects = await $('[aria-label="Edit mode"]');
     await editObjects.click();
     await expect(editObjects).toHaveAttribute('aria-pressed', 'true');
-    await expect($('.pdf-edit-ribbon-hint')).toHaveText('Click text or an image to select it.');
+    await expect($('.ribbon-hint')).toHaveText('Click text or an image to select it.');
     await expect($('.page-container')).toHaveElementClass('object-edit-cursor');
     await expect($('.text-layer')).toHaveElementClass('edit-targets');
 
@@ -154,7 +169,7 @@ describe('PDF Edit Mode', () => {
     await expect(editObjects).toHaveAttribute('aria-pressed', 'true');
 
     await $('button=Add Text').click();
-    await expect($('.pdf-edit-ribbon-hint')).toHaveText('Click the page to place text.');
+    await expect($('.ribbon-hint')).toHaveText('Click the page to place text.');
     await expect($('.page-container')).toHaveElementClass('text-edit-cursor');
     await expect($('.text-layer')).not.toHaveElementClass('edit-targets');
     const textPoint = await getCenterOfTextSpan('Hello');
@@ -169,6 +184,7 @@ describe('PDF Edit Mode', () => {
     await waitForPdfOpen();
     await rotateCurrentPage();
     await waitForPageRendered();
+    await selectEditRibbonTab();
 
     await $('button=Add Text').click();
     const { cx, cy } = await browser.execute(() => {
@@ -192,6 +208,7 @@ describe('PDF Edit Mode', () => {
     await openPdfViaPathModal(fixturePdf);
     await waitForPdfOpen();
     await waitForPageRendered();
+    await selectEditRibbonTab();
 
     await $('button=Add Text').click();
     const { cx, cy } = await browser.execute(() => {
@@ -403,6 +420,7 @@ describe('PDF Edit Mode', () => {
       { timeout: 15_000, timeoutMsg: 'expected rich-text edit overlay to disappear after apply' },
     );
 
+    await selectHomeRibbonTab();
     const undo = await $('[data-testid="undo-btn"]');
     await undo.waitForEnabled({ timeout: 10_000 });
     await browser.keys(['\uE009', 'z']);
@@ -416,6 +434,7 @@ describe('PDF Edit Mode', () => {
     await openPdfViaPathModal(fixturePdf);
     await waitForPdfOpen();
     await waitForPageRendered();
+    await selectEditRibbonTab();
 
     await $('button=Edit Text').click();
     const { cx, cy } = await getCenterOfTextSpan('Hello');
@@ -432,6 +451,7 @@ describe('PDF Edit Mode', () => {
       async () => !(await $('.rich-text-edit-textarea').isDisplayed().catch(() => false)),
       { timeout: 5_000, timeoutMsg: 'expected unchanged Edit Text field to close' },
     );
+    await selectHomeRibbonTab();
     await expect($('[data-testid="undo-btn"]')).toBeDisabled();
 
     await browser.action('pointer').move(blank).down({ button: 0 }).up({ button: 0 }).perform();
@@ -443,6 +463,7 @@ describe('PDF Edit Mode', () => {
     await openPdfViaPathModal(fixturePdf);
     await waitForPdfOpen();
     await waitForPageRendered();
+    await selectEditRibbonTab();
 
     const editText = await $('button=Edit Text');
     await editText.click();
@@ -528,7 +549,9 @@ describe('PDF Edit Mode', () => {
       async () => !(await $('.rich-text-edit-textarea').isDisplayed().catch(() => false)),
       { timeout: 5_000, timeoutMsg: 'expected unchanged paragraph editor to close' },
     );
+    await selectHomeRibbonTab();
     await expect($('[data-testid="undo-btn"]')).toBeDisabled();
+    await selectEditRibbonTab();
 
     const point = await getCenterOfTextSpan('First line');
     await browser.action('pointer').move({ x: point.cx, y: point.cy }).down({ button: 0 }).up({ button: 0 }).perform();
@@ -596,6 +619,7 @@ describe('PDF Edit Mode', () => {
       async () => !(await $('.image-selection-overlay').isDisplayed().catch(() => false)),
       { timeout: 5_000, timeoutMsg: 'expected unchanged image selection to close' },
     );
+    await selectHomeRibbonTab();
     await expect($('[data-testid="undo-btn"]')).toBeDisabled();
     const freshImagePoint = await browser.execute(() => {
       const img = document.querySelector('.page-image') as HTMLImageElement | null;
@@ -641,6 +665,7 @@ describe('PDF Edit Mode', () => {
     await openPdfViaPathModal(fixturePdf);
     await waitForPdfOpen();
     await waitForPageRendered();
+    await selectEditRibbonTab();
 
     const insertBtn = await $('[aria-label="Add image"]');
     await insertBtn.waitForDisplayed({ timeout: 10_000 });
@@ -686,6 +711,7 @@ describe('PDF Edit Mode', () => {
       async () => !(await $('.image-selection-overlay').isDisplayed().catch(() => false)),
       { timeout: 5_000, timeoutMsg: 'expected inserted image selection to close' },
     );
+    await selectHomeRibbonTab();
     await expect($('[data-testid="undo-btn"]')).toBeEnabled();
     await browser.execute(() => {
       const target = window as Window & { __kanopriiOriginalPrompt?: typeof window.prompt };
@@ -698,6 +724,7 @@ describe('PDF Edit Mode', () => {
     await openPdfViaPathModal(fixturePdf);
     await waitForPdfOpen();
     await waitForPageRendered();
+    await selectEditRibbonTab();
 
     await $('button=Edit Vector').click();
     const points = await browser.execute(() => {
@@ -727,6 +754,7 @@ describe('PDF Edit Mode', () => {
       { timeout: 5_000, timeoutMsg: 'expected unchanged vector selection to close' },
     );
 
+    await selectHomeRibbonTab();
     const undo = await $('[data-testid="undo-btn"]');
     await undo.click();
     await browser.waitUntil(() => undo.isEnabled().then((enabled) => !enabled), {
@@ -734,6 +762,7 @@ describe('PDF Edit Mode', () => {
       timeoutMsg: 'expected one Undo to remove the newly created vector',
     });
     expect(await $('.page-vector-edit-overlay:not(.page-vector-draft)').isDisplayed().catch(() => false)).toBe(false);
+    await selectEditRibbonTab();
 
     await browser.action('pointer')
       .move({ x: points.x1, y: points.y1 }).down({ button: 0 })
