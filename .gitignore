@@ -14,7 +14,7 @@ build/
 src-tauri/target/
 src-tauri/bin/
 
-# Agent planning matrix (AGENTS.md is tracked; keep the rest local)
+# Agent context + planning files (kept local, never tracked)
 AGENTS.md
 CLAUDE.md
 GEMINI.md
