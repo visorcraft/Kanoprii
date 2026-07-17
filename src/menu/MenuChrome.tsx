@@ -215,16 +215,12 @@ export function MenuChrome({
 }: MenuChromeProps) {
   const { onTabContextMenu, overlay: tabMenuOverlay } = useTabContextMenu({ tabs, ...tabMenuApi });
   const showTabChrome = documentChromeVisible && workspaceView === 'tabs';
-  const ribbonTabs = useMemo(
-    () =>
-      buildRibbonTabs({
-        menus: menus.menus,
-        quickAccess: menus.quickAccess,
-        editTabContent: ribbonExtras.editTab,
-        annotateOptions: ribbonExtras.annotateOptions,
-      }),
-    [menus, ribbonExtras],
-  );
+  const ribbonTabs = buildRibbonTabs({
+    menus: menus.menus,
+    quickAccess: menus.quickAccess,
+    editTabContent: ribbonExtras.editTab,
+    annotateOptions: ribbonExtras.annotateOptions,
+  });
   return (
     <>
       <div className="menu-chrome">

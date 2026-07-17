@@ -25,7 +25,7 @@ export function useAppSurfaceState(): SurfaceState {
   const closeSettings = useCallback(() => {
     setActiveSurface('document');
     const target = previousFocusRef.current;
-    if (target instanceof HTMLElement) {
+    if (target instanceof HTMLElement && target.isConnected) {
       target.focus();
     } else {
       document

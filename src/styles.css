@@ -1137,14 +1137,6 @@ body {
   background: var(--pp-border);
 }
 
-.pdf-edit-context-label {
-  color: var(--pp-text);
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-}
-
 .pdf-edit-tool {
   display: inline-flex;
   min-width: 58px;
@@ -1199,7 +1191,11 @@ body {
 .pdf-edit-context-label {
   min-width: 58px;
   color: var(--pp-text-muted);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
   text-align: center;
+  text-transform: uppercase;
 }
 
 .pdf-edit-context-group {
