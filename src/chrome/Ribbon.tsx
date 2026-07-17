@@ -177,8 +177,8 @@ export function Ribbon({ tabs }: { tabs: RibbonTabDef[] }) {
   );
 
   return (
-    <div className="ribbon" ref={rootRef}>
-      <nav className="ribbon-tabs" aria-label="Ribbon">
+    <nav className="ribbon" ref={rootRef} aria-label="Ribbon">
+      <div className="ribbon-tabs">
         {leadingMenus.map(renderMenuTab)}
         <div className="ribbon-tablist" role="tablist" aria-label="Ribbon">
           {bodyTabs.map((tab) => (
@@ -211,7 +211,7 @@ export function Ribbon({ tabs }: { tabs: RibbonTabDef[] }) {
         >
           <RibbonIcon name={collapsed ? 'chevron-down' : 'chevron-up'} className="ribbon-collapse-icon" />
         </button>
-      </nav>
+      </div>
       {!collapsed && active && (
         <div
           className="ribbon-body"
@@ -232,6 +232,6 @@ export function Ribbon({ tabs }: { tabs: RibbonTabDef[] }) {
           {active.extras}
         </div>
       )}
-    </div>
+    </nav>
   );
 }
