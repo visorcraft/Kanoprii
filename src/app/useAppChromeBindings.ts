@@ -135,6 +135,7 @@ export function useAppChromeBindings(input: UseAppChromeBindingsInput) {
       textEditMode: input.annotation.textEditMode,
       editTextRunMode: input.annotation.editTextRunMode,
       vectorEditMode: input.annotation.vectorEditMode,
+      formAddMode: input.annotation.formAddMode,
     },
     panels: {
       showFormsPanel: input.panels.showFormsPanel,
@@ -158,6 +159,7 @@ export function useAppChromeBindings(input: UseAppChromeBindingsInput) {
       setShowSidebar: input.panels.setShowSidebar,
       setShowHiddenLayers: input.panels.setShowHiddenLayers,
       setShowPageEditsModal: input.annotation.setShowPageEditsModal,
+      setFormAddMode: input.annotation.setFormAddMode,
       openTesseractGuide: input.chrome.openTesseractGuide,
       openPdf: input.chrome.openPdf,
       handlePrint: input.chrome.handlePrint,

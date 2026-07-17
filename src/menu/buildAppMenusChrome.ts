@@ -85,7 +85,8 @@ export function buildQuickAccessActions(ctx: AppMenuContext): MenuAction[] {
   const noToolActive =
     !ctx.highlightMode && !ctx.noteMode && !ctx.drawMode && !ctx.shapeMode &&
     !ctx.stampMode && !ctx.redactMode && !ctx.imageInsertMode &&
-    !ctx.textEditMode && !ctx.editTextRunMode && !ctx.vectorEditMode && !ctx.editMode;
+    !ctx.textEditMode && !ctx.editTextRunMode && !ctx.vectorEditMode &&
+    !ctx.formAddMode && !ctx.editMode;
   return [
     act('qa-save', ctx.isDirty ? 'Save •' : 'Save', ctx.handleSave, {
       shortcutCommandId: 'save',
@@ -104,6 +105,7 @@ export function buildQuickAccessActions(ctx: AppMenuContext): MenuAction[] {
       if (ctx.textEditMode) ctx.toggleTextEditMode();
       if (ctx.editTextRunMode) ctx.toggleEditTextRunMode();
       if (ctx.vectorEditMode) ctx.toggleVectorEditMode();
+      if (ctx.formAddMode) ctx.exitFormAddMode();
       if (ctx.editMode) ctx.toggleEditMode();
     }, { disabled: off, active: ctx.hasPdf && noToolActive }),
     act('qa-find', 'Find', ctx.openSearchModal, { shortcutCommandId: 'find', disabled: off }),

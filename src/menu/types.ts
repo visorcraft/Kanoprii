@@ -62,6 +62,8 @@ export interface AppMenuContext {
   togglePdfUaPanel: () => void;
   showSidebar: boolean;
   toggleSidebar: () => void;
+  formAddMode: boolean;
+  exitFormAddMode: () => void;
   showHiddenLayers: boolean;
   toggleShowHiddenLayers: () => void;
   tesseractInstalled: boolean;
@@ -263,6 +265,8 @@ export type AppMenuContextSource = {
   togglePdfUaPanel: () => void;
   showSidebar: boolean;
   toggleSidebar: () => void;
+  formAddMode: boolean;
+  exitFormAddMode: () => void;
   showHiddenLayers: boolean;
   toggleShowHiddenLayers: () => void;
   tesseractInstalled: boolean;

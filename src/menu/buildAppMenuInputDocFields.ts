@@ -23,6 +23,7 @@ export function menuInputDocFields(args: BuildAppMenuInputArgs): Pick<
   | 'textEditMode'
   | 'editTextRunMode'
   | 'vectorEditMode'
+  | 'formAddMode'
   | 'editMode'
   | 'showFormsPanel'
   | 'showBookmarksPanel'
@@ -43,6 +44,7 @@ export function menuInputDocFields(args: BuildAppMenuInputArgs): Pick<
   | 'setShowHiddenLayers'
   | 'setShowSidebar'
   | 'setShowPageEditsModal'
+  | 'setFormAddMode'
   | 'setShowShortcutsHelp'
   | 'setShowLicenses'
   | 'setShowCredits'
@@ -128,6 +130,7 @@ export function menuInputDocFields(args: BuildAppMenuInputArgs): Pick<
     textEditMode: annotation.textEditMode,
     editTextRunMode: annotation.editTextRunMode,
     vectorEditMode: annotation.vectorEditMode,
+    formAddMode: annotation.formAddMode,
     editMode: pdfEdit.editMode,
     showFormsPanel: panels.showFormsPanel,
     showBookmarksPanel: panels.showBookmarksPanel,
@@ -148,6 +151,7 @@ export function menuInputDocFields(args: BuildAppMenuInputArgs): Pick<
     setShowHiddenLayers: chrome.setShowHiddenLayers,
     setShowSidebar: chrome.setShowSidebar,
     setShowPageEditsModal: chrome.setShowPageEditsModal,
+    setFormAddMode: chrome.setFormAddMode,
     setShowShortcutsHelp: help.setShowShortcutsHelp,
     setShowLicenses: help.setShowLicenses,
     setShowCredits: help.setShowCredits,

@@ -19,6 +19,7 @@ export type BuildAppMenuSourceInput = Omit<
   | 'toggleAnnotationsPanel'
   | 'togglePdfUaPanel'
   | 'toggleSidebar'
+  | 'exitFormAddMode'
   | 'toggleShowHiddenLayers'
   | 'toggleContinuousScroll'
   | 'openPageEditsModal'
@@ -48,6 +49,7 @@ export type BuildAppMenuSourceInput = Omit<
   setShowAnnotationsPanel: (fn: (prev: boolean) => boolean) => void;
   setShowPdfUaPanel: (fn: (prev: boolean) => boolean) => void;
   setShowSidebar: (fn: (prev: boolean) => boolean) => void;
+  setFormAddMode: (on: boolean) => void;
   setShowHiddenLayers: (fn: (prev: boolean) => boolean) => void;
   setShowPageEditsModal: (open: boolean) => void;
   setShowShortcutsHelp: (open: boolean) => void;
@@ -76,6 +78,7 @@ export function buildAppMenuSource(input: BuildAppMenuSourceInput): AppMenuConte
     setShowAnnotationsPanel,
     setShowPdfUaPanel,
     setShowSidebar,
+    setFormAddMode,
     setShowHiddenLayers,
     setShowPageEditsModal,
     setShowShortcutsHelp,
@@ -111,6 +114,7 @@ export function buildAppMenuSource(input: BuildAppMenuSourceInput): AppMenuConte
     toggleAnnotationsPanel: () => setShowAnnotationsPanel((prev) => !prev),
     togglePdfUaPanel: () => setShowPdfUaPanel((prev) => !prev),
     toggleSidebar: () => setShowSidebar((prev) => !prev),
+    exitFormAddMode: () => setFormAddMode(false),
     toggleShowHiddenLayers: () => setShowHiddenLayers((prev) => !prev),
     openPageEditsModal: () => setShowPageEditsModal(true),
     openShortcutsHelp: () => setShowShortcutsHelp(true),

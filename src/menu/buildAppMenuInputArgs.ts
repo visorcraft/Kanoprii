@@ -10,7 +10,7 @@ import type { PdfEditState } from '../app/usePdfEditState';
 
 export type BuildAppMenuInputArgs = {
   doc: Pick<DocumentState, 'filePath' | 'originalPath' | 'sourcePath' | 'sourceKind' | 'isDirty' | 'pageCount' | 'currentPage' | 'viewMode' | 'scrollViewMode' | 'ocrAvailable'>;
-  annotation: Pick<AnnotationState, 'highlightMode' | 'noteMode' | 'drawMode' | 'shapeMode' | 'stampMode' | 'redactMode' | 'imageInsertMode' | 'textEditMode' | 'editTextRunMode' | 'vectorEditMode'>;
+  annotation: Pick<AnnotationState, 'highlightMode' | 'noteMode' | 'drawMode' | 'shapeMode' | 'stampMode' | 'redactMode' | 'imageInsertMode' | 'textEditMode' | 'editTextRunMode' | 'vectorEditMode' | 'formAddMode'>;
   panels: Pick<PanelsState, 'showFormsPanel' | 'showBookmarksPanel' | 'showSignaturesPanel' | 'showAnnotationsPanel' | 'showPdfUaPanel' | 'showHiddenLayers' | 'showSidebar'>;
   history: { canUndo: boolean; canRedo: boolean; undo: () => void; redo: () => void };
   chrome: {
@@ -25,6 +25,7 @@ export type BuildAppMenuInputArgs = {
     setShowSidebar: PanelsState['setShowSidebar'];
     setShowHiddenLayers: PanelsState['setShowHiddenLayers'];
     setShowPageEditsModal: AnnotationState['setShowPageEditsModal'];
+    setFormAddMode: AnnotationState['setFormAddMode'];
     openTesseractGuide: () => void;
     openPdf: () => void;
     handlePrint: () => void;

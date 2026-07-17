@@ -23,6 +23,8 @@ export function menuContextDocAnnotFields(source: AppMenuContextSource): Pick<
   | 'imageInsertMode'
   | 'textEditMode'
   | 'vectorEditMode'
+  | 'formAddMode'
+  | 'exitFormAddMode'
   | 'editMode'
   | 'toggleEditMode'
   | 'showFormsPanel'
@@ -128,6 +130,8 @@ export function menuContextDocAnnotFields(source: AppMenuContextSource): Pick<
     imageInsertMode: source.imageInsertMode,
     textEditMode: source.textEditMode,
     vectorEditMode: source.vectorEditMode,
+    formAddMode: source.formAddMode,
+    exitFormAddMode: source.exitFormAddMode,
     editMode: source.editMode,
     toggleEditMode: source.toggleEditMode,
     showFormsPanel: source.showFormsPanel,
