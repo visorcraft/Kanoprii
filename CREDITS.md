@@ -40,22 +40,22 @@ excluded).
 
 | Crate | Version | License | Project |
 | ----- | ------- | ------- | ------- |
-| `tauri` | 2.11.3 | MIT OR Apache-2.0 | [tauri-apps/tauri](https://github.com/tauri-apps/tauri) |
+| `tauri` | 2.11.5 | MIT OR Apache-2.0 | [tauri-apps/tauri](https://github.com/tauri-apps/tauri) |
 | `tauri-build` | 2.6.3 | MIT OR Apache-2.0 | [tauri-apps/tauri](https://github.com/tauri-apps/tauri) |
 | `tauri-plugin-dialog` | 2.7.1 | MIT OR Apache-2.0 | [tauri-apps/plugins-workspace](https://github.com/tauri-apps/plugins-workspace) |
 | `tauri-plugin-process` | 2.3.1 | MIT OR Apache-2.0 | [tauri-apps/plugins-workspace](https://github.com/tauri-apps/plugins-workspace) |
-| `tauri-plugin-single-instance` | 2.4.2 | MIT OR Apache-2.0 | [tauri-apps/plugins-workspace](https://github.com/tauri-apps/plugins-workspace) |
+| `tauri-plugin-single-instance` | 2.4.3 | MIT OR Apache-2.0 | [tauri-apps/plugins-workspace](https://github.com/tauri-apps/plugins-workspace) |
 | `tauri-plugin-updater` | 2.10.1 | MIT OR Apache-2.0 | [tauri-apps/plugins-workspace](https://github.com/tauri-apps/plugins-workspace) |
-| `pdfium-render` | 0.9.2 | MIT OR Apache-2.0 | [ajrcarey/pdfium-render](https://github.com/ajrcarey/pdfium-render) |
-| `lopdf` | 0.42.0 | MIT | [J-F-Liu/lopdf](https://github.com/J-F-Liu/lopdf) |
+| `pdfium-render` | 0.9.3 | MIT OR Apache-2.0 | [ajrcarey/pdfium-render](https://github.com/ajrcarey/pdfium-render) |
+| `lopdf` | 0.43.0 | MIT | [J-F-Liu/lopdf](https://github.com/J-F-Liu/lopdf) |
 | `image` | 0.25.10 | MIT OR Apache-2.0 | [image-rs/image](https://github.com/image-rs/image) |
 | `fax` | 0.2.7 | MIT | [pdf-rs/fax](https://github.com/pdf-rs/fax) |
 | `underskrift` | 0.1.4 | BSD-2-Clause | [kushaldas/underskrift](https://github.com/kushaldas/underskrift) |
 | `serde` | 1.0.228 | MIT OR Apache-2.0 | [serde-rs/serde](https://github.com/serde-rs/serde) |
 | `serde_json` | 1.0.150 | MIT OR Apache-2.0 | [serde-rs/json](https://github.com/serde-rs/json) |
-| `tokio` | 1.52.3 | MIT | [tokio-rs/tokio](https://github.com/tokio-rs/tokio) |
-| `ureq` | 2.12.1 | MIT OR Apache-2.0 | [algesten/ureq](https://github.com/algesten/ureq) |
-| `sha2` | 0.10.9 | MIT OR Apache-2.0 | [RustCrypto/hashes](https://github.com/RustCrypto/hashes) |
+| `tokio` | 1.52.4 | MIT | [tokio-rs/tokio](https://github.com/tokio-rs/tokio) |
+| `ureq` | 3.3.0 | MIT OR Apache-2.0 | [algesten/ureq](https://github.com/algesten/ureq) |
+| `sha2` | 0.11.0 | MIT OR Apache-2.0 | [RustCrypto/hashes](https://github.com/RustCrypto/hashes) |
 | `ttf-parser` | 0.25.1 | MIT OR Apache-2.0 | [harfbuzz/ttf-parser](https://github.com/harfbuzz/ttf-parser) |
 | `printers` | 2.3.0 | MIT | [talesluna/rust-printers](https://github.com/talesluna/rust-printers) |
 | `openssl-sys` (Windows) | 0.9.117 | MIT | [rust-openssl/rust-openssl](https://github.com/rust-openssl/rust-openssl) |
@@ -75,6 +75,8 @@ are omitted because they are not bundled into release artifacts.
 | `@tauri-apps/plugin-updater` | 2.10.1 | MIT OR Apache-2.0 | [tauri-apps/plugins-workspace](https://github.com/tauri-apps/plugins-workspace) |
 | `react` | 19.2.7 | MIT | [react](https://react.dev/) |
 | `react-dom` | 19.2.7 | MIT | [react](https://react.dev/) |
+| `marked` | 18.0.6 | MIT | [marked](https://marked.js.org/) |
+| `html2canvas` | 1.4.1 | MIT | [html2canvas](https://html2canvas.hertzen.com/) |
 
 Regenerate `docs/credits-npm.json` and the npm license appendix via
 `scripts/generate-credits.sh` after any npm dependency change.

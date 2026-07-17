@@ -17,8 +17,8 @@ If you have questions about license compliance, please contact
 
 ## Licenses in use
 
-- **Apache License 2.0** (488 crates)
-- **MIT License** (150 crates)
+- **Apache License 2.0** (489 crates)
+- **MIT License** (154 crates)
 - **Unicode License v3** (19 crates)
 - **BSD 3-Clause &quot;New&quot; or &quot;Revised&quot; License** (12 crates)
 - **BSD 2-Clause &quot;Simplified&quot; License** (6 crates)
@@ -491,7 +491,7 @@ Used by:
 - [`flagset 0.4.7`](https://github.com/enarx/flagset)
 - [`kurbo 0.13.1`](https://github.com/linebender/kurbo)
 - [`polycool 0.4.0`](https://github.com/linebender/kurbo)
-- [`tinyvec 1.11.0`](https://github.com/Lokathor/tinyvec)
+- [`tinyvec 1.12.0`](https://github.com/Lokathor/tinyvec)
 - [`utf8_iter 1.0.4`](https://github.com/hsivonen/utf8_iter)
 - [`zeroize 1.9.0`](https://github.com/RustCrypto/utils)
 
@@ -1615,8 +1615,8 @@ Used by:
 ### Apache License 2.0
 
 Used by:
-- [`zerocopy-derive 0.8.53`](https://github.com/google/zerocopy)
-- [`zerocopy 0.8.53`](https://github.com/google/zerocopy)
+- [`zerocopy-derive 0.8.54`](https://github.com/google/zerocopy)
+- [`zerocopy 0.8.54`](https://github.com/google/zerocopy)
 
 ```
                                  Apache License
@@ -2917,14 +2917,14 @@ Used by:
 - [`stringprep 0.1.5`](https://github.com/sfackler/rust-stringprep)
 - [`toml 0.8.2`](https://github.com/toml-rs/toml)
 - [`toml 0.9.12+spec-1.1.0`](https://github.com/toml-rs/toml)
-- [`toml 1.1.2+spec-1.1.0`](https://github.com/toml-rs/toml)
+- [`toml 1.1.3+spec-1.1.0`](https://github.com/toml-rs/toml)
 - [`toml_datetime 0.7.5+spec-1.1.0`](https://github.com/toml-rs/toml)
 - [`toml_datetime 1.1.1+spec-1.1.0`](https://github.com/toml-rs/toml)
 - [`toml_edit 0.19.15`](https://github.com/toml-rs/toml)
 - [`toml_edit 0.20.2`](https://github.com/toml-rs/toml)
-- [`toml_edit 0.25.12+spec-1.1.0`](https://github.com/toml-rs/toml)
+- [`toml_edit 0.25.13+spec-1.1.0`](https://github.com/toml-rs/toml)
 - [`toml_parser 1.1.2+spec-1.1.0`](https://github.com/toml-rs/toml)
-- [`toml_writer 1.1.1+spec-1.1.0`](https://github.com/toml-rs/toml)
+- [`toml_writer 1.1.2+spec-1.1.0`](https://github.com/toml-rs/toml)
 
 ```
                                  Apache License
@@ -6550,15 +6550,15 @@ Used by:
 - [`base64 0.21.7`](https://github.com/marshallpierce/rust-base64)
 - [`base64 0.22.1`](https://github.com/marshallpierce/rust-base64)
 - [`bitflags 1.3.2`](https://github.com/bitflags/bitflags)
-- [`bitflags 2.13.0`](https://github.com/bitflags/bitflags)
+- [`bitflags 2.13.1`](https://github.com/bitflags/bitflags)
 - [`bitstream-io 4.10.0`](https://github.com/tuffy/bitstream-io)
 - [`blocking 1.6.2`](https://github.com/smol-rs/blocking)
 - [`bumpalo 3.20.3`](https://github.com/fitzgen/bumpalo)
 - [`camino 1.2.4`](https://github.com/camino-rs/camino)
-- [`cc 1.2.66`](https://github.com/rust-lang/cc-rs)
+- [`cc 1.2.67`](https://github.com/rust-lang/cc-rs)
 - [`cfg-if 1.0.4`](https://github.com/rust-lang/cfg-if)
 - [`concurrent-queue 2.5.0`](https://github.com/smol-rs/concurrent-queue)
-- [`console_log 1.0.0`](https://github.com/iamcodemaker/console_log)
+- [`console_log 1.1.0`](https://github.com/iamcodemaker/console_log)
 - [`core-foundation-sys 0.8.7`](https://github.com/servo/core-foundation-rs)
 - [`core-foundation 0.10.1`](https://github.com/servo/core-foundation-rs)
 - [`core-graphics-types 0.2.0`](https://github.com/servo/core-foundation-rs)
@@ -6611,6 +6611,7 @@ Used by:
 - [`muda 0.19.3`](https://github.com/tauri-apps/muda)
 - [`num-bigint-dig 0.8.6`](https://github.com/dignifiedquire/num-bigint)
 - [`num-bigint 0.4.8`](https://github.com/rust-num/num-bigint)
+- [`num-complex 0.4.6`](https://github.com/rust-num/num-complex)
 - [`num-derive 0.4.2`](https://github.com/rust-num/num-derive)
 - [`num-integer 0.1.46`](https://github.com/rust-num/num-integer)
 - [`num-iter 0.1.46`](https://github.com/rust-num/num-iter)
@@ -6631,14 +6632,14 @@ Used by:
 - [`polling 3.11.0`](https://github.com/smol-rs/polling)
 - [`rayon-core 1.13.0`](https://github.com/rayon-rs/rayon)
 - [`rayon 1.12.0`](https://github.com/rayon-rs/rayon)
-- [`regex-automata 0.4.14`](https://github.com/rust-lang/regex)
+- [`regex-automata 0.4.16`](https://github.com/rust-lang/regex)
 - [`regex-syntax 0.8.11`](https://github.com/rust-lang/regex)
-- [`regex 1.12.4`](https://github.com/rust-lang/regex)
+- [`regex 1.13.1`](https://github.com/rust-lang/regex)
 - [`ring 0.17.14`](https://github.com/briansmith/ring)
 - [`rustc_version 0.4.1`](https://github.com/djc/rustc-version-rs)
 - [`rustix 1.1.4`](https://github.com/bytecodealliance/rustix)
 - [`rustls-native-certs 0.8.4`](https://github.com/rustls/rustls-native-certs)
-- [`rustls 0.23.41`](https://github.com/rustls/rustls)
+- [`rustls 0.23.42`](https://github.com/rustls/rustls)
 - [`scopeguard 1.2.0`](https://github.com/bluss/scopeguard)
 - [`security-framework-sys 2.17.0`](https://github.com/kornelski/rust-security-framework)
 - [`security-framework 3.7.0`](https://github.com/kornelski/rust-security-framework)
@@ -6646,9 +6647,9 @@ Used by:
 - [`serde_with_macros 3.21.0`](https://github.com/jonasbb/serde_with/)
 - [`servo_arc 0.4.3`](https://github.com/servo/stylo)
 - [`signal-hook-registry 1.4.8`](https://github.com/vorner/signal-hook)
-- [`simd_cesu8 1.1.1`](https://github.com/seancroach/simd_cesu8)
+- [`simd_cesu8 1.2.0`](https://github.com/seancroach/simd_cesu8)
 - [`smallvec 1.15.2`](https://github.com/servo/rust-smallvec)
-- [`socket2 0.6.4`](https://github.com/rust-lang/socket2)
+- [`socket2 0.6.5`](https://github.com/rust-lang/socket2)
 - [`stable_deref_trait 1.2.1`](https://github.com/storyyeller/stable_deref_trait)
 - [`string_cache 0.9.0`](https://github.com/servo/string-cache)
 - [`string_cache_codegen 0.6.1`](https://github.com/servo/string-cache)
@@ -6665,7 +6666,7 @@ Used by:
 - [`unicode-segmentation 1.13.3`](https://github.com/unicode-rs/unicode-segmentation)
 - [`url 2.5.8`](https://github.com/servo/rust-url)
 - [`utf16string 0.2.0`](https://github.com/getsentry/utf16string)
-- [`uuid 1.23.4`](https://github.com/uuid-rs/uuid)
+- [`uuid 1.24.0`](https://github.com/uuid-rs/uuid)
 - [`version_check 0.9.5`](https://github.com/SergioBenitez/version_check)
 - [`wasi 0.11.1+wasi-snapshot-preview1`](https://github.com/bytecodealliance/wasi)
 - [`wasip2 1.0.4+wasi-0.2.12`](https://github.com/bytecodealliance/wasi-rs)
@@ -7570,7 +7571,7 @@ Used by:
 - [`pkcs8 0.10.2`](https://github.com/RustCrypto/formats/tree/master/pkcs8)
 - [`primeorder 0.13.6`](https://github.com/RustCrypto/elliptic-curves/tree/master/primeorder)
 - [`sec1 0.7.3`](https://github.com/RustCrypto/formats/tree/master/sec1)
-- [`sha1 0.10.6`](https://github.com/RustCrypto/hashes)
+- [`sha1 0.10.7`](https://github.com/RustCrypto/hashes)
 - [`sha2 0.10.9`](https://github.com/RustCrypto/hashes)
 - [`sha2 0.11.0`](https://github.com/RustCrypto/hashes)
 - [`sha3 0.10.9`](https://github.com/RustCrypto/hashes)
@@ -10145,8 +10146,8 @@ Apache License
 ### Apache License 2.0
 
 Used by:
-- [`bytemuck 1.25.0`](https://github.com/Lokathor/bytemuck)
-- [`bytemuck_derive 1.10.2`](https://github.com/Lokathor/bytemuck)
+- [`bytemuck 1.25.1`](https://github.com/Lokathor/bytemuck)
+- [`bytemuck_derive 1.11.0`](https://github.com/Lokathor/bytemuck)
 
 ```
 Apache License
@@ -10267,7 +10268,7 @@ Used by:
 - [`p12 0.6.3`](https://github.com/hjiayz/p12)
 - [`paste 1.0.15`](https://github.com/dtolnay/paste)
 - [`pastey 0.1.1`](https://github.com/as1100k/pastey)
-- [`pdfium-render 0.9.2`](https://github.com/ajrcarey/pdfium-render)
+- [`pdfium-render 0.9.3`](https://github.com/ajrcarey/pdfium-render)
 - [`pin-project-lite 0.2.17`](https://github.com/taiki-e/pin-project-lite)
 - [`portable-atomic-util 0.2.7`](https://github.com/taiki-e/portable-atomic-util)
 - [`portable-atomic 1.13.1`](https://github.com/taiki-e/portable-atomic)
@@ -10278,8 +10279,8 @@ Used by:
 - [`r-efi 5.3.0`](https://github.com/r-efi/r-efi)
 - [`r-efi 6.0.0`](https://github.com/r-efi/r-efi)
 - [`rand 0.10.2`](https://github.com/rust-random/rand)
-- [`rand 0.8.6`](https://github.com/rust-random/rand)
-- [`rand 0.9.4`](https://github.com/rust-random/rand)
+- [`rand 0.8.7`](https://github.com/rust-random/rand)
+- [`rand 0.9.5`](https://github.com/rust-random/rand)
 - [`rand_chacha 0.9.0`](https://github.com/rust-random/rand)
 - [`raw-window-handle 0.6.2`](https://github.com/rust-windowing/raw-window-handle)
 - [`rc2 0.8.1`](https://github.com/RustCrypto/block-ciphers)
@@ -10300,7 +10301,7 @@ Used by:
 - [`simdutf8 0.1.5`](https://github.com/rusticstuff/simdutf8)
 - [`siphasher 1.0.3`](https://github.com/jedisct1/rust-siphash)
 - [`subsetter 0.2.6`](https://github.com/typst/subsetter)
-- [`syn 2.0.118`](https://github.com/dtolnay/syn)
+- [`syn 2.0.119`](https://github.com/dtolnay/syn)
 - [`sync_wrapper 1.0.2`](https://github.com/Actyx/sync_wrapper)
 - [`tao-macros 0.1.3`](https://github.com/tauri-apps/tao)
 - [`tauri-build 2.6.3`](https://github.com/tauri-apps/tauri)
@@ -10309,7 +10310,7 @@ Used by:
 - [`tauri-plugin-dialog 2.7.1`](https://github.com/tauri-apps/plugins-workspace)
 - [`tauri-plugin-fs 2.5.1`](https://github.com/tauri-apps/plugins-workspace)
 - [`tauri-plugin-process 2.3.1`](https://github.com/tauri-apps/plugins-workspace)
-- [`tauri-plugin-single-instance 2.4.2`](https://github.com/tauri-apps/plugins-workspace)
+- [`tauri-plugin-single-instance 2.4.3`](https://github.com/tauri-apps/plugins-workspace)
 - [`tauri-plugin-updater 2.10.1`](https://github.com/tauri-apps/plugins-workspace)
 - [`tauri-plugin 2.6.3`](https://github.com/tauri-apps/tauri)
 - [`tauri-runtime-wry 2.11.4`](https://github.com/tauri-apps/tauri)
@@ -11057,7 +11058,7 @@ USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 Used by:
 - [`alloc-stdlib 0.2.4`](https://github.com/dropbox/rust-alloc-no-stdlib)
 - [`curve25519-dalek 4.1.3`](https://github.com/dalek-cryptography/curve25519-dalek/tree/main/curve25519-dalek)
-- [`exr 1.74.0`](https://github.com/johannesvollmer/exrs)
+- [`exr 1.74.2`](https://github.com/johannesvollmer/exrs)
 
 ```
 Copyright (c) &lt;year&gt; &lt;owner&gt;. 
@@ -11189,7 +11190,7 @@ insights.
 ### GNU General Public License v3.0 only
 
 Used by:
-- [`kanoprii 1.8.3`](https://crates.io/crates/kanoprii)
+- [`kanoprii 1.17.0`](https://crates.io/crates/kanoprii)
 
 ```
 GNU GENERAL PUBLIC LICENSE
@@ -11664,7 +11665,7 @@ DEALINGS IN THE SOFTWARE.
 ### MIT License
 
 Used by:
-- [`mio 1.2.1`](https://github.com/tokio-rs/mio)
+- [`mio 1.2.2`](https://github.com/tokio-rs/mio)
 
 ```
 Copyright (c) 2014 Carl Lerche and other MIO contributors
@@ -12021,7 +12022,7 @@ SOFTWARE.
 ### MIT License
 
 Used by:
-- [`bytes 1.12.0`](https://github.com/tokio-rs/bytes)
+- [`bytes 1.12.1`](https://github.com/tokio-rs/bytes)
 
 ```
 Copyright (c) 2018 Carl Lerche
@@ -12268,46 +12269,11 @@ DEALINGS IN THE SOFTWARE.
 ### MIT License
 
 Used by:
-- [`http-body 1.0.1`](https://github.com/hyperium/http-body)
+- [`http-body-util 0.1.4`](https://github.com/hyperium/http-body)
+- [`http-body 1.1.0`](https://github.com/hyperium/http-body)
 
 ```
-Copyright (c) 2019-2024 Sean McArthur &amp; Hyper Contributors
-
-Permission is hereby granted, free of charge, to any
-person obtaining a copy of this software and associated
-documentation files (the &quot;Software&quot;), to deal in the
-Software without restriction, including without
-limitation the rights to use, copy, modify, merge,
-publish, distribute, sublicense, and/or sell copies of
-the Software, and to permit persons to whom the Software
-is furnished to do so, subject to the following
-conditions:
-
-The above copyright notice and this permission notice
-shall be included in all copies or substantial portions
-of the Software.
-
-THE SOFTWARE IS PROVIDED &quot;AS IS&quot;, WITHOUT WARRANTY OF
-ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED
-TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
-PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT
-SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
-CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
-OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR
-IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
-DEALINGS IN THE SOFTWARE.
-
-```
-
----
-
-### MIT License
-
-Used by:
-- [`http-body-util 0.1.3`](https://github.com/hyperium/http-body)
-
-```
-Copyright (c) 2019-2025 Sean McArthur &amp; Hyper Contributors
+Copyright (c) 2019-2026 Sean McArthur &amp; Hyper Contributors
 
 Permission is hereby granted, free of charge, to any
 person obtaining a copy of this software and associated
@@ -12963,6 +12929,38 @@ SOFTWARE.
 ### MIT License
 
 Used by:
+- [`pulp 0.22.3`](https://github.com/sarah-quinones/pulp/)
+
+```
+MIT License
+
+Copyright (c) 2021 sarah
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the &quot;Software&quot;), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED &quot;AS IS&quot;, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+```
+
+---
+
+### MIT License
+
+Used by:
 - [`urlpattern 0.3.0`](https://github.com/denoland/rust-urlpattern)
 
 ```
@@ -13028,6 +13026,7 @@ SOFTWARE.
 
 Used by:
 - [`aligned-vec 0.6.4`](https://github.com/sarah-ek/aligned-vec/)
+- [`reborrow 0.5.5`](https://github.com/sarah-ek/reborrow/)
 
 ```
 MIT License
@@ -13170,6 +13169,7 @@ Used by:
 - [`objc2-encode 4.1.0`](https://github.com/madsmtm/objc2)
 - [`objc2-foundation 0.3.2`](https://github.com/madsmtm/objc2)
 - [`objc2 0.6.4`](https://github.com/madsmtm/objc2)
+- [`pulp-wasm-simd-flag 0.1.1`](https://github.com/sarah-quinones/pulp/)
 - [`simd_helpers 0.1.0`](https://github.com/lu-zero/simd_helpers)
 - [`webview2-com-macros 0.8.1`](https://github.com/wravery/webview2-rs)
 - [`webview2-com-sys 0.38.2`](https://github.com/wravery/webview2-rs)
@@ -13203,7 +13203,7 @@ USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 Used by:
 - [`tokio-util 0.7.18`](https://github.com/tokio-rs/tokio)
-- [`tokio 1.52.3`](https://github.com/tokio-rs/tokio)
+- [`tokio 1.52.4`](https://github.com/tokio-rs/tokio)
 
 ```
 MIT License
@@ -13235,7 +13235,7 @@ SOFTWARE.
 ### MIT License
 
 Used by:
-- [`simd-adler32 0.3.9`](https://github.com/mcountryman/simd-adler32)
+- [`simd-adler32 0.3.10`](https://github.com/mcountryman/simd-adler32)
 
 ```
 MIT License
@@ -13302,7 +13302,7 @@ Used by:
 - [`endi 1.1.1`](https://github.com/zeenix/endi)
 - [`x11-dl 2.21.0`](https://github.com/AltF02/x11-rs.git)
 - [`x11 2.21.0`](https://github.com/AltF02/x11-rs.git)
-- [`zmij 1.0.21`](https://github.com/dtolnay/zmij)
+- [`zmij 1.0.23`](https://github.com/dtolnay/zmij)
 - [`zvariant_utils 3.5.0`](https://github.com/z-galaxy/zbus/)
 
 ```
@@ -13339,7 +13339,7 @@ DEALINGS IN THE SOFTWARE.
 Used by:
 - [`winnow 0.5.40`](https://github.com/winnow-rs/winnow)
 - [`winnow 0.7.15`](https://github.com/winnow-rs/winnow)
-- [`winnow 1.0.3`](https://github.com/winnow-rs/winnow)
+- [`winnow 1.0.4`](https://github.com/winnow-rs/winnow)
 
 ```
 Permission is hereby granted, free of charge, to any person obtaining
@@ -13487,7 +13487,7 @@ SOFTWARE.
 ### MIT License
 
 Used by:
-- [`spin 0.9.8`](https://github.com/mvdnes/spin-rs.git)
+- [`spin 0.9.9`](https://github.com/mvdnes/spin-rs.git)
 
 ```
 The MIT License (MIT)
@@ -13622,9 +13622,9 @@ Used by:
 - [`byteorder-lite 0.1.0`](https://github.com/image-rs/byteorder-lite)
 - [`byteorder 1.5.0`](https://github.com/BurntSushi/byteorder)
 - [`jiff-tzdb-platform 0.1.3`](https://github.com/BurntSushi/jiff)
-- [`jiff-tzdb 0.1.7`](https://github.com/BurntSushi/jiff)
-- [`jiff 0.2.31`](https://github.com/BurntSushi/jiff)
-- [`memchr 2.8.2`](https://github.com/BurntSushi/memchr)
+- [`jiff-tzdb 0.1.8`](https://github.com/BurntSushi/jiff)
+- [`jiff 0.2.32`](https://github.com/BurntSushi/jiff)
+- [`memchr 2.8.3`](https://github.com/BurntSushi/memchr)
 - [`walkdir 2.5.0`](https://github.com/BurntSushi/walkdir)
 
 ```
@@ -13684,6 +13684,37 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
+```
+
+---
+
+### MIT License
+
+Used by:
+- [`raw-cpuid 11.6.0`](https://github.com/gz/rust-cpuid)
+
+```
+The MIT License (MIT)
+
+Copyright (c) 2015 Gerd Zellweger
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the &quot;Software&quot;), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED &quot;AS IS&quot;, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
 ```
 
 ---

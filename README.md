@@ -19,18 +19,6 @@
 
 ---
 
-## Screenshots
-
-<p align="center">
-  <img src="docs/screenshots/welcome-screen.png" alt="Kanoprii welcome screen with menu bar and click-to-open prompt" width="720" />
-</p>
-
-<p align="center">
-  <i>Welcome screen - custom title bar, menu bar, and click-to-open splash before a document is loaded.</i>
-</p>
-
----
-
 ## What is Kanoprii?
 
 Kanoprii is a desktop PDF editor for the everyday workflow: **view, reorganize,
@@ -47,9 +35,9 @@ Three things we care about:
 ### What it covers today
 
 **View & navigate**
-- **Menu bar** (File, Edit, Pages, Document, Annotate, Security, View, Help) plus a slim quick-access row - all page tools live in menus; **Ctrl/Cmd+Shift+P** opens a searchable command palette
-- Smooth viewer with **25%–400%** zoom; thumbnail sidebar matches viewer height
-- Page navigation via menus, quick bar, thumbnails, keyboard, mouse wheel at scroll edges, and a clickable **Bookmarks** outline
+- **Tabbed ribbon** (File, Home, Annotate, Edit, Pages, Document, View, Help) - everyday tools are icon buttons, deep page/document operations live in dropdown families, File/Help are classic dropdowns, and the whole ribbon collapses when you want the space back; **Ctrl/Cmd+Shift+P** opens a searchable command palette
+- Smooth viewer with **25%–400%** zoom; thumbnail sidebar matches viewer height and can be hidden from the View tab
+- Page navigation via the ribbon Home tab, page controls, thumbnails, keyboard, mouse wheel at scroll edges, and a clickable **Bookmarks** outline
 - **Find text** across the document with match highlighting (Ctrl/Cmd+F); **selectable text layer** with native copy and **Highlight Selection**
 - **Continuous scroll** mode (View → Continuous scroll) with virtualized page rendering
 - **Document tabs** - multiple PDF, Markdown, and HTML documents open at once (Ctrl+Tab / Ctrl+W)
