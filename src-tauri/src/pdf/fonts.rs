@@ -24,9 +24,6 @@ pub fn font_has_glyphs_for(text: &str) -> bool {
 /// registered on `page_id`. Phase 1 only has the regular faces bundled, so
 /// bold/italic requests still fall back to the regular face; the synthetic
 /// bold/italic styling is applied via the text matrix in the caller.
-// #[allow(dead_code)] is temporary: these helpers are consumed by edit_object.rs
-// in the upcoming `edit_text_line` / `add_text_box` implementation tasks.
-#[allow(dead_code)]
 pub fn ensure_font_family(doc: &mut Document, style: &TextStyle, page_id: ObjectId) -> Result<String, String> {
     if style.font_family == "LiberationSans" {
         ensure_full_font(doc, page_id)?;
@@ -63,7 +60,6 @@ pub fn uses_synthetic_font_style(style: &TextStyle) -> bool {
 
 /// Validate that `text` can be rendered with the requested style. For Phase 1
 /// only the bundled LiberationSans font can be checked for glyph coverage.
-#[allow(dead_code)]
 pub fn style_supports_text(style: &TextStyle, text: &str) -> Result<(), String> {
     if style.font_family == "LiberationSans" && !font_has_glyphs_for(text) {
         return Err("text contains characters not supported by LiberationSans".into());
@@ -128,7 +124,7 @@ pub fn page_font_name_for_resource(doc: &Document, page_id: ObjectId, resource_n
 }
 
 /// Ensure the page has a standard Type1 Courier font resource.
-#[allow(dead_code)]
+#[cfg(test)]
 fn ensure_courier_font(doc: &mut Document, page_id: ObjectId) -> Result<String, String> {
     ensure_standard_type1_font(doc, page_id, "Cour", "Courier")?;
     Ok("Cour".to_string())

@@ -8,9 +8,7 @@ const CREDITS_TEXT: &str = include_str!("../../CREDITS.md");
 
 const APACHE_2_0_TEXT: &str = include_str!("../../LICENSES/Apache-2.0.txt");
 const BSD_3_CLAUSE_TEXT: &str = include_str!("../../LICENSES/BSD-3-Clause.txt");
-const GPL_2_0_TEXT: &str = include_str!("../../LICENSES/GPL-2.0-or-later.txt");
 const LGPL_2_1_TEXT: &str = include_str!("../../LICENSES/LGPL-2.1-or-later.txt");
-const LGPL_3_0_TEXT: &str = include_str!("../../LICENSES/LGPL-3.0-only.txt");
 
 struct RuntimeComponent {
     name: &'static str,
@@ -64,9 +62,7 @@ fn runtime_license_body(spdx: &str) -> &'static str {
     match spdx {
         "Apache-2.0" => APACHE_2_0_TEXT,
         "BSD-3-Clause" => BSD_3_CLAUSE_TEXT,
-        "GPL-2.0-or-later" => GPL_2_0_TEXT,
         "LGPL-2.1-or-later" => LGPL_2_1_TEXT,
-        "LGPL-3.0-only" => LGPL_3_0_TEXT,
         _ => "",
     }
 }
@@ -79,7 +75,7 @@ fn build_runtime_licenses_text() -> String {
 that Kanoprii links against or bundles in packaged builds.\n\n",
     );
 
-    for spdx in ["BSD-3-Clause", "LGPL-2.1-or-later", "Apache-2.0", "GPL-2.0-or-later", "LGPL-3.0-only"] {
+    for spdx in ["BSD-3-Clause", "LGPL-2.1-or-later", "Apache-2.0"] {
         let body = runtime_license_body(spdx);
         if body.is_empty() {
             continue;

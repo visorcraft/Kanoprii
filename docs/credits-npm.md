@@ -9,13 +9,13 @@ shipped in release builds.
 ## Packages in use
 
 - **@tauri-apps/api** 2.11.1 - MIT OR Apache-2.0
-- **@tauri-apps/plugin-dialog** 2.7.1 - MIT OR Apache-2.0
+- **@tauri-apps/plugin-dialog** 2.7.2 - MIT OR Apache-2.0
 - **@tauri-apps/plugin-process** 2.3.1 - MIT OR Apache-2.0
 - **@tauri-apps/plugin-updater** 2.10.1 - MIT OR Apache-2.0
 - **html2canvas** 1.4.1 - MIT
-- **marked** 18.0.6 - MIT
-- **react** 19.2.7 - MIT
-- **react-dom** 19.2.7 - MIT
+- **marked** 18.0.7 - MIT
+- **react** 19.2.8 - MIT
+- **react-dom** 19.2.8 - MIT
 
 ---
 
@@ -24,10 +24,10 @@ shipped in release builds.
 ### MIT License
 
 Used by:
-- [`html2canvas 1.4.1`](https://www.npmjs.com/package/html2canvas)
-- [`marked 18.0.6`](https://www.npmjs.com/package/marked)
-- [`react 19.2.7`](https://react.dev/)
-- [`react-dom 19.2.7`](https://react.dev/)
+- [`html2canvas 1.4.1`](https://html2canvas.hertzen.com/)
+- [`marked 18.0.7`](https://marked.js.org/)
+- [`react 19.2.8`](https://react.dev/)
+- [`react-dom 19.2.8`](https://react.dev/)
 
 ```
 MIT License
@@ -57,9 +57,9 @@ SOFTWARE.
 
 Used by:
 - [`@tauri-apps/api 2.11.1`](https://github.com/tauri-apps/tauri)
-- [`@tauri-apps/plugin-dialog 2.7.1`](https://github.com/tauri-apps/plugins-workspace)
-- [`@tauri-apps/plugin-process 2.3.1`](https://www.npmjs.com/package/@tauri-apps/plugin-process)
-- [`@tauri-apps/plugin-updater 2.10.1`](https://www.npmjs.com/package/@tauri-apps/plugin-updater)
+- [`@tauri-apps/plugin-dialog 2.7.2`](https://github.com/tauri-apps/plugins-workspace)
+- [`@tauri-apps/plugin-process 2.3.1`](https://github.com/tauri-apps/plugins-workspace)
+- [`@tauri-apps/plugin-updater 2.10.1`](https://github.com/tauri-apps/plugins-workspace)
 
 ```
 MIT License

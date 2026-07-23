@@ -16,6 +16,10 @@ const PROJECT_URLS = {
   'react-dom': 'https://react.dev/',
   '@tauri-apps/api': 'https://github.com/tauri-apps/tauri',
   '@tauri-apps/plugin-dialog': 'https://github.com/tauri-apps/plugins-workspace',
+  '@tauri-apps/plugin-process': 'https://github.com/tauri-apps/plugins-workspace',
+  '@tauri-apps/plugin-updater': 'https://github.com/tauri-apps/plugins-workspace',
+  marked: 'https://marked.js.org/',
+  html2canvas: 'https://html2canvas.hertzen.com/',
 };
 
 const MIT_TEXT = fs.readFileSync(path.join(root, 'LICENSES/MIT.txt'), 'utf8').trim();

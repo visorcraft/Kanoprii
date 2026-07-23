@@ -1,7 +1,7 @@
 {
   "name": "kanoprii",
   "private": true,
-  "version": "1.17.1",
+  "version": "1.17.2",
   "license": "GPL-3.0-only",
   "type": "module",
   "scripts": {
@@ -31,7 +31,6 @@
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0",
     "@vitejs/plugin-react": "^6.0.2",
-    "@wdio/cli": "^9.28.0",
     "audit-ci": "^7.1.0",
     "eslint": "^10.6.0",
     "eslint-plugin-react-hooks": "^7.1.1",
