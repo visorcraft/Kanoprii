@@ -18085,20 +18085,73 @@ fn markdown_lines_turn_column_blocks_into_tables() {
 #[test]
 fn optimize_pdf_writes_output_file() {
     let path = save(&mut build_pdf(2), "optimize");
-    let msg = optimize_pdf(path.clone()).unwrap();
+    let msg = optimize_pdf(path.clone(), path.clone(), false).unwrap();
     assert!(msg.contains("Metadata stripped"));
     let p = PathBuf::from(&path);
     let out = p.with_file_name(format!("{}_optimized.pdf", p.file_stem().unwrap().to_string_lossy()));
     assert!(out.exists());
     assert!(page_count(&out.to_string_lossy()) == 2);
+    assert!(msg.contains(&out.to_string_lossy().into_owned()));
     let _ = std::fs::remove_file(&path);
     let _ = std::fs::remove_file(&out);
 }
 
 #[test]
+fn optimize_pdf_save_as_writes_beside_original_not_working_copy() {
+    let original = PathBuf::from(save(&mut build_pdf(2), "optimize_orig"));
+    let working = std::env::temp_dir().join(format!("kanoprii_work_{}_optimize_orig.pdf", std::process::id()));
+    std::fs::copy(&original, &working).unwrap();
+    let original_bytes = std::fs::read(&original).unwrap();
+
+    let msg =
+        optimize_pdf(working.to_string_lossy().into_owned(), original.to_string_lossy().into_owned(), false).unwrap();
+
+    let sibling = original.with_file_name(format!("{}_optimized.pdf", original.file_stem().unwrap().to_string_lossy()));
+    assert!(sibling.exists(), "optimized file must land next to the original PDF");
+    assert_eq!(page_count(&sibling.to_string_lossy()), 2);
+    assert_eq!(std::fs::read(&original).unwrap(), original_bytes, "original must stay unchanged on save-as");
+    assert!(
+        msg.contains(&sibling.to_string_lossy().into_owned()),
+        "toast must include the full destination path: {msg}"
+    );
+
+    let beside_working =
+        working.with_file_name(format!("{}_optimized.pdf", working.file_stem().unwrap().to_string_lossy()));
+    assert!(!beside_working.exists(), "must not write the optimized PDF next to the temp working copy");
+
+    let _ = std::fs::remove_file(&original);
+    let _ = std::fs::remove_file(&working);
+    let _ = std::fs::remove_file(&sibling);
+}
+
+#[test]
+fn optimize_pdf_replace_overwrites_original_and_working_copy() {
+    let original = PathBuf::from(save(&mut build_pdf(2), "optimize_replace"));
+    let working = std::env::temp_dir().join(format!("kanoprii_work_{}_optimize_replace.pdf", std::process::id()));
+    std::fs::copy(&original, &working).unwrap();
+
+    let msg =
+        optimize_pdf(working.to_string_lossy().into_owned(), original.to_string_lossy().into_owned(), true).unwrap();
+
+    assert!(original.exists());
+    assert_eq!(page_count(&original.to_string_lossy()), 2);
+    assert_eq!(page_count(&working.to_string_lossy()), 2);
+    assert!(msg.contains("Replaced"));
+    assert!(msg.contains(&original.to_string_lossy().into_owned()));
+
+    let sibling = original.with_file_name(format!("{}_optimized.pdf", original.file_stem().unwrap().to_string_lossy()));
+    assert!(!sibling.exists(), "replace must not create a sibling _optimized.pdf");
+
+    let _ = std::fs::remove_file(&original);
+    let _ = std::fs::remove_file(&working);
+    let _ = std::fs::remove_file(&sibling);
+}
+
+#[test]
 fn optimize_pdf_rejects_missing_file() {
     let missing = std::env::temp_dir().join(format!("pp_optimize_missing_{}.pdf", std::process::id()));
-    let err = optimize_pdf(missing.to_string_lossy().into_owned()).unwrap_err();
+    let err = optimize_pdf(missing.to_string_lossy().into_owned(), missing.to_string_lossy().into_owned(), false)
+        .unwrap_err();
     assert!(!err.is_empty());
 }
 

@@ -1,4 +1,6 @@
 import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import {
   applyRedactions,
   clickMenuAction,
@@ -250,5 +252,45 @@ describe('v0.5 viewer features', () => {
     expect(await (await $('.sidebar')).isExisting()).toBe(false);
     await (await $('[data-testid="thumbnails"]')).click();
     await (await $('.sidebar')).waitForDisplayed({ timeout: 5_000 });
+  });
+
+  it('saves an optimized sibling next to the original PDF', async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'kanoprii-opt-as-'));
+    const original = path.join(dir, 'report.pdf');
+    fs.copyFileSync(fixturePdf, original);
+    await resetToWelcome();
+    await openPdfViaPathModal(original);
+    await waitForPdfOpen();
+    await clickMenuAction('document', 'optimize');
+    const saveAs = await $('[data-testid="optimize-save-as"]');
+    await saveAs.waitForDisplayed({ timeout: 10_000 });
+    await saveAs.click();
+    const sibling = path.join(dir, 'report_optimized.pdf');
+    await browser.waitUntil(() => fs.existsSync(sibling), {
+      timeout: 20_000,
+      timeoutMsg: 'expected report_optimized.pdf next to the original',
+    });
+    expect(fs.existsSync(original)).toBe(true);
+  });
+
+  it('replaces the original PDF without creating a sibling', async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'kanoprii-opt-rep-'));
+    const original = path.join(dir, 'report.pdf');
+    fs.copyFileSync(fixturePdf, original);
+    await resetToWelcome();
+    await openPdfViaPathModal(original);
+    await waitForPdfOpen();
+    await clickMenuAction('document', 'optimize');
+    const replace = await $('[data-testid="optimize-replace"]');
+    await replace.waitForDisplayed({ timeout: 10_000 });
+    await replace.click();
+    const toast = await $('[data-testid="toast"]');
+    await toast.waitForDisplayed({ timeout: 20_000 });
+    await browser.waitUntil(async () => (await toast.getText()).includes('Replaced'), {
+      timeout: 10_000,
+      timeoutMsg: 'expected replace toast',
+    });
+    expect(fs.existsSync(original)).toBe(true);
+    expect(fs.existsSync(path.join(dir, 'report_optimized.pdf'))).toBe(false);
   });
 });

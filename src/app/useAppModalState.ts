@@ -33,6 +33,7 @@ export function useAppModalState() {
   const [cropMarginBottom, setCropMarginBottom] = useState(50);
   const [cropMarginLeft, setCropMarginLeft] = useState(50);
   const [showFlattenModal, setShowFlattenModal] = useState(false);
+  const [showOptimizeModal, setShowOptimizeModal] = useState(false);
   const [showAddBookmarkModal, setShowAddBookmarkModal] = useState(false);
   const [bookmarkTitle, setBookmarkTitle] = useState('');
   const [showRenameBookmarkModal, setShowRenameBookmarkModal] = useState(false);
@@ -155,6 +156,7 @@ export function useAppModalState() {
     cropMarginBottom, setCropMarginBottom,
     cropMarginLeft, setCropMarginLeft,
     showFlattenModal, setShowFlattenModal,
+    showOptimizeModal, setShowOptimizeModal,
     showAddBookmarkModal, setShowAddBookmarkModal,
     bookmarkTitle, setBookmarkTitle,
     showRenameBookmarkModal, setShowRenameBookmarkModal,

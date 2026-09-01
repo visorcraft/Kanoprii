@@ -335,6 +335,7 @@ export function modalPdfActionFields(m: ModalState) {
     setShowExtractModal: m.setShowExtractModal,
     setShowExtractOddModal: m.setShowExtractOddModal,
     setShowFlattenModal: m.setShowFlattenModal,
+    setShowOptimizeModal: m.setShowOptimizeModal,
     setShowInsertBlankPagesModal: m.setShowInsertBlankPagesModal,
     setShowInsertImagePageModal: m.setShowInsertImagePageModal,
     setShowInsertModal: m.setShowInsertModal,

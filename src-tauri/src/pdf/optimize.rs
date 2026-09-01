@@ -1,5 +1,5 @@
 use lopdf::{Document, Object};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 fn recompress_images(doc: &mut Document) -> Result<u32, String> {
     let pages = doc.get_pages();
@@ -48,31 +48,65 @@ fn reencode_image(raw: &[u8], width: u32, height: u32) -> Option<Vec<u8>> {
     Some(buf)
 }
 
-pub fn optimize_pdf_file(path: &Path) -> Result<String, String> {
-    let mut doc = Document::load(path).map_err(|e| e.to_string())?;
+fn same_path(a: &Path, b: &Path) -> bool {
+    if a == b {
+        return true;
+    }
+    match (a.canonicalize(), b.canonicalize()) {
+        (Ok(left), Ok(right)) => left == right,
+        _ => false,
+    }
+}
 
+fn optimized_sibling_path(original: &Path) -> PathBuf {
+    original.with_file_name(format!(
+        "{}_optimized.pdf",
+        original.file_stem().unwrap_or_else(|| std::ffi::OsStr::new("document")).to_string_lossy()
+    ))
+}
+
+fn strip_and_compress(doc: &mut Document) -> Result<u32, String> {
     if let Ok(catalog) = doc.catalog_mut() {
         catalog.set(b"Metadata", Object::Null);
     }
-
     if let Ok(trailer) = doc.trailer.get_mut(b"Info") {
         *trailer = Object::Null;
     }
-
-    let images_recompressed = recompress_images(&mut doc)?;
-
+    let images_recompressed = recompress_images(doc)?;
     doc.prune_objects();
     doc.compress();
+    Ok(images_recompressed)
+}
 
-    let output_path = path.with_file_name(format!(
-        "{}_optimized.pdf",
-        path.file_stem().unwrap_or_else(|| std::ffi::OsStr::new("document")).to_string_lossy()
-    ));
-    crate::pdf::io::save_atomic(&mut doc, &output_path)?;
-
-    Ok(format!(
-        "Saved to {}. Metadata stripped, objects pruned & streams compressed. {} image(s) recompressed.",
-        output_path.file_name().unwrap().to_string_lossy(),
+/// Optimize `source` (the open working copy).
+///
+/// - `replace == false`: write `<original-stem>_optimized.pdf` next to `original`.
+///   Leaves `source` and `original` unchanged.
+/// - `replace == true`: overwrite `source`, then write the same bytes to `original`
+///   so the open document and the file on disk stay in sync. No sibling is created.
+pub fn optimize_pdf_file(source: &Path, original: &Path, replace: bool) -> Result<String, String> {
+    let original = if original.as_os_str().is_empty() { source } else { original };
+    let mut doc = Document::load(source).map_err(|e| e.to_string())?;
+    let images_recompressed = strip_and_compress(&mut doc)?;
+    let summary = format!(
+        "Metadata stripped, objects pruned & streams compressed. {} image(s) recompressed.",
         images_recompressed
-    ))
+    );
+
+    if replace {
+        // Write the working copy first. If the subsequent original write fails, Save
+        // still persists the optimized bytes instead of clobbering the original with
+        // the pre-optimize working copy.
+        crate::pdf::io::save_atomic(&mut doc, source)?;
+        crate::pdf::render::invalidate_document_cache(source);
+        if !same_path(source, original) {
+            crate::pdf::io::save_atomic(&mut doc, original)?;
+            crate::pdf::render::invalidate_document_cache(original);
+        }
+        Ok(format!("Replaced {}. {summary}", original.display()))
+    } else {
+        let dest = optimized_sibling_path(original);
+        crate::pdf::io::save_atomic(&mut doc, &dest)?;
+        Ok(format!("Saved to {}. {summary}", dest.display()))
+    }
 }

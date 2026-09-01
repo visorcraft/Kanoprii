@@ -7,7 +7,7 @@ export function buildDocumentMenu(ctx: AppMenuContext): MenuRoot {
     label: 'Document',
     disabled: !ctx.hasPdf,
     items: [
-      act('optimize', 'Optimize PDF', ctx.handleOptimizePdf, { shortcutCommandId: 'optimize-pdf' }),
+      act('optimize', 'Optimize PDF…', ctx.handleOptimizePdf, { shortcutCommandId: 'optimize-pdf' }),
       act('make-searchable', 'Make Searchable (OCR)', () => void ctx.handleMakePdfSearchable()),
       act(
         'apply-redactions',

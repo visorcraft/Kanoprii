@@ -75,7 +75,7 @@ Three things we care about:
 - **Markdown / HTML → PDF** - Markdown opens in Markdown view; HTML opens in a sandboxed Webpage view with local CSS and assets. Switching to PDF View renders a collision-safe sibling PDF without overwriting an existing file.
 - **PDF → Markdown** - tagged-PDF structure when available (headings, lists, tables with THead/TBody, links, TOC, captions, code, notes, inline emphasis); otherwise PDFium heuristic layout with column reading order, paragraph merge, header/footer stripping, and link/URL autodetection; on save, scanned/sparse pages, embedded images (JPEG/PNG/Gray/CMYK/Indexed/JPX, CCITT Fax scans, RunLength 1-bit), and painted Form XObjects (vector charts rasterized via PDFium, including nested form content) land in `<md-stem>_assets/` with optional Tesseract OCR; auto-save sibling `.md` or **Save As…** for a custom path
 - **Summarize** - extractive overview, key points, and extracted headings/emails/URLs/dates
-- **Optimize** - strip metadata, recompress images, prune unused objects, compress streams
+- **Optimize** - strip metadata, recompress images, prune unused objects, compress streams; choose **Replace original** or **Save as new** (`<name>_optimized.pdf` next to the original)
 - **Export PNG/JPEG/WebP/BMP/TIFF/GIF/PPM/TGA/ICO** - save rendered pages as image files (Ctrl/Cmd+Shift+B)
 - **Print** with Kanoprii's preview dialog (printer, range, paper, scaling, margins, copies, duplex, save-as-PDF) or hand off to the system print dialog; print-only hidden watermarks/layers can be included or suppressed
 - **Help → Check for Updates…** (AppImage / macOS / Windows; signed `latest.json` when release artifacts are published)

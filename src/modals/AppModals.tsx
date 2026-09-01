@@ -31,6 +31,7 @@ import { MergePdfModal } from './MergePdfModal';
 import { MetadataModal } from './MetadataModal';
 import { MoveRangeModal } from './MoveRangeModal';
 import { OpenPdfModal } from './OpenPdfModal';
+import { OptimizePdfModal } from './OptimizePdfModal';
 import { PageBorderModal } from './PageBorderModal';
 import { PageEditsModal } from './PageEditsModal';
 import { PageFooterModal } from './PageFooterModal';
@@ -245,6 +246,15 @@ export function AppModals({ ctx: rawCtx }: AppModalsProps) {
           pageCount={ctx.pageCount}
           onClose={() => ctx.setShowFlattenModal(false)}
           onFlatten={ctx.handleFlattenAnnotations}
+        />
+      )}
+
+      {ctx.showOptimizeModal && (
+        <OptimizePdfModal
+          originalFileName={ctx.originalFileName}
+          onClose={() => ctx.setShowOptimizeModal(false)}
+          onReplaceOriginal={ctx.handleOptimizeReplace}
+          onSaveAsNew={ctx.handleOptimizeSaveAs}
         />
       )}
 

@@ -48,6 +48,8 @@ export function modalCtxFileFields(args: BuildAppModalCtxInputArgs) {
       args.workspace.setWorkspaceView('tabs');
       return args.lifecycle.handleOpenPdfPath(path);
     },
+    handleOptimizeReplace: args.pdfActions.handleOptimizeReplace,
+    handleOptimizeSaveAs: args.pdfActions.handleOptimizeSaveAs,
     handleOpenPdfPath: args.lifecycle.handleOpenPdfPath,
     handleOpenRecentPdf: args.lifecycle.handleOpenRecentPdf,
     handlePrependPdf: args.pdfActions.handlePrependPdf,
@@ -76,6 +78,9 @@ export function modalCtxFileFields(args: BuildAppModalCtxInputArgs) {
     mergeRange: args.pageRanges.mergeRange,
     mergeSourcePageCount: args.modal.mergeSourcePageCount,
     nativeDialogs: args.modal.nativeDialogs,
+    originalFileName: fileNameFromPath(
+      args.doc.activeSession?.originalPath || args.doc.activeSession?.filePath || '',
+    ),
     openFilePath: args.modal.openFilePath,
     openDirectlyInBirdsEye: args.workspace.workspaceView === 'birdseye',
     openPdfBrowser: args.browser.openPdfBrowser,
@@ -121,6 +126,7 @@ export function modalCtxFileFields(args: BuildAppModalCtxInputArgs) {
     setShowMarkdownSaveAsModal: args.modal.setShowMarkdownSaveAsModal,
     setShowMergeModal: args.modal.setShowMergeModal,
     setShowOpenModal: args.modal.setShowOpenModal,
+    setShowOptimizeModal: args.modal.setShowOptimizeModal,
     setShowPrintDialog: args.modal.setShowPrintDialog,
     setShowPrependModal: args.modal.setShowPrependModal,
     setShowReplacePageModal: args.modal.setShowReplacePageModal,
@@ -145,6 +151,7 @@ export function modalCtxFileFields(args: BuildAppModalCtxInputArgs) {
     showMarkdownSaveAsModal: args.modal.showMarkdownSaveAsModal,
     showMergeModal: args.modal.showMergeModal,
     showOpenModal: args.modal.showOpenModal,
+    showOptimizeModal: args.modal.showOptimizeModal,
     showPrintDialog: args.modal.showPrintDialog,
     showPrependModal: args.modal.showPrependModal,
     showReplacePageModal: args.modal.showReplacePageModal,

@@ -61,7 +61,7 @@ before a release tag.
 - [ ] Summarize (Ctrl/Cmd+Shift+E); sibling `.summary.md`
 - [ ] Scanned/no-text page saves PNG + OCR text in `<name>_assets/`; sparse/complex pages get page-render OCR supplement; embedded images extracted + OCR'd on save (needs Tesseract)
 - [ ] Export image (Ctrl/Cmd+Shift+B) - PNG or JPEG, current page, range, or all pages
-- [ ] Optimize, password-protect export, decrypt to `_decrypted.pdf`, and print
+- [ ] Optimize: **Save as new** writes `_optimized.pdf` next to the original; **Replace original** overwrites the open file without creating a sibling; password-protect export, decrypt to `_decrypted.pdf`, and print
 - [ ] Open an encrypted `_protected.pdf` with password prompt
 
 ## Platforms

@@ -1,9 +1,10 @@
 import { invoke } from '@tauri-apps/api/core';
-import { useCallback } from 'react';
+import { useCallback, type Dispatch, type SetStateAction } from 'react';
 import type { PageRangePairController } from '../pageRange/usePageRange';
 
 type UsePdfFileOpsActionsOptions = {
   filePath: string;
+  originalPath: string;
   pageCount: number | null;
   currentPage: number;
   deletePageInput: string;
@@ -17,8 +18,11 @@ type UsePdfFileOpsActionsOptions = {
   extractRange: PageRangePairController;
   withLoading: <T>(fn: () => Promise<T>) => Promise<T | undefined>;
   markPdfEdited: () => void;
+  markSaved: () => void;
   loadThumbnails: (path: string) => Promise<void>;
   renderPage: (path: string, page: number) => Promise<void>;
+  reloadOpenPdf: (page: number) => Promise<void>;
+  setPdfRevision: Dispatch<SetStateAction<number>>;
   showToast: (msg: string, kind?: 'error') => void;
   setPageCount: (count: number) => void;
   setCurrentPage: (page: number) => void;
@@ -32,6 +36,7 @@ type UsePdfFileOpsActionsOptions = {
   setShowMergeModal: (open: boolean) => void;
   setMergeFilePath: (path: string) => void;
   setShowExtractModal: (open: boolean) => void;
+  setShowOptimizeModal: (open: boolean) => void;
 };
 
 export function usePdfFileOpsActions(opts: UsePdfFileOpsActionsOptions) {
@@ -142,13 +147,32 @@ export function usePdfFileOpsActions(opts: UsePdfFileOpsActionsOptions) {
     });
   }, [opts]);
 
-  const handleOptimizePdf = useCallback(async () => {
+  const handleOptimizePdf = useCallback(() => {
     if (!opts.filePath) return;
+    opts.setShowOptimizeModal(true);
+  }, [opts]);
+
+  const runOptimizePdf = useCallback(async (replaceOriginal: boolean) => {
+    if (!opts.filePath) return;
+    const originalPath = opts.originalPath || opts.filePath;
     await opts.withLoading(async () => {
-      const result = await invoke<string>('optimize_pdf', { path: opts.filePath });
+      const result = await invoke<string>('optimize_pdf', {
+        path: opts.filePath,
+        originalPath,
+        replaceOriginal,
+      });
+      opts.setShowOptimizeModal(false);
+      if (replaceOriginal) {
+        opts.markSaved();
+        opts.setPdfRevision((r) => r + 1);
+        await opts.reloadOpenPdf(opts.currentPage);
+      }
       opts.showToast(result);
     });
   }, [opts]);
+
+  const handleOptimizeReplace = useCallback(() => runOptimizePdf(true), [runOptimizePdf]);
+  const handleOptimizeSaveAs = useCallback(() => runOptimizePdf(false), [runOptimizePdf]);
 
   return {
     openMergeModal,
@@ -158,5 +182,7 @@ export function usePdfFileOpsActions(opts: UsePdfFileOpsActionsOptions) {
     handleInsertPdf,
     handleMergePdf,
     handleOptimizePdf,
+    handleOptimizeReplace,
+    handleOptimizeSaveAs,
   };
 }

@@ -11,6 +11,7 @@ type ModalDismissSetters = {
   setPendingEncryptedPath: (path: string) => void;
   setPdfPasswordDraft: (value: string) => void;
   setShowOpenModal: (show: boolean) => void;
+  setShowOptimizeModal: (show: boolean) => void;
   setShowBrowserModal: (show: boolean) => void;
   setShowDeleteModal: (show: boolean) => void;
   setShowSplitModal: (show: boolean) => void;
@@ -80,6 +81,7 @@ type ModalDismissFlags = {
   showMetadataModal: boolean;
   showPasswordModal: boolean;
   showOpenModal: boolean;
+  showOptimizeModal: boolean;
   showBrowserModal: boolean;
   showDeleteModal: boolean;
   showSplitModal: boolean;
@@ -160,6 +162,7 @@ export function useModalDismiss(opts: UseModalDismissOptions) {
     rest.setPendingEncryptedPath('');
     rest.setPdfPasswordDraft('');
     rest.setShowOpenModal(false);
+    rest.setShowOptimizeModal(false);
     rest.setShowBrowserModal(false);
     rest.setShowDeleteModal(false);
     rest.setShowSplitModal(false);
@@ -232,6 +235,7 @@ export function useModalDismiss(opts: UseModalDismissOptions) {
       rest.showMetadataModal ||
       rest.showPasswordModal ||
       rest.showOpenModal ||
+      rest.showOptimizeModal ||
       rest.showBrowserModal ||
       rest.showDeleteModal ||
       rest.showSplitModal ||
@@ -296,6 +300,7 @@ export function useModalDismiss(opts: UseModalDismissOptions) {
       rest.showMetadataModal,
       rest.showPasswordModal,
       rest.showOpenModal,
+      rest.showOptimizeModal,
       rest.showBrowserModal,
       rest.showDeleteModal,
       rest.showSplitModal,
