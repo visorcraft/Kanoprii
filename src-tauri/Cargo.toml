@@ -1,6 +1,6 @@
 [package]
 name = "kanoprii"
-version = "1.17.4"
+version = "1.17.5"
 description = "A high-performance PDF editor"
 edition = "2021"
 license = "GPL-3.0-only"

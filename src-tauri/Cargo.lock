@@ -2896,7 +2896,7 @@ dependencies = [
 
 [[package]]
 name = "kanoprii"
-version = "1.17.4"
+version = "1.17.5"
 dependencies = [
  "fax",
  "image",
