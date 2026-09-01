@@ -21,7 +21,7 @@ const GROUPED_ROWS: { label: string; commandIds: ShortcutCommandId[] }[] = [
   { label: 'Split PDF', commandIds: ['split-pdf'] },
   { label: 'Extract pages', commandIds: ['extract-pages'] },
   { label: 'Markdown view', commandIds: ['markdown-view'] },
-  { label: 'Optimize PDF', commandIds: ['optimize-pdf'] },
+  { label: 'Optimize PDF…', commandIds: ['optimize-pdf'] },
   { label: 'Export images', commandIds: ['export-images'] },
   { label: 'Summarize', commandIds: ['summarize'] },
   { label: 'Sign PDF', commandIds: ['sign-pdf'] },

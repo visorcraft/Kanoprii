@@ -7,7 +7,7 @@ use std::collections::BTreeMap;
 use std::fs;
 use std::path::Path;
 
-pub fn split_pdf(path: &Path, page_ranges: Vec<(u32, u32)>) -> Result<Vec<String>, String> {
+pub fn split_pdf(path: &Path, page_ranges: Vec<(u32, u32)>, original: Option<&Path>) -> Result<Vec<String>, String> {
     let mut doc = crate::pdf::render::cached_document(path).map_err(|e| e.to_string())?;
 
     if page_ranges.is_empty() {
@@ -24,6 +24,7 @@ pub fn split_pdf(path: &Path, page_ranges: Vec<(u32, u32)>) -> Result<Vec<String
     }
 
     let mut output_paths = Vec::new();
+    let anchor = original.unwrap_or(path);
 
     for (i, (start, end)) in page_ranges.iter().enumerate() {
         let range_kids: Vec<Object> = all_kids[*start as usize..=*end as usize].to_vec();
@@ -34,11 +35,7 @@ pub fn split_pdf(path: &Path, page_ranges: Vec<(u32, u32)>) -> Result<Vec<String
         // a full copy with a trimmed page list.
         doc.prune_objects();
 
-        let output_path = path.with_file_name(format!(
-            "{}_part{}.pdf",
-            path.file_stem().unwrap_or_else(|| std::ffi::OsStr::new("document")).to_string_lossy(),
-            i + 1
-        ));
+        let output_path = crate::pdf::io::unique_sibling_pdf(anchor, &format!("_part{}", i + 1));
         crate::pdf::io::save_atomic(&mut doc, &output_path)?;
         output_paths.push(output_path.to_string_lossy().to_string());
 

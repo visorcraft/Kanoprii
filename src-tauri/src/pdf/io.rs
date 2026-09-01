@@ -2,6 +2,7 @@ use crate::pdf::render;
 use lopdf::Document;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, VecDeque};
+use std::ffi::OsStr;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, OnceLock};
@@ -197,6 +198,36 @@ pub fn save_atomic_overwrite(src: &Path, dst: &Path) -> Result<(), String> {
         return Err(format!("Failed to replace {}: {}", dst.display(), e));
     }
     Ok(())
+}
+
+/// Directory + stem for auto-named sibling exports.
+/// Empty `original` falls back to `source` (the working copy).
+pub fn sibling_anchor(source: &Path, original: Option<&str>) -> PathBuf {
+    match original.map(str::trim).filter(|s| !s.is_empty()) {
+        Some(p) => PathBuf::from(p),
+        None => source.to_path_buf(),
+    }
+}
+
+/// `{stem}{suffix}.pdf` next to `anchor` (suffix includes the leading `_`, e.g. `_protected`).
+pub fn sibling_pdf(anchor: &Path, suffix: &str) -> PathBuf {
+    let stem = anchor.file_stem().unwrap_or_else(|| OsStr::new("document")).to_string_lossy();
+    anchor.with_file_name(format!("{stem}{suffix}.pdf"))
+}
+
+/// Like `sibling_pdf`, but pick `{suffix}_2`, `{suffix}_3`, … if the first name exists.
+pub fn unique_sibling_pdf(anchor: &Path, suffix: &str) -> PathBuf {
+    let first = sibling_pdf(anchor, suffix);
+    if !first.exists() {
+        return first;
+    }
+    for n in 2..=999 {
+        let candidate = sibling_pdf(anchor, &format!("{suffix}_{n}"));
+        if !candidate.exists() {
+            return candidate;
+        }
+    }
+    first
 }
 
 /// Return the number of pages without mutating the file.
@@ -452,6 +483,34 @@ mod tests {
         // Sanity: not a zero-byte file (would mean we crashed mid-write).
         assert!(!original_bytes.is_empty());
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn unique_sibling_pdf_skips_existing_names() {
+        let dir = std::env::temp_dir().join(format!(
+            "kanoprii_sibling_test_{}_{}",
+            std::process::id(),
+            std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos()
+        ));
+        std::fs::create_dir_all(&dir).unwrap();
+        let original = dir.join("report.pdf");
+        std::fs::write(&original, b"%PDF").unwrap();
+        let first = super::unique_sibling_pdf(&original, "_optimized");
+        assert_eq!(first.file_name().unwrap(), "report_optimized.pdf");
+        std::fs::write(&first, b"1").unwrap();
+        let second = super::unique_sibling_pdf(&original, "_optimized");
+        assert_eq!(second.file_name().unwrap(), "report_optimized_2.pdf");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn sibling_anchor_prefers_original_path() {
+        let source = PathBuf::from("/tmp/kanoprii_work_1_report.pdf");
+        let original = "/home/user/docs/report.pdf";
+        let anchor = super::sibling_anchor(&source, Some(original));
+        assert_eq!(anchor, PathBuf::from(original));
+        assert_eq!(super::sibling_anchor(&source, Some("")), source);
+        assert_eq!(super::sibling_anchor(&source, None), source);
     }
 
     #[test]

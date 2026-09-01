@@ -102,7 +102,7 @@ export const SHORTCUT_REGISTRY: ShortcutBinding[] = [
   { commandId: 'markdown-view', category: 'View', label: 'Markdown view', defaultShortcuts: ['Ctrl+Shift+M'] },
   { commandId: 'toggle-forms', category: 'View', label: 'Forms panel', defaultShortcuts: ['F'] },
 
-  { commandId: 'optimize-pdf', category: 'Document', label: 'Optimize PDF', defaultShortcuts: ['Ctrl+Shift+O'] },
+  { commandId: 'optimize-pdf', category: 'Document', label: 'Optimize PDF…', defaultShortcuts: ['Ctrl+Shift+O'] },
   { commandId: 'export-images', category: 'Document', label: 'Export images', defaultShortcuts: ['Ctrl+Shift+B'] },
   { commandId: 'summarize', category: 'Document', label: 'Summarize', defaultShortcuts: ['Ctrl+Shift+E'] },
   { commandId: 'sign-pdf', category: 'Document', label: 'Sign PDF', defaultShortcuts: ['Ctrl+Shift+U'] },

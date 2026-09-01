@@ -30,7 +30,7 @@ export function ProtectPdfModal({
   return (
     <Modal onClose={onClose}>
       <h3>Password protect</h3>
-      <p className="modal-help">Writes an encrypted copy as <code>&lt;name&gt;_protected.pdf</code> beside the working file. The open document stays editable.</p>
+      <p className="modal-help">Writes an encrypted copy as <code>&lt;name&gt;_protected.pdf</code> beside the original file. The open document stays editable.</p>
       <label htmlFor={userId}>User password:</label>
       <input
         id={userId}

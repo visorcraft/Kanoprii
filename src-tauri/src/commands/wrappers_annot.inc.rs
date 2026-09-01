@@ -1,6 +1,11 @@
 #[tauri::command]
-fn protect_pdf(path: String, user_password: String, owner_password: Option<String>) -> Result<String, String> {
-    pdf::security::protect_pdf(path, user_password, owner_password)
+fn protect_pdf(
+    path: String,
+    user_password: String,
+    owner_password: Option<String>,
+    original_path: Option<String>,
+) -> Result<String, String> {
+    pdf::security::protect_pdf(path, user_password, owner_password, original_path)
 }
 #[tauri::command]
 fn list_pdf_signatures(path: String) -> Result<Vec<PdfSignatureInfo>, String> {

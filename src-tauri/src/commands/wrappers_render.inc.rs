@@ -527,7 +527,7 @@ fn interleave_pdf(path: String, other_path: String, other_start: u32, other_end:
 }
 /// Split the document into odd-indexed and even-indexed page files.
 #[tauri::command]
-fn split_odd_even_pages(path: String) -> Result<Vec<String>, String> {
+fn split_odd_even_pages(path: String, original_path: Option<String>) -> Result<Vec<String>, String> {
     let path = PathBuf::from(&path);
     let doc = Document::load(&path).map_err(|e| e.to_string())?;
     let (all_kids, pages_ref) = get_pages_kids(&doc)?;
@@ -538,13 +538,13 @@ fn split_odd_even_pages(path: String) -> Result<Vec<String>, String> {
         all_kids.iter().enumerate().filter(|(i, _)| i % 2 == 0).map(|(_, k)| k.clone()).collect();
     let even_kids: Vec<Object> =
         all_kids.iter().enumerate().filter(|(i, _)| i % 2 == 1).map(|(_, k)| k.clone()).collect();
-    let stem = path.file_stem().unwrap_or_else(|| std::ffi::OsStr::new("document")).to_string_lossy();
+    let anchor = crate::pdf::io::sibling_anchor(&path, original_path.as_deref());
     let mut output_paths = Vec::new();
     for (suffix, kids) in [("_odd", odd_kids), ("_even", even_kids)] {
         let mut part = Document::load(&path).map_err(|e| e.to_string())?;
         set_pages_kids(&mut part, pages_ref, kids)?;
         part.prune_objects();
-        let output_path = path.with_file_name(format!("{stem}{suffix}.pdf"));
+        let output_path = crate::pdf::io::unique_sibling_pdf(&anchor, suffix);
         crate::pdf::io::save_atomic(&mut part, &output_path)?;
         output_paths.push(output_path.to_string_lossy().into_owned());
     }
@@ -703,7 +703,7 @@ fn prepend_pdf(path: String, source_path: String, source_start: u32, source_end:
 }
 /// Split the document into consecutive files with at most `pages_per_file` pages each.
 #[tauri::command]
-fn split_every_n_pages(path: String, pages_per_file: u32) -> Result<Vec<String>, String> {
+fn split_every_n_pages(path: String, pages_per_file: u32, original_path: Option<String>) -> Result<Vec<String>, String> {
     if pages_per_file == 0 {
         return Err("Pages per file must be at least 1".to_string());
     }
@@ -719,7 +719,7 @@ fn split_every_n_pages(path: String, pages_per_file: u32) -> Result<Vec<String>,
         ranges.push((start, end));
         start = end + 1;
     }
-    split_pdf(path, ranges)
+    split_pdf(path, ranges, original_path)
 }
 /// Draw a rectangular border inset on each page in the range (viewer pixels).
 #[tauri::command]

@@ -53,9 +53,10 @@ export function useSplitExtractPrependActions(opts: UseSplitExtractPrependAction
       const written = await invoke<string[]>('split_pdf_at_page', {
         path: opts.filePath,
         atPage: atIndex,
+        originalPath: opts.originalPath || opts.filePath,
       });
       opts.setShowSplitAtModal(false);
-      opts.showToast(`Split into ${written.length} files at page ${opts.splitAtPage}`);
+      opts.showToast(`Split into ${written.length} files at page ${opts.splitAtPage}: ${written[0] ?? ''}`);
     });
   }, [opts]);
 
@@ -171,9 +172,10 @@ export function useSplitExtractPrependActions(opts: UseSplitExtractPrependAction
       const outputs = await invoke<string[]>('split_every_n_pages', {
         path: opts.filePath,
         pagesPerFile: opts.splitEveryN,
+        originalPath: opts.originalPath || opts.filePath,
       });
       opts.setShowSplitEveryModal(false);
-      opts.showToast(`Split into ${outputs.length} file${outputs.length === 1 ? '' : 's'}`);
+      opts.showToast(`Split into ${outputs.length} file${outputs.length === 1 ? '' : 's'}: ${outputs[0] ?? ''}`);
     });
   }, [opts]);
 

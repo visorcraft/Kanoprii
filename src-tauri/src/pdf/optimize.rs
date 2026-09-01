@@ -1,5 +1,5 @@
 use lopdf::{Document, Object};
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 fn recompress_images(doc: &mut Document) -> Result<u32, String> {
     let pages = doc.get_pages();
@@ -58,13 +58,6 @@ fn same_path(a: &Path, b: &Path) -> bool {
     }
 }
 
-fn optimized_sibling_path(original: &Path) -> PathBuf {
-    original.with_file_name(format!(
-        "{}_optimized.pdf",
-        original.file_stem().unwrap_or_else(|| std::ffi::OsStr::new("document")).to_string_lossy()
-    ))
-}
-
 fn strip_and_compress(doc: &mut Document) -> Result<u32, String> {
     if let Ok(catalog) = doc.catalog_mut() {
         catalog.set(b"Metadata", Object::Null);
@@ -108,7 +101,7 @@ pub fn optimize_pdf_file(source: &Path, original: &Path, replace: bool) -> Resul
         }
         Ok(format!("Replaced {}. {summary}", original.display()))
     } else {
-        let dest = optimized_sibling_path(original);
+        let dest = crate::pdf::io::unique_sibling_pdf(original, "_optimized");
         crate::pdf::io::save_atomic(&mut doc, &dest)?;
         Ok(format!("Saved to {}. {summary}", dest.display()))
     }

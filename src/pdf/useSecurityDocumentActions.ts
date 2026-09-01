@@ -128,6 +128,7 @@ export function useSecurityDocumentActions(opts: UseSecurityDocumentActionsOptio
         path: opts.filePath,
         userPassword,
         ownerPassword: ownerPassword || null,
+        originalPath: opts.originalPath || opts.filePath,
       });
       opts.setShowProtectModal(false);
       opts.showToast(result);

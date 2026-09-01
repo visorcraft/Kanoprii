@@ -52,8 +52,12 @@ export function usePdfFileOpsActions(opts: UsePdfFileOpsActionsOptions) {
         const [start, end] = r.trim().split('-').map((n) => parseInt(n.trim(), 10) - 1);
         return [start, end] as [number, number];
       });
-      const outputPaths = await invoke<string[]>('split_pdf', { path: opts.filePath, pageRanges: ranges });
-      opts.showToast(`PDF split into ${outputPaths.length} file(s)`);
+      const outputPaths = await invoke<string[]>('split_pdf', {
+        path: opts.filePath,
+        pageRanges: ranges,
+        originalPath: opts.originalPath || opts.filePath,
+      });
+      opts.showToast(`PDF split into ${outputPaths.length} file(s): ${outputPaths[0] ?? ''}`);
       opts.setShowSplitModal(false);
       opts.setSplitRanges('');
     });

@@ -1123,7 +1123,7 @@ fn interleave_pdf_alternates_pages() {
 #[test]
 fn split_odd_even_pages_writes_two_files() {
     let path = save(&mut build_pdf(4), "odd_even");
-    let outputs = split_odd_even_pages(path.clone()).unwrap();
+    let outputs = split_odd_even_pages(path.clone(), None).unwrap();
     assert_eq!(outputs.len(), 2);
     assert_eq!(page_count(&outputs[0]), 2);
     assert_eq!(page_count(&outputs[1]), 2);
@@ -1158,7 +1158,7 @@ fn set_page_size_sets_media_box() {
 fn remove_pdf_password_writes_decrypted_copy() {
     let path = save(&mut build_pdf(1), "decrypt_src");
     let path_buf = PathBuf::from(&path);
-    let protected = protect_pdf(path.clone(), "secret".to_string(), None).unwrap();
+    let protected = protect_pdf(path.clone(), "secret".to_string(), None, None).unwrap();
     let protected_path =
         path_buf.parent().unwrap().join(format!("{}_protected.pdf", path_buf.file_stem().unwrap().to_string_lossy()));
     assert!(protected.contains("encrypted"));
@@ -1252,7 +1252,7 @@ fn prepend_pdf_inserts_at_start() {
 #[test]
 fn split_every_n_pages_writes_chunks() {
     let path = save(&mut build_pdf(5), "split_every_n");
-    let outputs = split_every_n_pages(path.clone(), 2).unwrap();
+    let outputs = split_every_n_pages(path.clone(), 2, None).unwrap();
     assert_eq!(outputs.len(), 3);
     assert_eq!(page_count(&outputs[0]), 2);
     assert_eq!(page_count(&outputs[1]), 2);
@@ -1547,7 +1547,7 @@ fn duplicate_page_before_inserts_copy() {
 #[test]
 fn split_pdf_at_page_writes_two_files() {
     let path = save(&mut build_pdf(4), "split_at");
-    let written = split_pdf_at_page(path.clone(), 2).unwrap();
+    let written = split_pdf_at_page(path.clone(), 2, None).unwrap();
     assert_eq!(written.len(), 2);
     assert_eq!(Document::load(&written[0]).unwrap().get_pages().len(), 2);
     assert_eq!(Document::load(&written[1]).unwrap().get_pages().len(), 2);
@@ -17042,7 +17042,7 @@ fn insert_pdf_adds_pages_at_index() {
 #[test]
 fn split_pdf_creates_separate_files() {
     let path = save(&mut build_pdf(4), "split");
-    let outputs = split_pdf(path.clone(), vec![(0, 1), (2, 3)]).unwrap();
+    let outputs = split_pdf(path.clone(), vec![(0, 1), (2, 3)], None).unwrap();
     assert_eq!(outputs.len(), 2);
     for out in &outputs {
         assert_eq!(page_count(out), 2);
@@ -17055,7 +17055,7 @@ fn split_pdf_creates_separate_files() {
 #[test]
 fn split_pdf_rejects_invalid_range() {
     let path = save(&mut build_pdf(3), "split_invalid");
-    let err = split_pdf(path.clone(), vec![(2, 1)]).unwrap_err();
+    let err = split_pdf(path.clone(), vec![(2, 1)], None).unwrap_err();
     assert!(err.contains("Invalid page range"));
     let _ = std::fs::remove_file(&path);
 }
@@ -17063,7 +17063,7 @@ fn split_pdf_rejects_invalid_range() {
 #[test]
 fn split_pdf_rejects_empty_ranges() {
     let path = save(&mut build_pdf(2), "split_empty");
-    match split_pdf(path.clone(), vec![]) {
+    match split_pdf(path.clone(), vec![], None) {
         Ok(_) => panic!("expected empty ranges to fail"),
         Err(message) => assert!(message.contains("At least one page range")),
     }
@@ -17073,7 +17073,7 @@ fn split_pdf_rejects_empty_ranges() {
 #[test]
 fn split_pdf_rejects_missing_file() {
     let missing = std::env::temp_dir().join(format!("pp_split_missing_{}.pdf", std::process::id()));
-    let err = split_pdf(missing.to_string_lossy().into_owned(), vec![(0, 0)]).unwrap_err();
+    let err = split_pdf(missing.to_string_lossy().into_owned(), vec![(0, 0)], None).unwrap_err();
     assert!(!err.is_empty());
 }
 
@@ -18150,7 +18150,7 @@ fn optimize_pdf_replace_overwrites_original_and_working_copy() {
 #[test]
 fn optimize_pdf_replace_rejects_encrypted_original() {
     let plain = save(&mut build_pdf(1), "opt_enc_plain");
-    protect_pdf(plain.clone(), "secret".to_string(), None).unwrap();
+    protect_pdf(plain.clone(), "secret".to_string(), None, None).unwrap();
     let original = PathBuf::from(&plain)
         .with_file_name(format!("{}_protected.pdf", PathBuf::from(&plain).file_stem().unwrap().to_string_lossy()));
     let working = std::env::temp_dir().join(format!("kanoprii_work_{}_opt_enc.pdf", std::process::id()));
@@ -18177,7 +18177,7 @@ fn optimize_pdf_rejects_missing_file() {
 #[test]
 fn protect_pdf_writes_encrypted_output() {
     let path = save(&mut build_pdf(1), "protect");
-    let msg = protect_pdf(path.clone(), "user-secret".to_string(), None).unwrap();
+    let msg = protect_pdf(path.clone(), "user-secret".to_string(), None, None).unwrap();
     assert!(msg.contains("_protected.pdf"));
     let protected = PathBuf::from(&path)
         .with_file_name(format!("{}_protected.pdf", PathBuf::from(&path).file_stem().unwrap().to_string_lossy()));
@@ -18189,9 +18189,80 @@ fn protect_pdf_writes_encrypted_output() {
 }
 
 #[test]
+fn protect_pdf_writes_beside_original_not_working_copy() {
+    let original = PathBuf::from(save(&mut build_pdf(1), "protect_orig"));
+    let working = std::env::temp_dir().join(format!("kanoprii_work_{}_protect_orig.pdf", std::process::id()));
+    std::fs::copy(&original, &working).unwrap();
+
+    let msg = protect_pdf(
+        working.to_string_lossy().into_owned(),
+        "secret".to_string(),
+        None,
+        Some(original.to_string_lossy().into_owned()),
+    )
+    .unwrap();
+
+    let sibling = original.with_file_name(format!("{}_protected.pdf", original.file_stem().unwrap().to_string_lossy()));
+    assert!(sibling.exists(), "protected copy must land next to the original PDF");
+    assert!(msg.contains(&sibling.to_string_lossy().into_owned()));
+    let beside_working =
+        working.with_file_name(format!("{}_protected.pdf", working.file_stem().unwrap().to_string_lossy()));
+    assert!(!beside_working.exists(), "must not write the protected PDF next to the temp working copy");
+
+    let _ = std::fs::remove_file(&original);
+    let _ = std::fs::remove_file(&working);
+    let _ = std::fs::remove_file(&sibling);
+}
+
+#[test]
+fn split_pdf_writes_beside_original_not_working_copy() {
+    let original = PathBuf::from(save(&mut build_pdf(4), "split_orig"));
+    let working = std::env::temp_dir().join(format!("kanoprii_work_{}_split_orig.pdf", std::process::id()));
+    std::fs::copy(&original, &working).unwrap();
+
+    let outputs = split_pdf(
+        working.to_string_lossy().into_owned(),
+        vec![(0, 1), (2, 3)],
+        Some(original.to_string_lossy().into_owned()),
+    )
+    .unwrap();
+    assert_eq!(outputs.len(), 2);
+    for out in &outputs {
+        let p = PathBuf::from(out);
+        assert_eq!(p.parent(), original.parent());
+        assert!(p.exists());
+        let _ = std::fs::remove_file(p);
+    }
+    let beside_working =
+        working.with_file_name(format!("{}_part1.pdf", working.file_stem().unwrap().to_string_lossy()));
+    assert!(!beside_working.exists());
+
+    let _ = std::fs::remove_file(&original);
+    let _ = std::fs::remove_file(&working);
+}
+
+#[test]
+fn optimize_pdf_save_as_picks_unique_name_when_sibling_exists() {
+    let original = PathBuf::from(save(&mut build_pdf(1), "opt_unique"));
+    let first = original.with_file_name(format!("{}_optimized.pdf", original.file_stem().unwrap().to_string_lossy()));
+    std::fs::write(&first, b"occupied").unwrap();
+    let msg =
+        optimize_pdf(original.to_string_lossy().into_owned(), original.to_string_lossy().into_owned(), false).unwrap();
+    let second =
+        original.with_file_name(format!("{}_optimized_2.pdf", original.file_stem().unwrap().to_string_lossy()));
+    assert!(second.exists());
+    assert!(msg.contains(&second.to_string_lossy().into_owned()));
+    assert_eq!(std::fs::read(&first).unwrap(), b"occupied");
+
+    let _ = std::fs::remove_file(&original);
+    let _ = std::fs::remove_file(&first);
+    let _ = std::fs::remove_file(&second);
+}
+
+#[test]
 fn protect_pdf_rejects_empty_password() {
     let path = save(&mut build_pdf(1), "protect_empty");
-    match protect_pdf(path.clone(), String::new(), None) {
+    match protect_pdf(path.clone(), String::new(), None, None) {
         Ok(_) => panic!("expected empty password to fail"),
         Err(message) => assert!(message.contains("required")),
     }
@@ -18201,7 +18272,7 @@ fn protect_pdf_rejects_empty_password() {
 #[test]
 fn pdf_is_encrypted_detects_protected_file() {
     let path = save(&mut build_pdf(1), "protect_detect");
-    protect_pdf(path.clone(), "secret".to_string(), None).unwrap();
+    protect_pdf(path.clone(), "secret".to_string(), None, None).unwrap();
     let protected = PathBuf::from(&path)
         .with_file_name(format!("{}_protected.pdf", PathBuf::from(&path).file_stem().unwrap().to_string_lossy()));
     assert!(pdf_is_encrypted(protected.to_string_lossy().into_owned()).unwrap());
@@ -18212,7 +18283,7 @@ fn pdf_is_encrypted_detects_protected_file() {
 #[test]
 fn verify_pdf_password_accepts_correct_secret() {
     let path = save(&mut build_pdf(1), "protect_verify");
-    protect_pdf(path.clone(), "open-me".to_string(), None).unwrap();
+    protect_pdf(path.clone(), "open-me".to_string(), None, None).unwrap();
     let protected = PathBuf::from(&path)
         .with_file_name(format!("{}_protected.pdf", PathBuf::from(&path).file_stem().unwrap().to_string_lossy()));
     verify_pdf_password(protected.to_string_lossy().into_owned(), "open-me".to_string()).unwrap();
@@ -18401,7 +18472,7 @@ fn sign_pdf_rejects_empty_password() {
 #[test]
 fn sign_pdf_rejects_encrypted_pdf() {
     let path = save(&mut build_pdf(1), "sig_reject_enc");
-    protect_pdf(path.clone(), "secret".to_string(), None).unwrap();
+    protect_pdf(path.clone(), "secret".to_string(), None, None).unwrap();
     let protected = PathBuf::from(&path)
         .with_file_name(format!("{}_protected.pdf", PathBuf::from(&path).file_stem().unwrap().to_string_lossy()));
     let err = sign_pdf(
@@ -18453,7 +18524,7 @@ fn pdf_signature_roundtrip_with_openssl() {
 #[test]
 fn open_working_copy_with_password_decrypts_for_editing() {
     let path = save(&mut build_pdf(2), "protect_open");
-    protect_pdf(path.clone(), "edit-me".to_string(), None).unwrap();
+    protect_pdf(path.clone(), "edit-me".to_string(), None, None).unwrap();
     let protected = PathBuf::from(&path)
         .with_file_name(format!("{}_protected.pdf", PathBuf::from(&path).file_stem().unwrap().to_string_lossy()));
     let working =

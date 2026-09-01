@@ -3,10 +3,10 @@ import { useCallback } from 'react';
 import type { PageSizePreset } from '../modals/PageSizeModal';
 import type { PageRangeController } from '../pageRange/usePageRange';
 import type { RunEdit } from './runEditTypes';
-import { fileNameFromPath } from '../app/utils';
 
 type UsePageSizeActionsOptions = {
   filePath: string;
+  originalPath: string;
   pageCount: number | null;
   pageSizePreset: PageSizePreset;
   pageSizeRange: PageRangeController;
@@ -24,8 +24,11 @@ export function usePageSizeActions(opts: UsePageSizeActionsOptions) {
       return;
     }
     await opts.withLoading(async () => {
-      const outputs = await invoke<string[]>('split_odd_even_pages', { path: opts.filePath });
-      opts.showToast(`Split into ${outputs.length} files: ${outputs.map((p) => fileNameFromPath(p)).join(', ')}`);
+      const outputs = await invoke<string[]>('split_odd_even_pages', {
+        path: opts.filePath,
+        originalPath: opts.originalPath || opts.filePath,
+      });
+      opts.showToast(`Split into ${outputs.length} files: ${outputs.join(', ')}`);
     });
   }, [opts]);
 

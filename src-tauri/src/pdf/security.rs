@@ -57,8 +57,15 @@ pub fn ensure_pdf_file_id(doc: &mut Document) {
     );
 }
 
-/// Write a password-protected sibling `<stem>_protected.pdf` next to `path`.
-pub fn protect_pdf(path: String, user_password: String, owner_password: Option<String>) -> Result<String, String> {
+/// Write a password-protected sibling `<stem>_protected.pdf` next to `original`
+/// (or next to `path` when `original` is empty). Source bytes come from `path`
+/// (the open working copy).
+pub fn protect_pdf(
+    path: String,
+    user_password: String,
+    owner_password: Option<String>,
+    original_path: Option<String>,
+) -> Result<String, String> {
     if user_password.is_empty() {
         return Err("User password is required".to_string());
     }
@@ -80,16 +87,11 @@ pub fn protect_pdf(path: String, user_password: String, owner_password: Option<S
     let state = EncryptionState::try_from(version).map_err(|e| e.to_string())?;
     doc.encrypt(&state).map_err(|e| e.to_string())?;
 
-    let output_path = path.with_file_name(format!(
-        "{}_protected.pdf",
-        path.file_stem().unwrap_or_else(|| std::ffi::OsStr::new("document")).to_string_lossy()
-    ));
+    let anchor = crate::pdf::io::sibling_anchor(&path, original_path.as_deref());
+    let output_path = crate::pdf::io::unique_sibling_pdf(&anchor, "_protected");
     crate::pdf::io::save_atomic(&mut doc, &output_path)?;
 
-    Ok(format!(
-        "Saved encrypted PDF to {}. Open it with the user password you set.",
-        output_path.file_name().unwrap().to_string_lossy()
-    ))
+    Ok(format!("Saved encrypted PDF to {}. Open it with the user password you set.", output_path.display()))
 }
 
 #[derive(Debug, Clone, Serialize)]

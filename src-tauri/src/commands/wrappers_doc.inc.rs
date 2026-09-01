@@ -150,14 +150,15 @@ fn summarize_pdf(path: String) -> Result<PdfSummaryResult, String> {
     Ok(pdf::summary::build_pdf_summary(&pages, scanned))
 }
 #[tauri::command]
-fn save_pdf_summary(path: String, overwrite: bool) -> Result<SummarySaveResult, String> {
-    let pdf_path = PathBuf::from(path);
+fn save_pdf_summary(path: String, overwrite: bool, original_path: Option<String>) -> Result<SummarySaveResult, String> {
+    let pdf_path = PathBuf::from(&path);
     if !pdf_path.is_file() {
         return Err(format!("file not found: {}", pdf_path.display()));
     }
     let (pages, scanned) = pdf_plain_text_pages(&pdf_path)?;
     let summary = pdf::summary::build_pdf_summary(&pages, scanned);
-    pdf::summary::save_summary_file(&pdf_path, &summary, overwrite)
+    let dest = crate::pdf::io::sibling_anchor(&pdf_path, original_path.as_deref());
+    pdf::summary::save_summary_file(&dest, &summary, overwrite)
 }
 /// Return on-disk byte length for undo snapshot sizing decisions.
 #[tauri::command]
@@ -334,8 +335,10 @@ fn save_pdf_markdown(path: String, overwrite: bool, output_path: Option<String>)
     ))
 }
 #[tauri::command]
-fn split_pdf(path: String, page_ranges: Vec<(u32, u32)>) -> Result<Vec<String>, String> {
-    pdf::merge_split::split_pdf(&PathBuf::from(path), page_ranges)
+fn split_pdf(path: String, page_ranges: Vec<(u32, u32)>, original_path: Option<String>) -> Result<Vec<String>, String> {
+    let source = PathBuf::from(&path);
+    let original = original_path.as_deref().filter(|s| !s.is_empty()).map(PathBuf::from);
+    pdf::merge_split::split_pdf(&source, page_ranges, original.as_deref())
 }
 /// Write a new PDF containing only `start_page`..=`end_page` from `path`.
 #[tauri::command]

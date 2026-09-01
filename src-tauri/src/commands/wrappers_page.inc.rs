@@ -82,7 +82,7 @@ fn duplicate_page_before(path: String, page_index: u32) -> Result<u32, String> {
 }
 /// Split into `_part1.pdf` (pages before `at_page`) and `_part2.pdf` (from `at_page` onward).
 #[tauri::command]
-fn split_pdf_at_page(path: String, at_page: u32) -> Result<Vec<String>, String> {
+fn split_pdf_at_page(path: String, at_page: u32, original_path: Option<String>) -> Result<Vec<String>, String> {
     let path = PathBuf::from(&path);
     let doc = Document::load(&path).map_err(|e| e.to_string())?;
     let (all_kids, pages_ref) = get_pages_kids(&doc)?;
@@ -95,13 +95,13 @@ fn split_pdf_at_page(path: String, at_page: u32) -> Result<Vec<String>, String> 
     }
     let part1_kids: Vec<Object> = all_kids[..at_page as usize].to_vec();
     let part2_kids: Vec<Object> = all_kids[at_page as usize..].to_vec();
-    let stem = path.file_stem().unwrap_or_else(|| std::ffi::OsStr::new("document")).to_string_lossy();
+    let anchor = crate::pdf::io::sibling_anchor(&path, original_path.as_deref());
     let mut output_paths = Vec::new();
     for (suffix, kids) in [("_part1", part1_kids), ("_part2", part2_kids)] {
         let mut part = Document::load(&path).map_err(|e| e.to_string())?;
         set_pages_kids(&mut part, pages_ref, kids)?;
         part.prune_objects();
-        let output_path = path.with_file_name(format!("{stem}{suffix}.pdf"));
+        let output_path = crate::pdf::io::unique_sibling_pdf(&anchor, suffix);
         crate::pdf::io::save_atomic(&mut part, &output_path)?;
         output_paths.push(output_path.to_string_lossy().into_owned());
     }

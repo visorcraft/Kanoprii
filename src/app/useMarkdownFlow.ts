@@ -156,11 +156,20 @@ export function useMarkdownFlow(opts: UseMarkdownFlowOptions) {
   const handleSaveSummary = useCallback(async () => {
     if (!opts.filePath) return;
     await opts.withLoading(async () => {
-      let result = await invoke<SummarySaveResult>('save_pdf_summary', { path: opts.filePath, overwrite: false });
+      const originalPath = opts.originalPath || opts.filePath;
+      let result = await invoke<SummarySaveResult>('save_pdf_summary', {
+        path: opts.filePath,
+        overwrite: false,
+        originalPath,
+      });
       if (result.conflict) {
         const overwrite = window.confirm('Overwrite existing summary file?');
         if (!overwrite) return;
-        result = await invoke<SummarySaveResult>('save_pdf_summary', { path: opts.filePath, overwrite: true });
+        result = await invoke<SummarySaveResult>('save_pdf_summary', {
+          path: opts.filePath,
+          overwrite: true,
+          originalPath,
+        });
       }
       opts.setPdfSummary(result.summary);
       opts.showToast(result.written ? `Summary saved to ${result.summaryPath}` : 'Summary already saved');
