@@ -94,6 +94,9 @@ pub fn optimize_pdf_file(source: &Path, original: &Path, replace: bool) -> Resul
     );
 
     if replace {
+        if crate::pdf::security::is_encrypted(original)? {
+            return Err("Cannot replace a password-protected original. Save as a new file instead.".to_string());
+        }
         // Write the working copy first. If the subsequent original write fails, Save
         // still persists the optimized bytes instead of clobbering the original with
         // the pre-optimize working copy.

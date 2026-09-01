@@ -27,6 +27,7 @@ export function OptimizePdfModal({
       <p className="modal-help">
         Replace overwrites <code>{name}</code> in place. Save as new writes{' '}
         <code>{siblingName}</code> next to it and leaves the original alone.
+        Password-protected originals cannot be replaced; save as a new file instead.
       </p>
       <div className="modal-actions">
         <button type="button" onClick={onClose} className="btn btn-secondary">Cancel</button>

@@ -18148,6 +18148,25 @@ fn optimize_pdf_replace_overwrites_original_and_working_copy() {
 }
 
 #[test]
+fn optimize_pdf_replace_rejects_encrypted_original() {
+    let plain = save(&mut build_pdf(1), "opt_enc_plain");
+    protect_pdf(plain.clone(), "secret".to_string(), None).unwrap();
+    let original = PathBuf::from(&plain)
+        .with_file_name(format!("{}_protected.pdf", PathBuf::from(&plain).file_stem().unwrap().to_string_lossy()));
+    let working = std::env::temp_dir().join(format!("kanoprii_work_{}_opt_enc.pdf", std::process::id()));
+    std::fs::copy(&plain, &working).unwrap();
+
+    let err = optimize_pdf(working.to_string_lossy().into_owned(), original.to_string_lossy().into_owned(), true)
+        .unwrap_err();
+    assert!(err.to_lowercase().contains("password-protected") || err.to_lowercase().contains("encrypt"));
+    assert!(pdf_is_encrypted(original.to_string_lossy().into_owned()).unwrap());
+
+    let _ = std::fs::remove_file(&plain);
+    let _ = std::fs::remove_file(&original);
+    let _ = std::fs::remove_file(&working);
+}
+
+#[test]
 fn optimize_pdf_rejects_missing_file() {
     let missing = std::env::temp_dir().join(format!("pp_optimize_missing_{}.pdf", std::process::id()));
     let err = optimize_pdf(missing.to_string_lossy().into_owned(), missing.to_string_lossy().into_owned(), false)
