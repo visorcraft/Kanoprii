@@ -1162,12 +1162,42 @@ fn remove_pdf_password_writes_decrypted_copy() {
     let protected_path =
         path_buf.parent().unwrap().join(format!("{}_protected.pdf", path_buf.file_stem().unwrap().to_string_lossy()));
     assert!(protected.contains("encrypted"));
-    let decrypted = remove_pdf_password(protected_path.to_string_lossy().into_owned(), "secret".to_string()).unwrap();
+    let decrypted =
+        remove_pdf_password(protected_path.to_string_lossy().into_owned(), "secret".to_string(), None).unwrap();
     assert!(PathBuf::from(&decrypted).is_file());
     assert!(!pdf_is_encrypted(decrypted.clone()).unwrap());
     let _ = std::fs::remove_file(&path);
     let _ = std::fs::remove_file(&protected_path);
     let _ = std::fs::remove_file(&decrypted);
+}
+
+#[test]
+fn remove_pdf_password_writes_beside_original_not_working_copy() {
+    let original_plain = PathBuf::from(save(&mut build_pdf(1), "decrypt_orig"));
+    protect_pdf(original_plain.to_string_lossy().into_owned(), "secret".to_string(), None, None).unwrap();
+    let original = original_plain
+        .with_file_name(format!("{}_protected.pdf", original_plain.file_stem().unwrap().to_string_lossy()));
+    let working = std::env::temp_dir().join(format!("kanoprii_work_{}_decrypt_orig.pdf", std::process::id()));
+    std::fs::copy(&original_plain, &working).unwrap();
+
+    let written = remove_pdf_password(
+        working.to_string_lossy().into_owned(),
+        "secret".to_string(),
+        Some(original.to_string_lossy().into_owned()),
+    )
+    .unwrap();
+    let dest = PathBuf::from(&written);
+    assert_eq!(dest.parent(), original.parent());
+    assert!(written.contains("_decrypted.pdf"));
+    let beside_working =
+        working.with_file_name(format!("{}_decrypted.pdf", working.file_stem().unwrap().to_string_lossy()));
+    assert!(!beside_working.exists());
+    assert!(!pdf_is_encrypted(written.clone()).unwrap());
+
+    let _ = std::fs::remove_file(&original_plain);
+    let _ = std::fs::remove_file(&original);
+    let _ = std::fs::remove_file(&working);
+    let _ = std::fs::remove_file(&dest);
 }
 
 #[test]
@@ -17596,6 +17626,25 @@ fn save_working_copy_rejects_missing_working_file() {
 }
 
 #[test]
+fn save_working_copy_rejects_encrypted_original() {
+    let plain = save(&mut build_pdf(1), "save_enc_plain");
+    protect_pdf(plain.clone(), "secret".to_string(), None, None).unwrap();
+    let original = PathBuf::from(&plain)
+        .with_file_name(format!("{}_protected.pdf", PathBuf::from(&plain).file_stem().unwrap().to_string_lossy()));
+    let working = std::env::temp_dir().join(format!("kanoprii_work_{}_save_enc.pdf", std::process::id()));
+    std::fs::copy(&plain, &working).unwrap();
+
+    let err =
+        save_working_copy(working.to_string_lossy().into_owned(), original.to_string_lossy().into_owned()).unwrap_err();
+    assert!(err.to_lowercase().contains("password-protected") || err.to_lowercase().contains("encrypt"));
+    assert!(pdf_is_encrypted(original.to_string_lossy().into_owned()).unwrap());
+
+    let _ = std::fs::remove_file(&plain);
+    let _ = std::fs::remove_file(&original);
+    let _ = std::fs::remove_file(&working);
+}
+
+#[test]
 fn snapshot_pdf_rejects_missing_source() {
     let missing = std::env::temp_dir().join(format!("pp_snapshot_missing_{}.pdf", std::process::id()));
     let err = snapshot_pdf(missing.to_string_lossy().into_owned()).unwrap_err();
@@ -18239,6 +18288,59 @@ fn split_pdf_writes_beside_original_not_working_copy() {
 
     let _ = std::fs::remove_file(&original);
     let _ = std::fs::remove_file(&working);
+}
+
+#[test]
+fn split_odd_even_and_every_n_write_beside_original() {
+    let original = PathBuf::from(save(&mut build_pdf(4), "split_parity_orig"));
+    let working = std::env::temp_dir().join(format!("kanoprii_work_{}_split_parity.pdf", std::process::id()));
+    std::fs::copy(&original, &working).unwrap();
+    let orig = original.to_string_lossy().into_owned();
+    let work = working.to_string_lossy().into_owned();
+
+    let odd_even = split_odd_even_pages(work.clone(), Some(orig.clone())).unwrap();
+    assert_eq!(odd_even.len(), 2);
+    for out in &odd_even {
+        assert_eq!(PathBuf::from(out).parent(), original.parent());
+        let _ = std::fs::remove_file(out);
+    }
+
+    let chunks = split_every_n_pages(work.clone(), 2, Some(orig.clone())).unwrap();
+    assert_eq!(chunks.len(), 2);
+    for out in &chunks {
+        assert_eq!(PathBuf::from(out).parent(), original.parent());
+        let _ = std::fs::remove_file(out);
+    }
+
+    let at_page = split_pdf_at_page(work.clone(), 2, Some(orig)).unwrap();
+    assert_eq!(at_page.len(), 2);
+    for out in &at_page {
+        assert_eq!(PathBuf::from(out).parent(), original.parent());
+        let _ = std::fs::remove_file(out);
+    }
+
+    let _ = std::fs::remove_file(&original);
+    let _ = std::fs::remove_file(&working);
+}
+
+#[test]
+fn save_pdf_summary_writes_beside_original() {
+    let original = PathBuf::from(save(&mut build_pdf(1), "sum_orig"));
+    let working = std::env::temp_dir().join(format!("kanoprii_work_{}_sum_orig.pdf", std::process::id()));
+    std::fs::copy(&original, &working).unwrap();
+    let result =
+        save_pdf_summary(working.to_string_lossy().into_owned(), true, Some(original.to_string_lossy().into_owned()))
+            .unwrap();
+    let dest = PathBuf::from(&result.summary_path);
+    assert!(dest.exists());
+    assert_eq!(dest.parent(), original.parent());
+    assert!(result.summary_path.ends_with(".summary.md"));
+    let beside_working = working.with_extension("summary.md");
+    assert!(!beside_working.exists() || beside_working == dest);
+
+    let _ = std::fs::remove_file(&original);
+    let _ = std::fs::remove_file(&working);
+    let _ = std::fs::remove_file(&dest);
 }
 
 #[test]

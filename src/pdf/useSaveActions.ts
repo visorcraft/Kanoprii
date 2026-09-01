@@ -21,13 +21,15 @@ export function useSaveActions(opts: UseSaveActionsOptions) {
   const { announce } = useAnnouncer();
 
   const handleSave = useCallback(async () => {
-    if (!opts.filePath || !opts.originalPath) return;
-    await opts.withLoading(async () => {
+    if (!opts.filePath || !opts.originalPath) return false;
+    const saved = await opts.withLoading(async () => {
       await invoke('save_working_copy', { working: opts.filePath, target: opts.originalPath });
       opts.markSaved();
       opts.showToast('Saved');
       announce('Saved');
+      return true;
     });
+    return saved === true;
   }, [opts, announce]);
 
   const handleSaveAs = useCallback(async () => {

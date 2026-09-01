@@ -113,6 +113,7 @@ export function useBirdsEyeWorkspace({
 
   const autosaveSession = useCallback(
     async (session: DocumentSessionData) => {
+      updateSession(session.id, { isDirty: true });
       if (!session.originalPath) return;
       await invoke('save_working_copy', {
         working: session.filePath,

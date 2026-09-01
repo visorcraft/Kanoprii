@@ -50,7 +50,7 @@ export type AppKeyboardActions = {
   toggleFormsPanel: () => void;
   openDeleteModal: () => void;
   openSaveAs: () => void;
-  handleSave: () => void | Promise<void>;
+  handleSave: () => boolean | void | Promise<boolean | void>;
   requestClosePdf: () => void;
   quitApp: () => void;
   handlePrint: () => void | Promise<void>;
@@ -128,7 +128,7 @@ export type BuildAppKeyboardActionsInput = {
   toggleFormsPanel: () => void;
   openDeleteModal: () => void;
   openSaveAs: () => void;
-  handleSave: () => void | Promise<void>;
+  handleSave: () => boolean | void | Promise<boolean | void>;
   guardUnsaved: (action: () => void) => void;
   closePdf: () => void;
   exitApp: () => void;

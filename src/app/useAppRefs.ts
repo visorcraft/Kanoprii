@@ -9,7 +9,7 @@ export function useAppRefs() {
   const cancelDrawingRef = useRef<() => void>(() => {});
   const keyboardActionsRef = useRef<AppKeyboardActions>({} as AppKeyboardActions);
   const imgRef = useRef<HTMLImageElement>(null);
-  const handleSaveRef = useRef<() => void | Promise<void>>(async () => {});
+  const handleSaveRef = useRef<() => boolean | Promise<boolean>>(async () => false);
 
   return {
     filePathRef,

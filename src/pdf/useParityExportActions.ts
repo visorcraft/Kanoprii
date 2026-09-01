@@ -11,9 +11,11 @@ import {
   parityBatchMutatesPdf,
   parityBatchNeedsRange,
 } from './parityPayload';
+import { directoryFromPath } from '../app/utils';
 
 type UseParityExportActionsOptions = {
   filePath: string;
+  originalPath: string;
   pageCount: number | null;
   currentPage: number;
   parityRange: PageRangePairController;
@@ -36,6 +38,7 @@ type UseParityExportActionsOptions = {
   reloadOpenPdf: (page: number) => Promise<void>;
   showToast: (msg: string, kind?: 'error') => void;
   setParityRangeCommand: (command: string) => void;
+  setParityRangeOutputPath: (path: string) => void;
   setShowParityRangeModal: (open: boolean) => void;
   setShowExportPngModal: (open: boolean) => void;
 };
@@ -65,6 +68,8 @@ export function useParityExportActions(opts: UseParityExportActionsOptions) {
     if (!opts.filePath || opts.pageCount === null) return;
     opts.parityRange.reset(opts.currentPage, opts.currentPage);
     opts.setParityRangeCommand('rotate_odd_pages_in_range');
+    const base = (opts.originalPath || opts.filePath).replace(/\.pdf$/i, '');
+    opts.setParityRangeOutputPath(`${base}_extract.pdf`);
     opts.setShowParityRangeModal(true);
   }, [opts]);
 
@@ -97,7 +102,8 @@ export function useParityExportActions(opts: UseParityExportActionsOptions) {
       if (typeof result === 'number') {
         opts.showToast(`Done - affected ${result} item${result === 1 ? '' : 's'}`);
       } else if (Array.isArray(result)) {
-        opts.showToast(`Wrote ${result.length} file${result.length === 1 ? '' : 's'}`);
+        const dir = directoryFromPath(String(result[0] ?? ''));
+        opts.showToast(`Wrote ${result.length} file${result.length === 1 ? '' : 's'}${dir ? ` in ${dir}` : ''}`);
       } else if (typeof result === 'string') {
         opts.showToast(`Wrote ${result}`);
       } else {

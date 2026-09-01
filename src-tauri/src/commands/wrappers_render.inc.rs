@@ -567,8 +567,8 @@ fn set_page_size(path: String, start_page: u32, end_page: u32, preset: String) -
 }
 /// Write a decrypted sibling `<stem>_decrypted.pdf` next to an encrypted `path`.
 #[tauri::command]
-fn remove_pdf_password(path: String, password: String) -> Result<String, String> {
-    pdf::security::remove_pdf_password(path, password)
+fn remove_pdf_password(path: String, password: String, original_path: Option<String>) -> Result<String, String> {
+    pdf::security::remove_pdf_password(path, password, original_path)
 }
 /// Export each page in the range as a separate single-page PDF in `output_dir`.
 #[tauri::command]

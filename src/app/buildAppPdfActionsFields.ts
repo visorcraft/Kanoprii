@@ -309,6 +309,7 @@ export function modalPdfActionFields(m: ModalState) {
     setPageNumbersPrefix: m.setPageNumbersPrefix,
     setPageSizePreset: m.setPageSizePreset,
     setParityRangeCommand: m.setParityRangeCommand,
+    setParityRangeOutputPath: m.setParityRangeOutputPath,
     setPdfSummary: m.setPdfSummary,
     setPngExportOutputPath: m.setPngExportOutputPath,
     setPrependFilePath: m.setPrependFilePath,

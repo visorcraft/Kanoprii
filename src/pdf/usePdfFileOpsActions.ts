@@ -1,5 +1,6 @@
 import { invoke } from '@tauri-apps/api/core';
 import { useCallback, type Dispatch, type SetStateAction } from 'react';
+import { directoryFromPath, ensureExtension } from '../app/utils';
 import type { PageRangePairController } from '../pageRange/usePageRange';
 
 type UsePdfFileOpsActionsOptions = {
@@ -57,7 +58,8 @@ export function usePdfFileOpsActions(opts: UsePdfFileOpsActionsOptions) {
         pageRanges: ranges,
         originalPath: opts.originalPath || opts.filePath,
       });
-      opts.showToast(`PDF split into ${outputPaths.length} file(s): ${outputPaths[0] ?? ''}`);
+      const dir = directoryFromPath(outputPaths[0] ?? '');
+      opts.showToast(`PDF split into ${outputPaths.length} file(s) in ${dir || outputPaths[0] || ''}`);
       opts.setShowSplitModal(false);
       opts.setSplitRanges('');
     });
@@ -98,7 +100,7 @@ export function usePdfFileOpsActions(opts: UsePdfFileOpsActionsOptions) {
     await opts.withLoading(async () => {
       const written = await invoke<string>('extract_pdf_pages', {
         path: opts.filePath,
-        outputPath: output,
+        outputPath: ensureExtension(output, 'pdf'),
         startPage: opts.extractRange.startPage,
         endPage: opts.extractRange.endPage,
       });

@@ -123,7 +123,7 @@ export type UseAppPdfActionsInput = Omit<
     | 'setBatesPosition'
   > & {
     cancelDrawingRef: { current: () => void };
-    handleSaveRef: { current: () => void | Promise<void> };
+    handleSaveRef: { current: () => boolean | Promise<boolean> };
     handleMarkdownViewRef: { current: () => void | Promise<void> };
     openTesseractGuide: () => void;
     pdfEdit: PdfEditState;

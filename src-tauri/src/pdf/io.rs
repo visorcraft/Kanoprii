@@ -216,6 +216,7 @@ pub fn sibling_pdf(anchor: &Path, suffix: &str) -> PathBuf {
 }
 
 /// Like `sibling_pdf`, but pick `{suffix}_2`, `{suffix}_3`, … if the first name exists.
+/// Never reuses an existing path (falls back to a pid/nanos suffix).
 pub fn unique_sibling_pdf(anchor: &Path, suffix: &str) -> PathBuf {
     let first = sibling_pdf(anchor, suffix);
     if !first.exists() {
@@ -227,7 +228,8 @@ pub fn unique_sibling_pdf(anchor: &Path, suffix: &str) -> PathBuf {
             return candidate;
         }
     }
-    first
+    let nanos = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_nanos()).unwrap_or(0);
+    sibling_pdf(anchor, &format!("{suffix}_{}_{nanos}", std::process::id()))
 }
 
 /// Return the number of pages without mutating the file.

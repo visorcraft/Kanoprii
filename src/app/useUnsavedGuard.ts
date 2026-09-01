@@ -4,7 +4,7 @@ import type { UnsavedChoice } from '../modals/UnsavedChangesModal';
 type UseUnsavedGuardOptions = {
   isDirty: boolean;
   setIsDirty: (dirty: boolean) => void;
-  onSave: () => void | Promise<void>;
+  onSave: () => boolean | void | Promise<boolean | void>;
 };
 
 export function useUnsavedGuard({ isDirty, setIsDirty, onSave }: UseUnsavedGuardOptions) {
@@ -27,8 +27,12 @@ export function useUnsavedGuard({ isDirty, setIsDirty, onSave }: UseUnsavedGuard
       setShowUnsavedModal(false);
       return;
     }
-    if (choice === 'save') await onSave();
-    else setIsDirty(false);
+    if (choice === 'save') {
+      const saved = await onSave();
+      if (saved === false) return;
+    } else {
+      setIsDirty(false);
+    }
     setShowUnsavedModal(false);
     const action = pendingNavRef.current;
     pendingNavRef.current = null;

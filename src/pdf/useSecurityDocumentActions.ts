@@ -57,18 +57,27 @@ export function useSecurityDocumentActions(opts: UseSecurityDocumentActionsOptio
     opts.setShowProtectModal(true);
   }, [opts]);
 
-  const openDecryptModal = useCallback(() => {
+  const openDecryptModal = useCallback(async () => {
+    const source = opts.originalPath || opts.filePath;
+    if (!source) return;
+    const encrypted = await invoke<boolean>('pdf_is_encrypted', { path: source });
+    if (!encrypted) {
+      opts.showToast('This PDF is not password-protected', 'error');
+      return;
+    }
     opts.setDecryptPassword('');
     opts.setShowDecryptModal(true);
   }, [opts]);
 
   const handleRemovePdfPassword = useCallback(async () => {
     if (!opts.filePath || !opts.decryptPassword) return;
-    const sourcePath = opts.originalPath || opts.filePath;
+    const sourcePath = opts.filePath || opts.originalPath;
+    const originalPath = opts.originalPath || opts.filePath;
     await opts.withLoading(async () => {
       const written = await invoke<string>('remove_pdf_password', {
         path: sourcePath,
         password: opts.decryptPassword,
+        originalPath,
       });
       opts.setShowDecryptModal(false);
       opts.setDecryptPassword('');

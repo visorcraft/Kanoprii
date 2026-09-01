@@ -272,6 +272,7 @@ pub fn sign_pdf(
     let signed = pdf_sign_runtime()
         .block_on(PdfSigner::new().options(options).sign(&pdf_bytes, &signer))
         .map_err(|e| e.to_string())?;
+    let wrote_in_place = output_path.is_none();
     let output = output_path.map(PathBuf::from).unwrap_or(path);
     // ponytail: atomic write — a crash mid-fs::write would otherwise leave
     // the file truncated (and invalidate the signature). Write bytes to a
@@ -288,22 +289,42 @@ pub fn sign_pdf(
         let _ = std::fs::remove_file(&temp);
         return Err(format!("Failed to replace {}: {}", output.display(), e));
     }
-    Ok(format!("Signed PDF saved to {}", output.file_name().unwrap_or_default().to_string_lossy()))
+    if wrote_in_place {
+        Ok("Document signed. Save to write the signature to the original file.".to_string())
+    } else {
+        Ok(format!("Signed PDF saved to {}", output.display()))
+    }
 }
 
-pub fn remove_pdf_password(path: String, password: String) -> Result<String, String> {
+/// Write an unencrypted sibling `<stem>_decrypted.pdf` next to `original`
+/// (or next to `path` when `original` is empty). `path` is the source bytes
+/// (working copy when the PDF is already open).
+pub fn remove_pdf_password(path: String, password: String, original_path: Option<String>) -> Result<String, String> {
     if password.is_empty() {
         return Err("Password is required".to_string());
     }
-    let path = PathBuf::from(&path);
-    let mut doc = Document::load_with_password(&path, &password).map_err(|_| "Incorrect password".to_string())?;
-    if doc.is_encrypted() {
-        doc.decrypt(&password).map_err(|e| e.to_string())?;
-    }
-    let output_path = path.with_file_name(format!(
-        "{}_decrypted.pdf",
-        path.file_stem().unwrap_or_else(|| std::ffi::OsStr::new("document")).to_string_lossy()
-    ));
+    let source = PathBuf::from(&path);
+    let anchor = crate::pdf::io::sibling_anchor(&source, original_path.as_deref());
+    let encrypted = if is_encrypted(&source)? {
+        &source
+    } else if is_encrypted(&anchor)? {
+        &anchor
+    } else {
+        return Err("PDF is not encrypted".to_string());
+    };
+    verify_pdf_password(encrypted.to_string_lossy().into_owned(), password.clone())?;
+
+    let mut doc = if is_encrypted(&source)? {
+        let mut loaded =
+            Document::load_with_password(&source, &password).map_err(|_| "Incorrect password".to_string())?;
+        if loaded.is_encrypted() {
+            loaded.decrypt(&password).map_err(|e| e.to_string())?;
+        }
+        loaded
+    } else {
+        Document::load(&source).map_err(|e| e.to_string())?
+    };
+    let output_path = crate::pdf::io::unique_sibling_pdf(&anchor, "_decrypted");
     crate::pdf::io::save_atomic(&mut doc, &output_path)?;
     Ok(output_path.to_string_lossy().into_owned())
 }

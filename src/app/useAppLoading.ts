@@ -23,7 +23,8 @@ export function useAppLoading({ setToast, setLoading }: UseAppLoadingOptions) {
       clearTimeout(timeoutRef.current);
     }
     setToast({ message, type });
-    timeoutRef.current = setTimeout(() => setToast(null), 3000);
+    const holdMs = type === 'error' || message.length > 72 ? 8000 : 3000;
+    timeoutRef.current = setTimeout(() => setToast(null), holdMs);
   }, [setToast]);
 
   useEffect(() => () => {

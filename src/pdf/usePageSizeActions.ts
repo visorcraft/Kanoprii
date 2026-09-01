@@ -2,6 +2,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { useCallback } from 'react';
 import type { PageSizePreset } from '../modals/PageSizeModal';
 import type { PageRangeController } from '../pageRange/usePageRange';
+import { directoryFromPath } from '../app/utils';
 import type { RunEdit } from './runEditTypes';
 
 type UsePageSizeActionsOptions = {
@@ -28,7 +29,9 @@ export function usePageSizeActions(opts: UsePageSizeActionsOptions) {
         path: opts.filePath,
         originalPath: opts.originalPath || opts.filePath,
       });
-      opts.showToast(`Split into ${outputs.length} files: ${outputs.join(', ')}`);
+      opts.showToast(
+        `Split into ${outputs.length} files in ${directoryFromPath(outputs[0] ?? '') || outputs[0] || ''}`,
+      );
     });
   }, [opts]);
 

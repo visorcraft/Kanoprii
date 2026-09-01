@@ -1,5 +1,6 @@
 import { invoke } from '@tauri-apps/api/core';
 import { useCallback } from 'react';
+import { directoryFromPath, ensureExtension } from '../app/utils';
 import type { PageRangePairController } from '../pageRange/usePageRange';
 import type { RunEdit } from './runEditTypes';
 
@@ -56,7 +57,9 @@ export function useSplitExtractPrependActions(opts: UseSplitExtractPrependAction
         originalPath: opts.originalPath || opts.filePath,
       });
       opts.setShowSplitAtModal(false);
-      opts.showToast(`Split into ${written.length} files at page ${opts.splitAtPage}: ${written[0] ?? ''}`);
+      opts.showToast(
+        `Split into ${written.length} files at page ${opts.splitAtPage} in ${directoryFromPath(written[0] ?? '') || written[0] || ''}`,
+      );
     });
   }, [opts]);
 
@@ -96,7 +99,7 @@ export function useSplitExtractPrependActions(opts: UseSplitExtractPrependAction
     await opts.withLoading(async () => {
       const written = await invoke<string>('extract_odd_pages', {
         path: opts.filePath,
-        outputPath: opts.extractOddOutputPath.trim(),
+        outputPath: ensureExtension(opts.extractOddOutputPath.trim(), 'pdf'),
       });
       opts.setShowExtractOddModal(false);
       opts.showToast(`Extracted odd pages to ${written}`);
@@ -115,7 +118,7 @@ export function useSplitExtractPrependActions(opts: UseSplitExtractPrependAction
     await opts.withLoading(async () => {
       const written = await invoke<string>('extract_even_pages', {
         path: opts.filePath,
-        outputPath: opts.extractEvenOutputPath.trim(),
+        outputPath: ensureExtension(opts.extractEvenOutputPath.trim(), 'pdf'),
       });
       opts.setShowExtractEvenModal(false);
       opts.showToast(`Extracted even pages to ${written}`);
@@ -175,7 +178,9 @@ export function useSplitExtractPrependActions(opts: UseSplitExtractPrependAction
         originalPath: opts.originalPath || opts.filePath,
       });
       opts.setShowSplitEveryModal(false);
-      opts.showToast(`Split into ${outputs.length} file${outputs.length === 1 ? '' : 's'}: ${outputs[0] ?? ''}`);
+      opts.showToast(
+        `Split into ${outputs.length} file${outputs.length === 1 ? '' : 's'} in ${directoryFromPath(outputs[0] ?? '') || outputs[0] || ''}`,
+      );
     });
   }, [opts]);
 

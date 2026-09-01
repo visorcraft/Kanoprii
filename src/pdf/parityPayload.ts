@@ -1,3 +1,5 @@
+import { ensureExtension } from '../app/utils';
+
 export type ParityBatchContext = {
   filePath: string;
   startPage: number;
@@ -39,7 +41,7 @@ function applyParityCommandFields(
   ctx: ParityBatchContext,
 ): Record<string, unknown> {
   if (command.startsWith('extract_')) {
-    return { ...base, outputPath: ctx.outputPath.trim() };
+    return { ...base, outputPath: ensureExtension(ctx.outputPath.trim(), 'pdf') };
   }
   if (command.startsWith('export_')) {
     return { ...base, outputDir: ctx.outputPath.trim() };

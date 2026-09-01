@@ -78,6 +78,7 @@ export function modalCtxFileFields(args: BuildAppModalCtxInputArgs) {
     mergeRange: args.pageRanges.mergeRange,
     mergeSourcePageCount: args.modal.mergeSourcePageCount,
     nativeDialogs: args.modal.nativeDialogs,
+    originalPdfPath: args.doc.activeSession?.originalPath || args.doc.activeSession?.filePath || '',
     originalFileName: fileNameFromPath(
       args.doc.activeSession?.originalPath || args.doc.activeSession?.filePath || '',
     ),

@@ -7,6 +7,7 @@ type ParityRangeModalProps = {
   commands: readonly string[];
   command: string;
   outputPath: string;
+  originalPdfPath: string;
   startPage: number;
   endPage: number;
   pageCount: number | null;
@@ -18,10 +19,19 @@ type ParityRangeModalProps = {
   onRun: () => void;
 };
 
+function parityOutputDefaults(originalPdfPath: string) {
+  const base = originalPdfPath.replace(/\.pdf$/i, '') || 'document';
+  return {
+    extract: `${base}_extract.pdf`,
+    export: `${base}_pages`,
+  };
+}
+
 export function ParityRangeModal({
   commands,
   command,
   outputPath,
+  originalPdfPath,
   startPage,
   endPage,
   pageCount,
@@ -52,7 +62,21 @@ export function ParityRangeModal({
         />
       )}
       <label htmlFor={actionId}>Action:</label>
-      <select id={actionId} className="modal-input" value={command} onChange={(e) => onCommandChange(e.target.value)}>
+      <select
+        id={actionId}
+        className="modal-input"
+        value={command}
+        onChange={(e) => {
+          const next = e.target.value;
+          const defaults = parityOutputDefaults(originalPdfPath);
+          const isDefault = !outputPath.trim()
+            || outputPath === defaults.extract
+            || outputPath === defaults.export;
+          onCommandChange(next);
+          if (isDefault && next.startsWith('extract_')) onOutputPathChange(defaults.extract);
+          if (isDefault && next.startsWith('export_')) onOutputPathChange(defaults.export);
+        }}
+      >
         {commands.map((cmd) => (
           <option key={cmd} value={cmd}>{cmd.replaceAll('_', ' ')}</option>
         ))}

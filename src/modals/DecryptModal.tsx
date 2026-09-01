@@ -16,7 +16,7 @@ export function DecryptModal({
   return (
     <Modal onClose={onClose}>
       <h3>Decrypt PDF</h3>
-      <p className="modal-help">Writes an unencrypted copy as <code>&lt;name&gt;_decrypted.pdf</code> beside the encrypted source (uses the original file path when available).</p>
+      <p className="modal-help">Writes an unencrypted copy as <code>&lt;name&gt;_decrypted.pdf</code> beside the original file. If that name exists, a numbered sibling is used.</p>
       <label>Password:</label>
       <input
         type="password"

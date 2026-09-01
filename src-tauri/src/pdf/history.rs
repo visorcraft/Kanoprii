@@ -29,6 +29,12 @@ pub fn save_working_copy(working: String, target: String) -> Result<(), String> 
     if !path_resides_in_dir(&working, &std::env::temp_dir()) {
         return Err("working path must be inside the app's temp directory".to_string());
     }
+    // Same rule as optimize-replace: the working copy is decrypted. Copying it
+    // over a password-protected original would silently strip the password.
+    // Unreadable/non-PDF targets are allowed (Save As, tests).
+    if target.exists() && crate::pdf::security::is_encrypted(&target).unwrap_or(false) {
+        return Err("Cannot replace a password-protected original. Save as a new file instead.".to_string());
+    }
     fs::copy(&working, &target).map_err(|e| e.to_string())?;
     Ok(())
 }

@@ -571,6 +571,7 @@ export function AppModals({ ctx: rawCtx }: AppModalsProps) {
           commands={parityBatchCommands as string[]}
           command={ctx.parityRangeCommand}
           outputPath={ctx.parityRangeOutputPath}
+          originalPdfPath={ctx.originalPdfPath}
           startPage={ctx.parityRange.startPage}
           endPage={ctx.parityRange.endPage}
           pageCount={ctx.pageCount}
@@ -915,10 +916,13 @@ export function AppModals({ ctx: rawCtx }: AppModalsProps) {
       {ctx.showPrintDialog && (
         <PrintDialog
           filePath={ctx.activeFilePath}
+          originalPath={ctx.originalPdfPath}
+          nativeDialogs={ctx.nativeDialogs}
           pageCount={ctx.pageCount ?? 0}
           currentPage={ctx.currentPage}
           onClose={() => ctx.setShowPrintDialog(false)}
           onUseSystemPrint={ctx.handleUseSystemPrint}
+          showToast={ctx.showToast}
         />
       )}
 

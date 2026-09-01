@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 
 import { invoke } from '@tauri-apps/api/core';
 import { save } from '@tauri-apps/plugin-dialog';
+import { ensureExtension } from '../app/utils';
 import { Modal } from '../ui/Modal';
 
 type PrinterInfo = {
@@ -31,10 +32,13 @@ type PrintOptions = {
 
 type PrintDialogProps = {
   filePath: string;
+  originalPath: string;
+  nativeDialogs: boolean;
   pageCount: number;
   currentPage: number;
   onClose: () => void;
   onUseSystemPrint: () => void;
+  showToast: (message: string, type?: 'success' | 'error') => void;
 };
 
 const DEFAULT_OPTS: PrintOptions = {
@@ -81,10 +85,13 @@ const pageRangeMode = (range: string, current: number): 'all' | 'current' | 'cus
 
 export function PrintDialog({
   filePath,
+  originalPath,
+  nativeDialogs,
   pageCount,
   currentPage,
   onClose,
   onUseSystemPrint,
+  showToast,
 }: PrintDialogProps) {
   const [printers, setPrinters] = useState<PrinterInfo[]>([]);
   const [opts, setOpts] = useState<PrintOptions>(DEFAULT_OPTS);
@@ -195,6 +202,7 @@ export function PrintDialog({
     try {
       await invoke('print_document', { sourcePath: filePath, opts: toBackendOpts(opts) });
       onClose();
+      showToast(`Sent to ${opts.printerName}`);
     } catch (e) {
       setError(`Print failed: ${e instanceof Error ? e.message : String(e)}`);
     } finally {
@@ -204,25 +212,34 @@ export function PrintDialog({
 
   const handleSaveAsPdf = async () => {
     setError(null);
+    const defaultPath = originalPath
+      ? originalPath.replace(/\.pdf$/i, '_print.pdf')
+      : 'print-output.pdf';
     let outputPath: string | null;
     try {
-      outputPath = await save({
-        defaultPath: 'print-output.pdf',
-        filters: [{ name: 'PDF', extensions: ['pdf'] }],
-      });
+      if (nativeDialogs) {
+        outputPath = await save({
+          defaultPath,
+          filters: [{ name: 'PDF', extensions: ['pdf'] }],
+        });
+      } else {
+        outputPath = window.prompt('Save print PDF to:', defaultPath)?.trim() || null;
+      }
     } catch (e) {
       setError(`Save dialog failed: ${e instanceof Error ? e.message : String(e)}`);
       return;
     }
     if (!outputPath) return;
+    const dest = ensureExtension(outputPath, 'pdf');
     setWorking(true);
     try {
       await invoke('print_to_pdf', {
         sourcePath: filePath,
         opts: toBackendOpts(opts),
-        outputPath,
+        outputPath: dest,
       });
       onClose();
+      showToast(`Saved print PDF to ${dest}`);
     } catch (e) {
       setError(`Save as PDF failed: ${e instanceof Error ? e.message : String(e)}`);
     } finally {

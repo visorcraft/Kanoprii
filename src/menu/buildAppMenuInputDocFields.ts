@@ -161,7 +161,7 @@ export function menuInputDocFields(args: BuildAppMenuInputArgs): Pick<
     setShowCommandPalette: help.setShowCommandPalette,
     openTesseractGuide: chrome.openTesseractGuide,
     openPdf: chrome.openPdf,
-    handleSave: pdfActions.handleSave,
+    handleSave: () => { void pdfActions.handleSave(); },
     openSaveAs: pdfActions.openSaveAs,
     undo: history.undo,
     redo: history.redo,

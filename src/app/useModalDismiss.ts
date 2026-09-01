@@ -12,6 +12,7 @@ type ModalDismissSetters = {
   setPdfPasswordDraft: (value: string) => void;
   setShowOpenModal: (show: boolean) => void;
   setShowOptimizeModal: (show: boolean) => void;
+  setShowPrintDialog: (show: boolean) => void;
   setShowBrowserModal: (show: boolean) => void;
   setShowDeleteModal: (show: boolean) => void;
   setShowSplitModal: (show: boolean) => void;
@@ -19,9 +20,11 @@ type ModalDismissSetters = {
   setShowExportPngModal: (show: boolean) => void;
   setShowDeleteRangeModal: (show: boolean) => void;
   setShowPageNumbersModal: (show: boolean) => void;
+  setShowBatesNumberModal: (show: boolean) => void;
   setShowWatermarkModal: (show: boolean) => void;
   setShowCropModal: (show: boolean) => void;
   setShowFlattenModal: (show: boolean) => void;
+  setShowApplyRedactionsModal: (show: boolean) => void;
   setShowAddBookmarkModal: (show: boolean) => void;
   setShowRenameBookmarkModal: (show: boolean) => void;
   setShowDuplicateRangeModal: (show: boolean) => void;
@@ -69,6 +72,7 @@ type ModalDismissSetters = {
   setShowLicenses: (show: boolean) => void;
   setShowCredits: (show: boolean) => void;
   setShowAbout: (show: boolean) => void;
+  setShowUpdateModal: (show: boolean) => void;
   setShowTesseractModal: (show: boolean) => void;
 };
 
@@ -82,6 +86,7 @@ type ModalDismissFlags = {
   showPasswordModal: boolean;
   showOpenModal: boolean;
   showOptimizeModal: boolean;
+  showPrintDialog: boolean;
   showBrowserModal: boolean;
   showDeleteModal: boolean;
   showSplitModal: boolean;
@@ -89,9 +94,11 @@ type ModalDismissFlags = {
   showExportPngModal: boolean;
   showDeleteRangeModal: boolean;
   showPageNumbersModal: boolean;
+  showBatesNumberModal: boolean;
   showWatermarkModal: boolean;
   showCropModal: boolean;
   showFlattenModal: boolean;
+  showApplyRedactionsModal: boolean;
   showAddBookmarkModal: boolean;
   showRenameBookmarkModal: boolean;
   showDuplicateRangeModal: boolean;
@@ -136,6 +143,7 @@ type ModalDismissFlags = {
   showLicenses: boolean;
   showCredits: boolean;
   showAbout: boolean;
+  showUpdateModal: boolean;
   showTesseractModal: boolean;
 };
 
@@ -163,6 +171,7 @@ export function useModalDismiss(opts: UseModalDismissOptions) {
     rest.setPdfPasswordDraft('');
     rest.setShowOpenModal(false);
     rest.setShowOptimizeModal(false);
+    rest.setShowPrintDialog(false);
     rest.setShowBrowserModal(false);
     rest.setShowDeleteModal(false);
     rest.setShowSplitModal(false);
@@ -170,9 +179,11 @@ export function useModalDismiss(opts: UseModalDismissOptions) {
     rest.setShowExportPngModal(false);
     rest.setShowDeleteRangeModal(false);
     rest.setShowPageNumbersModal(false);
+    rest.setShowBatesNumberModal(false);
     rest.setShowWatermarkModal(false);
     rest.setShowCropModal(false);
     rest.setShowFlattenModal(false);
+    rest.setShowApplyRedactionsModal(false);
     rest.setShowAddBookmarkModal(false);
     rest.setShowRenameBookmarkModal(false);
     rest.setShowDuplicateRangeModal(false);
@@ -221,6 +232,7 @@ export function useModalDismiss(opts: UseModalDismissOptions) {
     rest.setShowLicenses(false);
     rest.setShowCredits(false);
     rest.setShowAbout(false);
+    rest.setShowUpdateModal(false);
     rest.setShowTesseractModal(false);
   // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional: stable option object / destructured deps
   }, [showUnsavedModal, closeSearchModal, resolveUnsaved]);
@@ -236,6 +248,7 @@ export function useModalDismiss(opts: UseModalDismissOptions) {
       rest.showPasswordModal ||
       rest.showOpenModal ||
       rest.showOptimizeModal ||
+      rest.showPrintDialog ||
       rest.showBrowserModal ||
       rest.showDeleteModal ||
       rest.showSplitModal ||
@@ -243,9 +256,11 @@ export function useModalDismiss(opts: UseModalDismissOptions) {
       rest.showExportPngModal ||
       rest.showDeleteRangeModal ||
       rest.showPageNumbersModal ||
+      rest.showBatesNumberModal ||
       rest.showWatermarkModal ||
       rest.showCropModal ||
       rest.showFlattenModal ||
+      rest.showApplyRedactionsModal ||
       rest.showAddBookmarkModal ||
       rest.showRenameBookmarkModal ||
       rest.showDuplicateRangeModal ||
@@ -290,6 +305,7 @@ export function useModalDismiss(opts: UseModalDismissOptions) {
       rest.showLicenses ||
       rest.showCredits ||
       rest.showAbout ||
+      rest.showUpdateModal ||
       rest.showTesseractModal,
     [
       showUnsavedModal,
@@ -301,6 +317,7 @@ export function useModalDismiss(opts: UseModalDismissOptions) {
       rest.showPasswordModal,
       rest.showOpenModal,
       rest.showOptimizeModal,
+      rest.showPrintDialog,
       rest.showBrowserModal,
       rest.showDeleteModal,
       rest.showSplitModal,
@@ -308,9 +325,11 @@ export function useModalDismiss(opts: UseModalDismissOptions) {
       rest.showExportPngModal,
       rest.showDeleteRangeModal,
       rest.showPageNumbersModal,
+      rest.showBatesNumberModal,
       rest.showWatermarkModal,
       rest.showCropModal,
       rest.showFlattenModal,
+      rest.showApplyRedactionsModal,
       rest.showAddBookmarkModal,
       rest.showRenameBookmarkModal,
       rest.showDuplicateRangeModal,
@@ -355,6 +374,7 @@ export function useModalDismiss(opts: UseModalDismissOptions) {
       rest.showLicenses,
       rest.showCredits,
       rest.showAbout,
+      rest.showUpdateModal,
       rest.showTesseractModal,
     ]
   );

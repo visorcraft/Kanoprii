@@ -83,6 +83,15 @@ export function useAppKeyboard(
       if (!handler) return;
 
       if (!handler.enabled(a)) return;
+      // Tab/command shortcuts would retarget the open modal at a different document.
+      // DOM check covers overlays that aren't in anyModalOpen (tab rename, batch-close).
+      if (
+        a.anyModalOpen ||
+        document.querySelector('.modal-backdrop, .command-palette-backdrop') !== null
+      ) {
+        e.preventDefault();
+        return;
+      }
 
       e.preventDefault();
       void handler.run(a);
