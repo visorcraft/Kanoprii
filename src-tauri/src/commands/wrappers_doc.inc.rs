@@ -356,8 +356,28 @@ fn insert_pdf(
     pdf::merge_split::insert_pdf(&PathBuf::from(path), &PathBuf::from(insert_path), at_index, insert_start, insert_end)
 }
 #[tauri::command]
-fn optimize_pdf(path: String, original_path: String, replace_original: bool) -> Result<String, String> {
-    pdf::optimize::optimize_pdf_file(&PathBuf::from(path), &PathBuf::from(original_path), replace_original)
+fn optimize_pdf(
+    path: String,
+    original_path: String,
+    replace_original: bool,
+    jpeg_quality: u8,
+    max_dpi: u32,
+) -> Result<String, String> {
+    pdf::optimize::optimize_pdf_file(
+        &PathBuf::from(path),
+        &PathBuf::from(original_path),
+        replace_original,
+        jpeg_quality,
+        max_dpi,
+    )
+}
+#[tauri::command]
+fn estimate_optimize_pdf(path: String, jpeg_quality: u8, max_dpi: u32) -> Result<pdf::optimize::OptimizeEstimate, String> {
+    pdf::optimize::estimate_optimize_pdf(&PathBuf::from(path), jpeg_quality, max_dpi)
+}
+#[tauri::command]
+fn optimize_source_size(path: String) -> Result<u64, String> {
+    pdf::optimize::source_size(&PathBuf::from(path))
 }
 /// OCR scanned pages and write an invisible text layer for search/select.
 #[tauri::command]

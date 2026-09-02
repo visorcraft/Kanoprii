@@ -252,6 +252,7 @@ export function AppModals({ ctx: rawCtx }: AppModalsProps) {
       {ctx.showOptimizeModal && (
         <OptimizePdfModal
           originalFileName={ctx.originalFileName}
+          filePath={ctx.activeFilePath}
           onClose={() => ctx.setShowOptimizeModal(false)}
           onReplaceOriginal={ctx.handleOptimizeReplace}
           onSaveAsNew={ctx.handleOptimizeSaveAs}

@@ -18134,7 +18134,7 @@ fn markdown_lines_turn_column_blocks_into_tables() {
 #[test]
 fn optimize_pdf_writes_output_file() {
     let path = save(&mut build_pdf(2), "optimize");
-    let msg = optimize_pdf(path.clone(), path.clone(), false).unwrap();
+    let msg = optimize_pdf(path.clone(), path.clone(), false, 50, 150).unwrap();
     assert!(msg.contains("Metadata stripped"));
     let p = PathBuf::from(&path);
     let out = p.with_file_name(format!("{}_optimized.pdf", p.file_stem().unwrap().to_string_lossy()));
@@ -18153,7 +18153,8 @@ fn optimize_pdf_save_as_writes_beside_original_not_working_copy() {
     let original_bytes = std::fs::read(&original).unwrap();
 
     let msg =
-        optimize_pdf(working.to_string_lossy().into_owned(), original.to_string_lossy().into_owned(), false).unwrap();
+        optimize_pdf(working.to_string_lossy().into_owned(), original.to_string_lossy().into_owned(), false, 50, 150)
+            .unwrap();
 
     let sibling = original.with_file_name(format!("{}_optimized.pdf", original.file_stem().unwrap().to_string_lossy()));
     assert!(sibling.exists(), "optimized file must land next to the original PDF");
@@ -18180,7 +18181,8 @@ fn optimize_pdf_replace_overwrites_original_and_working_copy() {
     std::fs::copy(&original, &working).unwrap();
 
     let msg =
-        optimize_pdf(working.to_string_lossy().into_owned(), original.to_string_lossy().into_owned(), true).unwrap();
+        optimize_pdf(working.to_string_lossy().into_owned(), original.to_string_lossy().into_owned(), true, 50, 150)
+            .unwrap();
 
     assert!(original.exists());
     assert_eq!(page_count(&original.to_string_lossy()), 2);
@@ -18205,8 +18207,9 @@ fn optimize_pdf_replace_rejects_encrypted_original() {
     let working = std::env::temp_dir().join(format!("kanoprii_work_{}_opt_enc.pdf", std::process::id()));
     std::fs::copy(&plain, &working).unwrap();
 
-    let err = optimize_pdf(working.to_string_lossy().into_owned(), original.to_string_lossy().into_owned(), true)
-        .unwrap_err();
+    let err =
+        optimize_pdf(working.to_string_lossy().into_owned(), original.to_string_lossy().into_owned(), true, 50, 150)
+            .unwrap_err();
     assert!(err.to_lowercase().contains("password-protected") || err.to_lowercase().contains("encrypt"));
     assert!(pdf_is_encrypted(original.to_string_lossy().into_owned()).unwrap());
 
@@ -18218,8 +18221,9 @@ fn optimize_pdf_replace_rejects_encrypted_original() {
 #[test]
 fn optimize_pdf_rejects_missing_file() {
     let missing = std::env::temp_dir().join(format!("pp_optimize_missing_{}.pdf", std::process::id()));
-    let err = optimize_pdf(missing.to_string_lossy().into_owned(), missing.to_string_lossy().into_owned(), false)
-        .unwrap_err();
+    let err =
+        optimize_pdf(missing.to_string_lossy().into_owned(), missing.to_string_lossy().into_owned(), false, 50, 150)
+            .unwrap_err();
     assert!(!err.is_empty());
 }
 
@@ -18349,7 +18353,8 @@ fn optimize_pdf_save_as_picks_unique_name_when_sibling_exists() {
     let first = original.with_file_name(format!("{}_optimized.pdf", original.file_stem().unwrap().to_string_lossy()));
     std::fs::write(&first, b"occupied").unwrap();
     let msg =
-        optimize_pdf(original.to_string_lossy().into_owned(), original.to_string_lossy().into_owned(), false).unwrap();
+        optimize_pdf(original.to_string_lossy().into_owned(), original.to_string_lossy().into_owned(), false, 50, 150)
+            .unwrap();
     let second =
         original.with_file_name(format!("{}_optimized_2.pdf", original.file_stem().unwrap().to_string_lossy()));
     assert!(second.exists());
@@ -18359,6 +18364,199 @@ fn optimize_pdf_save_as_picks_unique_name_when_sibling_exists() {
     let _ = std::fs::remove_file(&original);
     let _ = std::fs::remove_file(&first);
     let _ = std::fs::remove_file(&second);
+}
+
+fn noisy_jpeg(width: u32, height: u32, quality: u8) -> Vec<u8> {
+    use image::{codecs::jpeg::JpegEncoder, ExtendedColorType, RgbImage};
+    let mut pixels = Vec::with_capacity((width * height * 3) as usize);
+    for y in 0..height {
+        for x in 0..width {
+            let v = ((x.wrapping_mul(73) + y.wrapping_mul(41)) % 256) as u8;
+            let n = ((x ^ y) % 256) as u8;
+            pixels.extend_from_slice(&[v, n, v.wrapping_add(n)]);
+        }
+    }
+    let img = RgbImage::from_raw(width, height, pixels).expect("rgb buffer");
+    let mut jpeg = Vec::new();
+    let mut encoder = JpegEncoder::new_with_quality(&mut jpeg, quality);
+    encoder.encode(img.as_raw(), width, height, ExtendedColorType::Rgb8).expect("jpeg");
+    jpeg
+}
+
+/// Full-page-style JPEG XObject: 480×480 px drawn at 72×72 pt → 480 DPI.
+/// Encoded as DCTDecode so the old raw-pixel recompressor would skip it.
+fn build_pdf_with_jpeg_image() -> Document {
+    let mut doc = build_pdf(1);
+    let page_id = *doc.get_pages().get(&1).unwrap();
+    let width = 480u32;
+    let height = 480u32;
+    let jpeg = noisy_jpeg(width, height, 95);
+    let mut image_dict = Dictionary::new();
+    image_dict.set("Type", Object::Name(b"XObject".to_vec()));
+    image_dict.set("Subtype", Object::Name(b"Image".to_vec()));
+    image_dict.set("Width", Object::Integer(width as i64));
+    image_dict.set("Height", Object::Integer(height as i64));
+    image_dict.set("ColorSpace", Object::Name(b"DeviceRGB".to_vec()));
+    image_dict.set("BitsPerComponent", Object::Integer(8));
+    image_dict.set("Filter", Object::Name(b"DCTDecode".to_vec()));
+    let image_id = doc.add_object(Object::Stream(Stream::new(image_dict, jpeg)));
+
+    let mut xobjects = Dictionary::new();
+    xobjects.set(b"Im1", Object::Reference(image_id));
+    let resources = Dictionary::from_iter(vec![(b"XObject".to_vec(), Object::Dictionary(xobjects))]);
+    doc.get_dictionary_mut(page_id).unwrap().set(b"Resources", Object::Dictionary(resources));
+
+    let content = b"q 72 0 0 72 50 50 cm /Im1 Do Q\n".to_vec();
+    let content_id = doc.add_object(Object::Stream(Stream::new(Dictionary::new(), content)));
+    doc.get_dictionary_mut(page_id).unwrap().set(b"Contents", Object::Reference(content_id));
+    doc
+}
+
+fn build_pdf_with_ccitt_image() -> Document {
+    use fax::encoder::Encoder;
+    use fax::{Color, VecWriter};
+    use std::iter::repeat_n;
+
+    let mut doc = build_pdf(1);
+    let page_id = *doc.get_pages().get(&1).unwrap();
+    let width = 32u16;
+    let height = 8u16;
+    let writer = VecWriter::new();
+    let mut encoder = Encoder::new(writer);
+    for row in 0..height {
+        let black = if row % 2 == 0 { 8 } else { 24 };
+        encoder
+            .encode_line(repeat_n(Color::White, (width as usize) - black).chain(repeat_n(Color::Black, black)), width)
+            .unwrap();
+    }
+    let encoded = encoder.finish().unwrap().finish();
+    let stream = Stream::new(
+        Dictionary::from_iter(vec![
+            (b"Type".to_vec(), Object::Name(b"XObject".to_vec())),
+            (b"Subtype".to_vec(), Object::Name(b"Image".to_vec())),
+            (b"Width".to_vec(), Object::Integer(width as i64)),
+            (b"Height".to_vec(), Object::Integer(height as i64)),
+            (b"BitsPerComponent".to_vec(), Object::Integer(1)),
+            (b"ColorSpace".to_vec(), Object::Name(b"DeviceGray".to_vec())),
+            (b"Filter".to_vec(), Object::Name(b"CCITTFaxDecode".to_vec())),
+            (
+                b"DecodeParms".to_vec(),
+                Object::Dictionary(Dictionary::from_iter(vec![
+                    (b"Columns".to_vec(), Object::Integer(width as i64)),
+                    (b"Rows".to_vec(), Object::Integer(height as i64)),
+                    (b"K".to_vec(), Object::Integer(-1)),
+                ])),
+            ),
+        ]),
+        encoded,
+    );
+    let image_id = doc.add_object(Object::Stream(stream));
+    let mut xobjects = Dictionary::new();
+    xobjects.set(b"Im1", Object::Reference(image_id));
+    let resources = Dictionary::from_iter(vec![(b"XObject".to_vec(), Object::Dictionary(xobjects))]);
+    doc.get_dictionary_mut(page_id).unwrap().set(b"Resources", Object::Dictionary(resources));
+    let content = b"q 200 0 0 50 50 50 cm /Im1 Do Q\n".to_vec();
+    let content_id = doc.add_object(Object::Stream(Stream::new(Dictionary::new(), content)));
+    doc.get_dictionary_mut(page_id).unwrap().set(b"Contents", Object::Reference(content_id));
+    doc
+}
+
+fn jpeg_filter_on_first_image(path: &PathBuf) -> Option<String> {
+    let doc = Document::load(path).ok()?;
+    for obj in doc.objects.values() {
+        let Object::Stream(stream) = obj else { continue };
+        if stream.dict.get(b"Subtype").ok().and_then(|o| o.as_name().ok()) != Some(b"Image") {
+            continue;
+        }
+        return stream
+            .dict
+            .get(b"Filter")
+            .ok()
+            .and_then(|f| f.as_name().ok())
+            .map(|n| String::from_utf8_lossy(n).into_owned());
+    }
+    None
+}
+
+#[test]
+fn estimate_optimize_pdf_does_not_write_and_matches_save_as() {
+    let path = save(&mut build_pdf_with_jpeg_image(), "opt_est_match");
+    let p = PathBuf::from(&path);
+    let sibling = p.with_file_name(format!("{}_optimized.pdf", p.file_stem().unwrap().to_string_lossy()));
+    let _ = std::fs::remove_file(&sibling);
+
+    let estimate = estimate_optimize_pdf(path.clone(), 40, 72).unwrap();
+    assert!(!sibling.exists(), "estimate must not write an output file");
+    assert_eq!(estimate.original_bytes, std::fs::metadata(&path).unwrap().len());
+    assert!(
+        estimate.images_recompressed >= 1,
+        "JPEG XObject must be recompressed, got {}",
+        estimate.images_recompressed
+    );
+    assert!(estimate.estimated_bytes < estimate.original_bytes);
+
+    let msg = optimize_pdf(path.clone(), path.clone(), false, 40, 72).unwrap();
+    assert!(sibling.exists(), "save-as must write {sibling:?}: {msg}");
+    let written = std::fs::metadata(&sibling).unwrap().len();
+    assert_eq!(written, estimate.estimated_bytes, "estimate must match the save-as file size");
+
+    let _ = std::fs::remove_file(&path);
+    let _ = std::fs::remove_file(&sibling);
+}
+
+#[test]
+fn optimize_pdf_quality_20_smaller_than_quality_80() {
+    let low_path = save(&mut build_pdf_with_jpeg_image(), "opt_q20");
+    let high_path = save(&mut build_pdf_with_jpeg_image(), "opt_q80");
+    optimize_pdf(low_path.clone(), low_path.clone(), false, 20, 0).unwrap();
+    optimize_pdf(high_path.clone(), high_path.clone(), false, 80, 0).unwrap();
+    let low_out = PathBuf::from(&low_path)
+        .with_file_name(format!("{}_optimized.pdf", PathBuf::from(&low_path).file_stem().unwrap().to_string_lossy()));
+    let high_out = PathBuf::from(&high_path)
+        .with_file_name(format!("{}_optimized.pdf", PathBuf::from(&high_path).file_stem().unwrap().to_string_lossy()));
+    let low_len = std::fs::metadata(&low_out).unwrap().len();
+    let high_len = std::fs::metadata(&high_out).unwrap().len();
+    assert!(low_len < high_len, "quality 20 ({low_len}) should be smaller than quality 80 ({high_len})");
+
+    let _ = std::fs::remove_file(&low_path);
+    let _ = std::fs::remove_file(&high_path);
+    let _ = std::fs::remove_file(&low_out);
+    let _ = std::fs::remove_file(&high_out);
+}
+
+#[test]
+fn optimize_pdf_dpi_72_smaller_than_original() {
+    let cap_path = save(&mut build_pdf_with_jpeg_image(), "opt_dpi72");
+    let orig_path = save(&mut build_pdf_with_jpeg_image(), "opt_dpi0");
+    optimize_pdf(cap_path.clone(), cap_path.clone(), false, 80, 72).unwrap();
+    optimize_pdf(orig_path.clone(), orig_path.clone(), false, 80, 0).unwrap();
+    let cap_out = PathBuf::from(&cap_path)
+        .with_file_name(format!("{}_optimized.pdf", PathBuf::from(&cap_path).file_stem().unwrap().to_string_lossy()));
+    let orig_out = PathBuf::from(&orig_path)
+        .with_file_name(format!("{}_optimized.pdf", PathBuf::from(&orig_path).file_stem().unwrap().to_string_lossy()));
+    let cap_len = std::fs::metadata(&cap_out).unwrap().len();
+    let orig_len = std::fs::metadata(&orig_out).unwrap().len();
+    assert!(cap_len < orig_len, "72 DPI ({cap_len}) should be smaller than Original ({orig_len})");
+
+    let _ = std::fs::remove_file(&cap_path);
+    let _ = std::fs::remove_file(&orig_path);
+    let _ = std::fs::remove_file(&cap_out);
+    let _ = std::fs::remove_file(&orig_out);
+}
+
+#[test]
+fn optimize_pdf_leaves_ccitt_image_as_ccitt() {
+    let path = save(&mut build_pdf_with_ccitt_image(), "opt_ccitt");
+    let before = jpeg_filter_on_first_image(&PathBuf::from(&path));
+    assert_eq!(before.as_deref(), Some("CCITTFaxDecode"));
+    optimize_pdf(path.clone(), path.clone(), false, 20, 72).unwrap();
+    let out = PathBuf::from(&path)
+        .with_file_name(format!("{}_optimized.pdf", PathBuf::from(&path).file_stem().unwrap().to_string_lossy()));
+    let after = jpeg_filter_on_first_image(&out);
+    assert_eq!(after.as_deref(), Some("CCITTFaxDecode"), "1-bit CCITT must not become JPEG, got {after:?}");
+
+    let _ = std::fs::remove_file(&path);
+    let _ = std::fs::remove_file(&out);
 }
 
 #[test]

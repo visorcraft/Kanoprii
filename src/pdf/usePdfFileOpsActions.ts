@@ -158,7 +158,7 @@ export function usePdfFileOpsActions(opts: UsePdfFileOpsActionsOptions) {
     opts.setShowOptimizeModal(true);
   }, [opts]);
 
-  const runOptimizePdf = useCallback(async (replaceOriginal: boolean) => {
+  const runOptimizePdf = useCallback(async (replaceOriginal: boolean, jpegQuality: number, maxDpi: number) => {
     if (!opts.filePath) return;
     const originalPath = opts.originalPath || opts.filePath;
     await opts.withLoading(async () => {
@@ -166,6 +166,8 @@ export function usePdfFileOpsActions(opts: UsePdfFileOpsActionsOptions) {
         path: opts.filePath,
         originalPath,
         replaceOriginal,
+        jpegQuality,
+        maxDpi,
       });
       opts.setShowOptimizeModal(false);
       if (replaceOriginal) {
@@ -177,8 +179,14 @@ export function usePdfFileOpsActions(opts: UsePdfFileOpsActionsOptions) {
     });
   }, [opts]);
 
-  const handleOptimizeReplace = useCallback(() => runOptimizePdf(true), [runOptimizePdf]);
-  const handleOptimizeSaveAs = useCallback(() => runOptimizePdf(false), [runOptimizePdf]);
+  const handleOptimizeReplace = useCallback(
+    (jpegQuality: number, maxDpi: number) => runOptimizePdf(true, jpegQuality, maxDpi),
+    [runOptimizePdf],
+  );
+  const handleOptimizeSaveAs = useCallback(
+    (jpegQuality: number, maxDpi: number) => runOptimizePdf(false, jpegQuality, maxDpi),
+    [runOptimizePdf],
+  );
 
   return {
     openMergeModal,

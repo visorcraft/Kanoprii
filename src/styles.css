@@ -2267,6 +2267,31 @@ body {
   line-height: 1.45;
 }
 
+.modal-range {
+  width: 100%;
+  margin: 4px 0 8px;
+  accent-color: var(--pp-accent);
+}
+
+.optimize-size-line {
+  margin: 0 0 12px;
+  color: var(--pp-text-secondary);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.optimize-estimate-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 4px 0 12px;
+}
+
+.optimize-estimate-row .optimize-size-line {
+  margin: 0;
+  flex: 1;
+}
+
 .modal-steps {
   margin: 0 0 12px;
   padding-left: 20px;

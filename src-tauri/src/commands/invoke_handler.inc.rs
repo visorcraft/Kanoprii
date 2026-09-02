@@ -1985,6 +1985,8 @@ tauri::generate_handler![
             ocr_status,
             ocr_pdf_page,
             optimize_pdf,
+            estimate_optimize_pdf,
+            optimize_source_size,
             make_pdf_searchable,
             apply_redactions,
             has_redaction_boxes,

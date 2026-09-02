@@ -264,6 +264,9 @@ describe('v0.5 viewer features', () => {
     await clickMenuAction('document', 'optimize');
     const saveAs = await $('[data-testid="optimize-save-as"]');
     await saveAs.waitForDisplayed({ timeout: 10_000 });
+    expect(await $('[data-testid="optimize-quality"]').isDisplayed()).toBe(true);
+    expect(await $('[data-testid="optimize-dpi"]').isDisplayed()).toBe(true);
+    expect(await $('[data-testid="optimize-estimate"]').isDisplayed()).toBe(true);
     await saveAs.click();
     const sibling = path.join(dir, 'report_optimized.pdf');
     await browser.waitUntil(() => fs.existsSync(sibling), {
