@@ -97,6 +97,34 @@ fn remove_ink_stroke(path: String, page_index: u32, index: u32) -> Result<(), St
 fn add_square(path: String, page_index: u32, x1: f64, y1: f64, x2: f64, y2: f64) -> Result<(), String> {
     pdf::annotation_markup::add_square(&PathBuf::from(path), page_index, x1, y1, x2, y2)
 }
+
+#[derive(serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ShapeAnnotationPayload {
+    page_index: u32,
+    kind: String,
+    x1: f64,
+    y1: f64,
+    x2: f64,
+    y2: f64,
+    stroke_color: Option<[f64; 3]>,
+    stroke_width: Option<f64>,
+}
+
+#[tauri::command]
+fn add_shape_annotation(path: String, shape: ShapeAnnotationPayload) -> Result<(), String> {
+    pdf::annotation_markup::add_shape_annotation(
+        &PathBuf::from(path),
+        shape.page_index,
+        pdf::annotation_markup::ShapeAnnotationArgs {
+            kind: &shape.kind,
+            start: [shape.x1, shape.y1],
+            end: [shape.x2, shape.y2],
+            stroke_color: shape.stroke_color,
+            stroke_width: shape.stroke_width,
+        },
+    )
+}
 #[tauri::command]
 fn add_circle(path: String, page_index: u32, x1: f64, y1: f64, x2: f64, y2: f64) -> Result<(), String> {
     pdf::annotation_markup::add_circle(&PathBuf::from(path), page_index, x1, y1, x2, y2)
@@ -104,6 +132,10 @@ fn add_circle(path: String, page_index: u32, x1: f64, y1: f64, x2: f64, y2: f64)
 #[tauri::command]
 fn add_line(path: String, page_index: u32, x1: f64, y1: f64, x2: f64, y2: f64) -> Result<(), String> {
     pdf::annotation_markup::add_line(&PathBuf::from(path), page_index, x1, y1, x2, y2)
+}
+#[tauri::command]
+fn add_arrow(path: String, page_index: u32, x1: f64, y1: f64, x2: f64, y2: f64) -> Result<(), String> {
+    pdf::annotation_markup::add_arrow(&PathBuf::from(path), page_index, x1, y1, x2, y2)
 }
 #[tauri::command]
 fn remove_square(path: String, page_index: u32, index: u32) -> Result<(), String> {

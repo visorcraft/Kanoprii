@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
+import type { ShapeKind } from './constants';
 
-export type EditMode = 'idle' | 'text' | 'image' | 'paragraph' | 'vector';
+export type EditMode = 'idle' | 'text' | 'image' | 'paragraph' | 'vector' | 'shape';
 
 export type TextAlignment = 'left' | 'center' | 'right';
 
@@ -14,6 +15,7 @@ export type PdfEditCallbacks = {
   onReplaceImage?: () => void | Promise<void>;
   onApplyVector?: () => void | Promise<void>;
   onDeleteVector?: () => void | Promise<void>;
+  onApplyShape?: () => void | Promise<void>;
 };
 
 /** Base font families. Bold/italic variants are selected at invoke time. */
@@ -103,6 +105,43 @@ export interface VectorEditDraft {
   original?: Rect;
 }
 
+export interface ShapeLineGeometry {
+  x1: number;
+  y1: number;
+  x2: number;
+  y2: number;
+}
+
+type BoxShapeDraft = {
+  pageIndex: number;
+  kind: Extract<ShapeKind, 'square' | 'circle'>;
+  geometry: { type: 'box'; rect: Rect };
+  style: ShapeStyle;
+};
+
+type LineShapeDraft = {
+  pageIndex: number;
+  kind: Extract<ShapeKind, 'line' | 'arrow'>;
+  geometry: { type: 'line'; line: ShapeLineGeometry };
+  style: ShapeStyle;
+};
+
+export type ShapeEditDraft = BoxShapeDraft | LineShapeDraft;
+export type NewShapeDraft = Omit<BoxShapeDraft, 'style'> | Omit<LineShapeDraft, 'style'>;
+
+function isBoxShapeDraft(draft: ShapeEditDraft): draft is BoxShapeDraft {
+  return draft.kind === 'square' || draft.kind === 'circle';
+}
+
+function isLineShapeDraft(draft: ShapeEditDraft): draft is LineShapeDraft {
+  return draft.kind === 'line' || draft.kind === 'arrow';
+}
+
+export interface ShapeStyle {
+  strokeColor: RgbColor;
+  strokeWidth: number;
+}
+
 export const DEFAULT_TEXT_STYLE: TextStyle = {
   fontFamily: 'Helvetica',
   fontSize: 12,
@@ -113,16 +152,24 @@ export const DEFAULT_TEXT_STYLE: TextStyle = {
   underline: false,
 };
 
+export const DEFAULT_SHAPE_STYLE: ShapeStyle = {
+  strokeColor: { r: 255, g: 0, b: 0 },
+  strokeWidth: 2,
+};
+
 export function usePdfEditState() {
   const [mode, setMode] = useState<EditMode>('idle');
   const [textDraft, setTextDraft] = useState<TextEditDraft | null>(null);
   const [imageDraft, setImageDraft] = useState<ImageEditDraft | null>(null);
   const [paragraphDraft, setParagraphDraft] = useState<ParagraphEditDraft | null>(null);
   const [vectorDraft, setVectorDraft] = useState<VectorEditDraft | null>(null);
+  const [shapeDraft, setShapeDraft] = useState<ShapeEditDraft | null>(null);
   /** Whether the paragraph draft is in text-edit mode (textarea) vs selection/move/resize mode. */
   const [paragraphEditing, setParagraphEditing] = useState(false);
   /** Default style applied to newly created text edits. */
   const [style, setStyle] = useState<TextStyle>(DEFAULT_TEXT_STYLE);
+  /** Default appearance applied to newly created shapes. */
+  const [shapeStyle, setShapeStyle] = useState<ShapeStyle>(DEFAULT_SHAPE_STYLE);
   /** Whether the PDF edit tool is selected. Active independently of any current draft. */
   const [editMode, setEditMode] = useState(false);
 
@@ -131,6 +178,7 @@ export function usePdfEditState() {
     setImageDraft(null);
     setParagraphDraft(null);
     setVectorDraft(null);
+    setShapeDraft(null);
     setMode('text');
   }, []);
 
@@ -140,6 +188,7 @@ export function usePdfEditState() {
       setImageDraft(null);
       setParagraphDraft(null);
       setVectorDraft(null);
+      setShapeDraft(null);
       setMode('text');
     },
     [style]
@@ -150,6 +199,7 @@ export function usePdfEditState() {
     setImageDraft(null);
     setParagraphDraft(null);
     setVectorDraft(null);
+    setShapeDraft(null);
     setParagraphEditing(false);
     setMode('text');
   }, []);
@@ -162,6 +212,7 @@ export function usePdfEditState() {
     setTextDraft(null);
     setParagraphDraft(null);
     setVectorDraft(null);
+    setShapeDraft(null);
     setMode('image');
   }, []);
 
@@ -174,6 +225,7 @@ export function usePdfEditState() {
     setTextDraft(null);
     setImageDraft(null);
     setVectorDraft(null);
+    setShapeDraft(null);
     setMode('paragraph');
   }, []);
 
@@ -182,8 +234,20 @@ export function usePdfEditState() {
     setTextDraft(null);
     setImageDraft(null);
     setParagraphDraft(null);
+    setShapeDraft(null);
     setMode('vector');
   }, []);
+
+  const startDrawingShape = useCallback((draft: NewShapeDraft) => {
+    if (draft.geometry.type === 'box') setShapeDraft({ ...draft, style: shapeStyle });
+    else setShapeDraft({ ...draft, style: shapeStyle });
+    setTextDraft(null);
+    setImageDraft(null);
+    setParagraphDraft(null);
+    setVectorDraft(null);
+    setParagraphEditing(false);
+    setMode('shape');
+  }, [shapeStyle]);
 
   const enterParagraphTextEdit = useCallback(() => {
     setParagraphEditing(true);
@@ -197,12 +261,32 @@ export function usePdfEditState() {
     setParagraphDraft((prev) => (prev ? { ...prev, ...patch } : null));
   }, []);
 
+  const onUpdateShapeBox = useCallback((rect: Rect) => {
+    setShapeDraft((prev) => {
+      if (!prev || !isBoxShapeDraft(prev)) return prev;
+      return { pageIndex: prev.pageIndex, kind: prev.kind, style: prev.style, geometry: { type: 'box', rect } };
+    });
+  }, []);
+
+  const onUpdateShapeLine = useCallback((line: ShapeLineGeometry) => {
+    setShapeDraft((prev) => {
+      if (!prev || !isLineShapeDraft(prev)) return prev;
+      return { pageIndex: prev.pageIndex, kind: prev.kind, style: prev.style, geometry: { type: 'line', line } };
+    });
+  }, []);
+
+  const updateShapeStyle = useCallback((patch: Partial<ShapeStyle>) => {
+    setShapeStyle((prev) => ({ ...prev, ...patch }));
+    setShapeDraft((prev) => (prev ? { ...prev, style: { ...prev.style, ...patch } } : null));
+  }, []);
+
   const onCancel = useCallback(() => {
     setMode('idle');
     setTextDraft(null);
     setImageDraft(null);
     setParagraphDraft(null);
     setVectorDraft(null);
+    setShapeDraft(null);
     setParagraphEditing(false);
     setStyle(DEFAULT_TEXT_STYLE);
   }, []);
@@ -225,6 +309,8 @@ export function usePdfEditState() {
       await callbacksRef.current.onApplyParagraph();
     } else if (mode === 'image' && callbacksRef.current.onApplyImage) {
       await callbacksRef.current.onApplyImage();
+    } else if (mode === 'shape' && callbacksRef.current.onApplyShape) {
+      await callbacksRef.current.onApplyShape();
     } else if (mode === 'vector' && callbacksRef.current.onApplyVector) {
       await callbacksRef.current.onApplyVector();
     } else {
@@ -289,8 +375,10 @@ export function usePdfEditState() {
       imageDraft,
       paragraphDraft,
       vectorDraft,
+      shapeDraft,
       paragraphEditing,
       style,
+      shapeStyle,
       startEditingText,
       startInsertingText,
       beginTextInsert,
@@ -298,9 +386,13 @@ export function usePdfEditState() {
       enterParagraphTextEdit,
       startEditingImage,
       startEditingVector,
+      startDrawingShape,
       updateStyle,
+      updateShapeStyle,
       onUpdate,
       onUpdateParagraph,
+      onUpdateShapeBox,
+      onUpdateShapeLine,
       onApply,
       onCancel,
       setEditMode,
@@ -313,6 +405,7 @@ export function usePdfEditState() {
       onDeleteImage,
       onReplaceImage,
       onDeleteVector,
+      onDeleteShape: onCancel,
       bindEditCallbacks,
     }),
     [
@@ -322,8 +415,10 @@ export function usePdfEditState() {
       imageDraft,
       paragraphDraft,
       vectorDraft,
+      shapeDraft,
       paragraphEditing,
       style,
+      shapeStyle,
       startEditingText,
       startInsertingText,
       beginTextInsert,
@@ -331,9 +426,13 @@ export function usePdfEditState() {
       enterParagraphTextEdit,
       startEditingImage,
       startEditingVector,
+      startDrawingShape,
       updateStyle,
+      updateShapeStyle,
       onUpdate,
       onUpdateParagraph,
+      onUpdateShapeBox,
+      onUpdateShapeLine,
       onApply,
       onCancel,
       setEditMode,

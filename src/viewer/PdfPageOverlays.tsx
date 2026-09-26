@@ -1,10 +1,18 @@
+import { useId } from 'react';
 import { PDF_BASE_HEIGHT, PDF_BASE_WIDTH } from '../pdf/usePdfDocument';
 import type { ShapeKind } from '../app/constants';
+import type { ShapeStyle } from '../app/usePdfEditState';
 import type { AnnotationData, FormFieldData, PageTextEdit, PageVectorEdit } from '../app/types';
 import { inkPointsToPolyline, shapeStrokeColor, stampPresetMeta } from '../app/utils';
 
 type Point = { x: number; y: number };
 type DragRect = { x: number; y: number; w: number; h: number };
+
+function lineEndingMarker(ending: string | undefined, openArrowId: string, closedArrowId: string): string | undefined {
+  if (ending === 'OpenArrow') return `url(#${openArrowId})`;
+  if (ending === 'ClosedArrow') return `url(#${closedArrowId})`;
+  return undefined;
+}
 
 export type PdfPageOverlaysProps = {
   activeSearchRect: [number, number, number, number] | null;
@@ -17,6 +25,7 @@ export type PdfPageOverlaysProps = {
   redactMode: boolean;
   imageInsertMode: boolean;
   vectorEditMode: boolean;
+  editShapeStyle?: ShapeStyle;
   formAddMode: boolean;
   shapeKind: ShapeKind;
   drawing: boolean;
@@ -48,6 +57,7 @@ export function PdfPageOverlays({
   redactMode,
   imageInsertMode,
   vectorEditMode,
+  editShapeStyle,
   formAddMode,
   shapeKind,
   drawing,
@@ -67,6 +77,14 @@ export function PdfPageOverlays({
   onRemoveInkStroke,
   onRemoveTextNote,
 }: PdfPageOverlaysProps) {
+  const markerScope = useId().replaceAll(':', '');
+  const openArrowId = `annotation-open-arrow-${markerScope}`;
+  const closedArrowId = `annotation-closed-arrow-${markerScope}`;
+  const editStroke = editShapeStyle
+    ? `rgb(${editShapeStyle.strokeColor.r},${editShapeStyle.strokeColor.g},${editShapeStyle.strokeColor.b})`
+    : 'rgb(255,0,0)';
+  const draftStroke = vectorEditMode ? editStroke : 'rgb(255,0,0)';
+  const draftStrokeWidth = vectorEditMode ? editShapeStyle?.strokeWidth ?? 2 : 2;
   return (
     <>
 {activeSearchRect && (
@@ -177,6 +195,7 @@ export function PdfPageOverlays({
       width: a.rect[2] - a.rect[0],
       height: a.rect[3] - a.rect[1],
       borderColor: shapeStrokeColor(a.color),
+      borderWidth: a.stroke_width ?? 2,
       pointerEvents: shapeMode ? 'auto' : 'none',
       cursor: shapeMode ? 'pointer' : 'default',
     }}
@@ -194,6 +213,7 @@ export function PdfPageOverlays({
       width: a.rect[2] - a.rect[0],
       height: a.rect[3] - a.rect[1],
       borderColor: shapeStrokeColor(a.color),
+      borderWidth: a.stroke_width ?? 2,
       pointerEvents: shapeMode ? 'auto' : 'none',
       cursor: shapeMode ? 'pointer' : 'default',
     }}
@@ -203,11 +223,21 @@ export function PdfPageOverlays({
 <svg
   className="ink-overlay"
   viewBox={`0 0 ${PDF_BASE_WIDTH} ${PDF_BASE_HEIGHT}`}
-  aria-hidden={!drawMode && !shapeMode}
+  aria-hidden={!drawMode && !shapeMode && !vectorEditMode}
 >
+  <defs>
+    <marker id={openArrowId} viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10" fill="none" stroke="context-stroke" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </marker>
+    <marker id={closedArrowId} viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 Z" fill="context-stroke" stroke="context-stroke" strokeWidth="1" />
+    </marker>
+  </defs>
   {annotations.filter((a) => a.subtype === 'Line' && a.line_endpoints).map((a, i) => {
     const [x1, y1, x2, y2] = a.line_endpoints!;
     const stroke = shapeStrokeColor(a.color);
+    const markerStart = lineEndingMarker(a.line_endings?.[0], openArrowId, closedArrowId);
+    const markerEnd = lineEndingMarker(a.line_endings?.[1], openArrowId, closedArrowId);
     return (
       <g key={`line-${i}`}>
         {shapeMode && (
@@ -230,8 +260,10 @@ export function PdfPageOverlays({
           x2={x2}
           y2={y2}
           stroke={stroke}
-          strokeWidth={2}
+          strokeWidth={a.stroke_width ?? 2}
           strokeLinecap="round"
+          markerStart={markerStart}
+          markerEnd={markerEnd}
           style={{ pointerEvents: 'none' }}
         />
       </g>
@@ -280,15 +312,16 @@ export function PdfPageOverlays({
       style={{ pointerEvents: 'none', opacity: 0.75 }}
     />
   )}
-  {shapeMode && drawing && highlightStart && shapeKind === 'line' && shapeLineEnd && (
+  {(shapeMode || vectorEditMode) && drawing && highlightStart && (shapeKind === 'line' || shapeKind === 'arrow') && shapeLineEnd && (
     <line
       x1={highlightStart.x}
       y1={highlightStart.y}
       x2={shapeLineEnd.x}
       y2={shapeLineEnd.y}
-      stroke="rgb(255,0,0)"
-      strokeWidth={2}
+      stroke={draftStroke}
+      strokeWidth={draftStrokeWidth}
       strokeLinecap="round"
+      markerEnd={shapeKind === 'arrow' ? `url(#${openArrowId})` : undefined}
       style={{ pointerEvents: 'none', opacity: 0.75 }}
     />
   )}
@@ -347,7 +380,7 @@ export function PdfPageOverlays({
   />
 )}
 {/* Current shape drag */}
-{shapeMode && highlightRect && highlightRect.w > 0 && highlightRect.h > 0 && shapeKind !== 'line' && (
+{(shapeMode || vectorEditMode) && highlightRect && highlightRect.w > 0 && highlightRect.h > 0 && shapeKind !== 'line' && shapeKind !== 'arrow' && (
   <div
     className={`shape-draft ${shapeKind === 'circle' ? 'shape-circle' : 'shape-square'}`}
     style={{
@@ -355,6 +388,8 @@ export function PdfPageOverlays({
       top: highlightRect.y,
       width: highlightRect.w,
       height: highlightRect.h,
+      borderColor: draftStroke,
+      borderWidth: draftStrokeWidth,
     }}
   />
 )}
@@ -372,17 +407,6 @@ export function PdfPageOverlays({
 {imageInsertMode && highlightRect && highlightRect.w > 0 && highlightRect.h > 0 && (
   <div
     className="image-insert-draft"
-    style={{
-      left: highlightRect.x,
-      top: highlightRect.y,
-      width: highlightRect.w,
-      height: highlightRect.h,
-    }}
-  />
-)}
-{vectorEditMode && highlightRect && highlightRect.w > 0 && highlightRect.h > 0 && (
-  <div
-    className="page-vector-edit-overlay page-vector-draft"
     style={{
       left: highlightRect.x,
       top: highlightRect.y,

@@ -61,6 +61,10 @@ function rectToPdfRect(rect: Rect): PdfRect {
   return { x: rect.x, y: rect.y, width: rect.w, height: rect.h };
 }
 
+function toBackendRgb(color: TextStyle['color']): [number, number, number] {
+  return [color.r / 255, color.g / 255, color.b / 255];
+}
+
 function sameRect(a: Rect, b: Rect): boolean {
   return a.x === b.x && a.y === b.y && a.w === b.w && a.h === b.h;
 }
@@ -568,6 +572,43 @@ export function usePageInteractionEdit(deps: UsePageInteractionEditOptions) {
     [deps, pdfEdit],
   );
 
+  const applyShapeEdit = useCallback(
+    async (session: DocumentSessionData) => {
+      if (!session?.filePath || !pdfEdit.shapeDraft) return;
+      const draft = pdfEdit.shapeDraft;
+      const styleArgs = {
+        strokeColor: toBackendRgb(draft.style.strokeColor),
+        strokeWidth: draft.style.strokeWidth,
+      };
+      const args = draft.geometry.type === 'line'
+        ? {
+            pageIndex: draft.pageIndex,
+            x1: draft.geometry.line.x1,
+            y1: draft.geometry.line.y1,
+            x2: draft.geometry.line.x2,
+            y2: draft.geometry.line.y2,
+            ...styleArgs,
+          }
+        : {
+            pageIndex: draft.pageIndex,
+            x1: draft.geometry.rect.x,
+            y1: draft.geometry.rect.y,
+            x2: draft.geometry.rect.x + draft.geometry.rect.w,
+            y2: draft.geometry.rect.y + draft.geometry.rect.h,
+            ...styleArgs,
+          };
+
+      const result = await runStructuralEdit(deps, {
+        command: 'add_shape_annotation',
+        args: { shape: { kind: draft.kind, ...args } },
+        reloadAt: draft.pageIndex,
+        toast: draft.kind === 'circle' ? 'Ellipse added' : draft.kind === 'line' ? 'Line added' : draft.kind === 'arrow' ? 'Arrow added' : 'Rectangle added',
+      });
+      if (result !== undefined) pdfEdit.onCancel();
+    },
+    [deps, pdfEdit],
+  );
+
   return {
     handlePageClick,
     applyTextEdit,
@@ -578,6 +619,7 @@ export function usePageInteractionEdit(deps: UsePageInteractionEditOptions) {
     deleteImage,
     applyVectorEdit,
     deleteVector,
+    applyShapeEdit,
     hitTestImage,
   };
 }

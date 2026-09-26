@@ -1,4 +1,5 @@
 import { STAMP_PRESETS, type ShapeKind, type StampKind } from '../app/constants';
+import { ShapeKindPicker } from './ShapeKindPicker';
 
 export type AnnotateToolOptionsProps = {
   stampMode: boolean;
@@ -47,17 +48,7 @@ export function AnnotateToolOptions({
         </div>
       )}
       {shapeMode && (
-        <div className="shape-kind-toggle" role="group" aria-label="Shape kind">
-          <button type="button" className={shapeKind === 'square' ? 'active' : ''} onClick={() => onShapeKindChange('square')}>
-            Rect
-          </button>
-          <button type="button" className={shapeKind === 'circle' ? 'active' : ''} onClick={() => onShapeKindChange('circle')}>
-            Ellipse
-          </button>
-          <button type="button" className={shapeKind === 'line' ? 'active' : ''} onClick={() => onShapeKindChange('line')}>
-            Line
-          </button>
-        </div>
+        <ShapeKindPicker value={shapeKind} onChange={onShapeKindChange} ariaLabel="Shape kind" />
       )}
     </div>
   );

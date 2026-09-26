@@ -388,6 +388,7 @@ export function useAppPdfActions(input: UseAppPdfActionsInput) {
     pdfEditReplaceImage: replaceEditImage,
     pdfEditApplyVector: editInteraction.applyVectorEdit,
     pdfEditDeleteVector: editInteraction.deleteVector,
+    pdfEditApplyShape: editInteraction.applyShapeEdit,
     insertEditImage,
     ...annotationModes,
     ...pageTextEdits,

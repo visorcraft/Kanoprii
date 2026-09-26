@@ -1,6 +1,7 @@
 import { invoke } from '@tauri-apps/api/core';
 import { useCallback } from 'react';
 import type { PageTextEdit } from './types';
+import type { PdfEditState } from './usePdfEditState';
 
 type UsePageTextEditsOptions = {
   filePath: string;
@@ -22,6 +23,7 @@ type UsePageTextEditsOptions = {
   setTextEditMode: (mode: boolean) => void;
   setVectorEditMode: (mode: boolean) => void;
   cancelDrawing: () => void;
+  pdfEdit: Pick<PdfEditState, 'onCancel'>;
 };
 
 export function usePageTextEdits(opts: UsePageTextEditsOptions) {
@@ -86,6 +88,7 @@ export function usePageTextEdits(opts: UsePageTextEditsOptions) {
 
   const exitVectorEditMode = useCallback(() => {
     opts.cancelDrawing();
+    opts.pdfEdit.onCancel();
     opts.setVectorEditMode(false);
   }, [opts]);
 

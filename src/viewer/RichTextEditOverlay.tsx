@@ -169,19 +169,20 @@ export function RichTextEditOverlay({
       e.preventDefault();
       e.stopPropagation();
       const current = rectRef.current;
+      const step = e.shiftKey ? 10 : 1;
       let { x, y } = current;
       switch (e.key) {
         case 'ArrowLeft':
-          x -= 5;
+          x -= step;
           break;
         case 'ArrowRight':
-          x += 5;
+          x += step;
           break;
         case 'ArrowUp':
-          y -= 5;
+          y -= step;
           break;
         case 'ArrowDown':
-          y += 5;
+          y += step;
           break;
       }
       const clamped = clampMove({ ...current, x, y });

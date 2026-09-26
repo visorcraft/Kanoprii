@@ -1,4 +1,7 @@
 import { browser, expect } from '@wdio/globals';
+import { copyFile, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import {
   clickMenuAction,
   fixturePdf,
@@ -36,6 +39,24 @@ async function selectHomeRibbonTab() {
   await tab.click();
 }
 
+/** Set a React-controlled <select> so onChange updates app state (WDIO selectBy* alone is flaky in WebKit). */
+async function setShapeStrokeWidth(width: number) {
+  const select = await $('[aria-label="Shape stroke width"]');
+  await select.waitForDisplayed({ timeout: 5_000 });
+  await browser.execute((w: number) => {
+    const el = document.querySelector('[aria-label="Shape stroke width"]') as HTMLSelectElement | null;
+    if (!el) throw new Error('shape stroke width select missing');
+    const setter = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value')?.set;
+    setter?.call(el, String(w));
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+    el.dispatchEvent(new Event('change', { bubbles: true }));
+  }, width);
+  await browser.waitUntil(async () => (await select.getValue()) === String(width), {
+    timeout: 5_000,
+    timeoutMsg: `expected shape stroke width to be ${width}`,
+  });
+}
+
 async function getCenterOfTextSpan(text: string): Promise<{ cx: number; cy: number }> {
   return browser.execute((t) => {
     const span = Array.from(document.querySelectorAll('.text-layer span')).find((el) =>
@@ -45,6 +66,29 @@ async function getCenterOfTextSpan(text: string): Promise<{ cx: number; cy: numb
     const rect = span.getBoundingClientRect();
     return { cx: Math.round(rect.left + rect.width / 2), cy: Math.round(rect.top + rect.height / 2) };
   }, text);
+}
+
+async function seedLegacyVector(path: string): Promise<void> {
+  const error = await browser.execute(async (pdfPath) => {
+    const tauri = (window as Window & {
+      __TAURI__?: { core?: { invoke: (command: string, args: Record<string, unknown>) => Promise<unknown> } };
+    }).__TAURI__;
+    if (!tauri?.core) return 'Tauri invoke API unavailable';
+    try {
+      await tauri.core.invoke('add_page_vector_rect', {
+        path: pdfPath,
+        pageIndex: 0,
+        x: 80,
+        y: 100,
+        width: 160,
+        height: 100,
+      });
+      return null;
+    } catch (cause) {
+      return String(cause);
+    }
+  }, path);
+  if (error) throw new Error(`Could not seed legacy vector fixture: ${error}`);
 }
 
 describe('PDF Edit Mode', () => {
@@ -66,7 +110,7 @@ describe('PDF Edit Mode', () => {
     expect(await toolbar.getAttribute('class')).toContain('edit-ribbon-tab');
     expect(await toolbar.$$('.pdf-edit-tool-group')).toHaveLength(4);
     expect(await toolbar.$$('.pdf-edit-tool-icon')).toHaveLength(6);
-    for (const label of ['Edit Text', 'Add Text', 'Add Image', 'Edit Objects', 'Edit Vector', 'Manage']) {
+    for (const label of ['Edit Text', 'Add Text', 'Add Image', 'Edit Objects', 'Shapes', 'Manage']) {
       expect(await toolbar.$(`button=${label}`).isExisting()).toBe(true);
     }
 
@@ -720,13 +764,15 @@ describe('PDF Edit Mode', () => {
     });
   });
 
-  it('selects, moves, and applies an existing vector', async () => {
+  it('drafts, cancels, moves, and applies a styled rectangle annotation', async () => {
     await openPdfViaPathModal(fixturePdf);
     await waitForPdfOpen();
     await waitForPageRendered();
     await selectEditRibbonTab();
 
-    await $('button=Edit Vector').click();
+    await $('button=Shapes').click();
+    await $('[aria-label="Shape stroke color"]').setValue('#0055ff');
+    await setShapeStrokeWidth(6);
     const points = await browser.execute(() => {
       const page = document.querySelector('.page-image')!.getBoundingClientRect();
       return {
@@ -740,67 +786,185 @@ describe('PDF Edit Mode', () => {
       .move({ x: points.x1, y: points.y1 }).down({ button: 0 })
       .move({ x: points.x2, y: points.y2 }).up({ button: 0 }).perform();
 
-    const selection = await $('[aria-label="Vector selection"]');
+    const selection = await $('[aria-label="Rectangle shape selection"]');
     await selection.waitForDisplayed({ timeout: 15_000 });
-    const vectorToolbar = await $('[aria-label="Vector editing toolbar"]');
-    await vectorToolbar.waitForDisplayed({ timeout: 10_000 });
-    expect(await selection.$$('.paragraph-handle')).toHaveLength(8);
-    await expect(vectorToolbar.$('button=Apply')).toBeDisplayed();
-    await expect(vectorToolbar.$('button=Delete')).toBeDisplayed();
-    await expect(vectorToolbar.$('button=Cancel')).toBeDisplayed();
-    await vectorToolbar.$('button=Apply').click();
-    await browser.waitUntil(
-      async () => !(await $('[aria-label="Vector selection"]').isDisplayed().catch(() => false)),
-      { timeout: 5_000, timeoutMsg: 'expected unchanged vector selection to close' },
-    );
+    const shapeToolbar = await $('[aria-label="Shape editing toolbar"]');
+    await shapeToolbar.waitForDisplayed({ timeout: 10_000 });
+    expect(await selection.$$('.object-selection-handle')).toHaveLength(8);
+    await expect(shapeToolbar.$('button=Apply')).toBeDisplayed();
+    await expect(shapeToolbar.$('button=Delete')).toBeDisplayed();
+    await expect(shapeToolbar.$('button=Cancel')).toBeDisplayed();
 
+    await shapeToolbar.$('button=Cancel').click();
+    await browser.waitUntil(
+      async () => !(await $('[aria-label="Rectangle shape selection"]').isDisplayed().catch(() => false)),
+      { timeout: 5_000, timeoutMsg: 'expected cancelled shape draft to close' },
+    );
     await selectHomeRibbonTab();
     const undo = await $('[data-testid="undo-btn"]');
-    await undo.click();
-    await browser.waitUntil(() => undo.isEnabled().then((enabled) => !enabled), {
-      timeout: 15_000,
-      timeoutMsg: 'expected one Undo to remove the newly created vector',
-    });
-    expect(await $('.page-vector-edit-overlay:not(.page-vector-draft)').isDisplayed().catch(() => false)).toBe(false);
+    await expect(undo).not.toBeEnabled();
     await selectEditRibbonTab();
 
     await browser.action('pointer')
       .move({ x: points.x1, y: points.y1 }).down({ button: 0 })
       .move({ x: points.x2, y: points.y2 }).up({ button: 0 }).perform();
-    const restoredSelection = await $('[aria-label="Vector selection"]');
-    await restoredSelection.waitForDisplayed({ timeout: 15_000 });
+    const activeSelection = await $('[aria-label="Rectangle shape selection"]');
+    await activeSelection.waitForDisplayed({ timeout: 15_000 });
 
-    const beforeNudge = await browser.execute(() => Number.parseFloat(getComputedStyle(document.querySelector('[aria-label="Vector selection"]')!).left));
+    const beforeNudge = await browser.execute(() => Number.parseFloat(getComputedStyle(document.querySelector('[aria-label="Rectangle shape selection"]')!).left));
     await browser.keys(['ArrowRight', 'ArrowRight']);
-    const afterNudge = await browser.execute(() => Number.parseFloat(getComputedStyle(document.querySelector('[aria-label="Vector selection"]')!).left));
+    const afterNudge = await browser.execute(() => Number.parseFloat(getComputedStyle(document.querySelector('[aria-label="Rectangle shape selection"]')!).left));
     expect(afterNudge - beforeNudge).toBe(2);
-    const before = await restoredSelection.getLocation();
+    const before = await activeSelection.getLocation();
     const center = await browser.execute(() => {
-      const rect = document.querySelector('[aria-label="Vector selection"]')!.getBoundingClientRect();
+      const rect = document.querySelector('[aria-label="Rectangle shape selection"]')!.getBoundingClientRect();
       return { x: Math.round(rect.left + rect.width / 2), y: Math.round(rect.top + rect.height / 2) };
     });
     await browser.action('pointer').move(center).down({ button: 0 })
       .move({ x: center.x + 60, y: center.y + 40 }).up({ button: 0 }).perform();
-    const movedSelection = await restoredSelection.getLocation();
+    const movedSelection = await activeSelection.getLocation();
     expect(movedSelection.x - before.x).toBeGreaterThan(30);
     expect(movedSelection.y - before.y).toBeGreaterThan(20);
     const movedNatural = await browser.execute(() => {
-      const style = getComputedStyle(document.querySelector('[aria-label="Vector selection"]')!);
+      const style = getComputedStyle(document.querySelector('[aria-label="Rectangle shape selection"]')!);
       return { x: Number.parseFloat(style.left), y: Number.parseFloat(style.top) };
     });
-    await $('[aria-label="Vector editing toolbar"]').$('button=Apply').click();
+    await $('[aria-label="Shape editing toolbar"]').$('button=Apply').click();
 
     await browser.waitUntil(
-      async () => !(await $('[aria-label="Vector selection"]').isDisplayed().catch(() => false)),
-      { timeout: 15_000, timeoutMsg: 'expected vector selection to close after Apply' },
+      async () => !(await $('[aria-label="Rectangle shape selection"]').isDisplayed().catch(() => false)),
+      { timeout: 15_000, timeoutMsg: 'expected shape selection to close after Apply' },
     );
     await browser.waitUntil(() => browser.execute(({ x, y }) =>
-      Array.from(document.querySelectorAll<HTMLElement>('.page-vector-edit-overlay:not(.page-vector-draft)')).some((node) => {
+      Array.from(document.querySelectorAll<HTMLElement>('.shape-overlay.shape-square')).some((node) => {
         const style = getComputedStyle(node);
         return Math.abs(Number.parseFloat(style.left) - x) < 1 && Math.abs(Number.parseFloat(style.top) - y) < 1;
       }), movedNatural), {
       timeout: 15_000,
-      timeoutMsg: 'expected moved vector placement to persist after Apply',
+      timeoutMsg: 'expected moved rectangle placement to persist after Apply',
     });
+    const savedSquare = await $('.shape-overlay.shape-square');
+    expect((await savedSquare.getCSSProperty('border-width')).parsed.value).toBe(6);
+
+    await selectHomeRibbonTab();
+    await expect(undo).toBeEnabled();
+    await undo.click();
+    await browser.waitUntil(
+      async () => !(await $('.shape-overlay.shape-square').isDisplayed().catch(() => false)),
+      { timeout: 15_000, timeoutMsg: 'expected one Undo to remove the applied shape annotation' },
+    );
+  });
+
+  it('previews ellipse geometry and applies an editable arrow', async () => {
+    await openPdfViaPathModal(fixturePdf);
+    await waitForPdfOpen();
+    await waitForPageRendered();
+    await selectEditRibbonTab();
+    await $('button=Shapes').click();
+
+    const points = await browser.execute(() => {
+      const page = document.querySelector('.page-image')!.getBoundingClientRect();
+      return {
+        x1: Math.round(page.left + page.width * 0.2),
+        y1: Math.round(page.top + page.height * 0.2),
+        x2: Math.round(page.left + page.width * 0.4),
+        y2: Math.round(page.top + page.height * 0.3),
+      };
+    });
+
+    await $('button=Ellipse').click();
+    await browser.action('pointer')
+      .move({ x: points.x1, y: points.y1 }).down({ button: 0 })
+      .move({ x: points.x2, y: points.y2 }).up({ button: 0 }).perform();
+    const ellipse = await $('[aria-label="Ellipse shape selection"]');
+    await ellipse.waitForDisplayed({ timeout: 15_000 });
+    expect((await ellipse.$('.object-selection-frame').getCSSProperty('border-radius')).value).not.toBe('0px');
+    await $('[aria-label="Shape editing toolbar"]').$('button=Delete').click();
+    await browser.waitUntil(
+      async () => !(await ellipse.isDisplayed().catch(() => false)),
+      { timeout: 5_000, timeoutMsg: 'expected Delete to discard the uncommitted ellipse' },
+    );
+
+    await $('button=Arrow').click();
+    await setShapeStrokeWidth(8);
+    await browser.action('pointer')
+      .move({ x: points.x1, y: points.y1 }).down({ button: 0 })
+      .move({ x: points.x2, y: points.y2 }).up({ button: 0 }).perform();
+    const arrow = await $('[aria-label="Arrow shape selection"]');
+    await arrow.waitForDisplayed({ timeout: 15_000 });
+    expect(await arrow.$('.object-selection-line').getAttribute('stroke-width')).toBe('8');
+    const endpoint = await arrow.$('[aria-label="Move line end"]');
+    await expect(endpoint).toBeDisplayed();
+    expect(await endpoint.getAttribute('tabindex')).toBe('0');
+    const startEndpoint = await arrow.$('[aria-label="Move line start"]');
+    const startBefore = Number(await startEndpoint.getAttribute('cx'));
+    const endBefore = Number(await endpoint.getAttribute('cx'));
+    await browser.execute(() => {
+      (document.querySelector('[aria-label="Move line end"]') as SVGElement | null)?.focus();
+    });
+    await browser.keys(['ArrowRight']);
+    expect(Number(await endpoint.getAttribute('cx')) - endBefore).toBe(1);
+    expect(Number(await startEndpoint.getAttribute('cx'))).toBe(startBefore);
+
+    await $('[aria-label="Shape editing toolbar"]').$('button=Apply').click();
+    const savedArrow = await $('.ink-overlay line[marker-end]');
+    await savedArrow.waitForDisplayed({ timeout: 15_000 });
+    expect(await savedArrow.getAttribute('stroke-width')).toBe('8');
+
+    await selectHomeRibbonTab();
+    const undo = await $('[data-testid="undo-btn"]');
+    await expect(undo).toBeEnabled();
+    await undo.click();
+    await browser.waitUntil(
+      async () => !(await savedArrow.isDisplayed().catch(() => false)),
+      { timeout: 15_000, timeoutMsg: 'expected Undo to remove the applied arrow' },
+    );
+  });
+
+  it('keeps legacy content-stream vectors editable', async () => {
+    const legacyPdf = join(tmpdir(), `kanoprii-e2e-legacy-vector-${process.pid}-${Date.now()}.pdf`);
+    await copyFile(fixturePdf, legacyPdf);
+    try {
+      await seedLegacyVector(legacyPdf);
+      await openPdfViaPathModal(legacyPdf);
+      await waitForPdfOpen();
+      await waitForPageRendered();
+      await selectEditRibbonTab();
+      await $('button=Shapes').click();
+
+      const center = await browser.execute(() => {
+        const page = document.querySelector('.page-image')!.getBoundingClientRect();
+        return {
+          x: Math.round(page.left + page.width * (160 / 800)),
+          y: Math.round(page.top + page.height * (150 / 1132)),
+        };
+      });
+      await browser.action('pointer').move(center).down({ button: 0 }).up({ button: 0 }).perform();
+
+      const selection = await $('[aria-label="Legacy vector selection"]');
+      await selection.waitForDisplayed({ timeout: 15_000 });
+      expect(await selection.$$('.object-selection-handle')).toHaveLength(8);
+      const before = Number.parseFloat(await selection.getCSSProperty('left').then((property) => String(property.value)));
+      await browser.keys(['ArrowRight']);
+      const after = Number.parseFloat(await selection.getCSSProperty('left').then((property) => String(property.value)));
+      expect(after - before).toBe(1);
+
+      await $('[aria-label="Vector editing toolbar"]').$('button=Apply').click();
+      await browser.waitUntil(
+        async () => !(await selection.isDisplayed().catch(() => false)),
+        { timeout: 15_000, timeoutMsg: 'expected legacy vector selection to close after Apply' },
+      );
+      await browser.action('pointer').move({ x: center.x + 1, y: center.y }).down({ button: 0 }).up({ button: 0 }).perform();
+      const movedSelection = await $('[aria-label="Legacy vector selection"]');
+      await movedSelection.waitForDisplayed({ timeout: 15_000 });
+      await $('[aria-label="Vector editing toolbar"]').$('button=Delete').click();
+      await browser.waitUntil(
+        async () => !(await movedSelection.isDisplayed().catch(() => false)),
+        { timeout: 15_000, timeoutMsg: 'expected legacy vector Delete to remove the object' },
+      );
+    } finally {
+      await resetToWelcome();
+      await rm(legacyPdf, { force: true });
+    }
   });
 });

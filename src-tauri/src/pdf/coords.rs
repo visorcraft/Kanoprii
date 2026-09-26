@@ -59,7 +59,18 @@ pub fn obj_to_f64(o: &Object) -> f64 {
 
 pub fn page_media_box(doc: &Document, page_id: ObjectId) -> Result<[f64; 4], String> {
     let page = doc.get_dictionary(page_id).map_err(|e| e.to_string())?;
-    let arr = page.get(b"MediaBox").map_err(|e| e.to_string())?.as_array().map_err(|_| "Bad MediaBox")?;
+    let media = page
+        .get(b"MediaBox")
+        .ok()
+        .cloned()
+        .or_else(|| crate::pdf::page_tree::inherited_page_attr(doc, page_id, b"MediaBox"))
+        .ok_or_else(|| "Missing MediaBox".to_string())?;
+    let arr = match &media {
+        Object::Reference(id) => {
+            doc.get_object(*id).map_err(|e| e.to_string())?.as_array().map_err(|_| "Bad MediaBox")?
+        }
+        _ => media.as_array().map_err(|_| "Bad MediaBox")?,
+    };
     let get = |i: usize| arr.get(i).map(obj_to_f64).unwrap_or(0.0);
     Ok([get(0), get(1), get(2), get(3)])
 }
@@ -102,4 +113,62 @@ pub fn viewer_point_to_pdf_with_rotation(mw: f64, mh: f64, vx: f64, vy: f64, rot
         270 => (mw - vy * mw / VIEWER_PAGE_H, mh - vx * mh / VIEWER_PAGE_W),
         _ => (vx * mw / VIEWER_PAGE_W, mh - vy * mh / VIEWER_PAGE_H),
     }
+}
+
+pub fn viewer_point_to_pdf_on_page(media: [f64; 4], vx: f64, vy: f64, rotation: i64) -> Result<(f64, f64), String> {
+    let mw = media[2] - media[0];
+    let mh = media[3] - media[1];
+    if mw <= 0.0 || mh <= 0.0 {
+        return Err("Invalid page size".to_string());
+    }
+    let (x, y) = viewer_point_to_pdf_with_rotation(mw, mh, vx, vy, rotation);
+    Ok((x + media[0], y + media[1]))
+}
+
+pub fn pdf_point_to_viewer_on_page(media: [f64; 4], px: f64, py: f64, rotation: i64) -> Result<(f64, f64), String> {
+    let mw = media[2] - media[0];
+    let mh = media[3] - media[1];
+    if mw <= 0.0 || mh <= 0.0 {
+        return Err("Invalid page size".to_string());
+    }
+    let x = px - media[0];
+    let y = py - media[1];
+    let point = match rotation.rem_euclid(360) {
+        90 => (y * VIEWER_PAGE_W / mh, x * VIEWER_PAGE_H / mw),
+        180 => ((mw - x) * VIEWER_PAGE_W / mw, y * VIEWER_PAGE_H / mh),
+        270 => ((mh - y) * VIEWER_PAGE_W / mh, (mw - x) * VIEWER_PAGE_H / mw),
+        _ => (x * VIEWER_PAGE_W / mw, (mh - y) * VIEWER_PAGE_H / mh),
+    };
+    Ok(point)
+}
+
+fn normalized_bounds(points: [(f64, f64); 4]) -> [f64; 4] {
+    let xs = [points[0].0, points[1].0, points[2].0, points[3].0];
+    let ys = [points[0].1, points[1].1, points[2].1, points[3].1];
+    [
+        xs.into_iter().fold(f64::INFINITY, f64::min),
+        ys.into_iter().fold(f64::INFINITY, f64::min),
+        xs.into_iter().fold(f64::NEG_INFINITY, f64::max),
+        ys.into_iter().fold(f64::NEG_INFINITY, f64::max),
+    ]
+}
+
+pub fn viewer_bounds_to_pdf_on_page(media: [f64; 4], bounds: [f64; 4], rotation: i64) -> Result<[f64; 4], String> {
+    let [left, top, right, bottom] = bounds;
+    Ok(normalized_bounds([
+        viewer_point_to_pdf_on_page(media, left, top, rotation)?,
+        viewer_point_to_pdf_on_page(media, right, top, rotation)?,
+        viewer_point_to_pdf_on_page(media, left, bottom, rotation)?,
+        viewer_point_to_pdf_on_page(media, right, bottom, rotation)?,
+    ]))
+}
+
+pub fn pdf_bounds_to_viewer_on_page(media: [f64; 4], bounds: [f64; 4], rotation: i64) -> Result<[f64; 4], String> {
+    let [left, bottom, right, top] = bounds;
+    let pdf_corners = [(left, bottom), (right, bottom), (left, top), (right, top)];
+    let mut viewer_corners = [(0.0, 0.0); 4];
+    for (index, (x, y)) in pdf_corners.into_iter().enumerate() {
+        viewer_corners[index] = pdf_point_to_viewer_on_page(media, x, y, rotation)?;
+    }
+    Ok(normalized_bounds(viewer_corners))
 }

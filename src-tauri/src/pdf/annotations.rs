@@ -6,12 +6,39 @@ use std::path::Path;
 const TEXT_NOTE_WIDTH: f64 = 140.0;
 const TEXT_NOTE_HEIGHT: f64 = 80.0;
 
-pub fn append_page_annotation(doc: &mut Document, page_id: ObjectId, annot_id: ObjectId) -> Result<(), String> {
-    let page_dict = doc.get_dictionary_mut(page_id).map_err(|e| e.to_string())?;
-    match page_dict.get_mut(b"Annots") {
-        Ok(Object::Array(arr)) => arr.push(Object::Reference(annot_id)),
-        _ => page_dict.set(b"Annots", Object::Array(vec![Object::Reference(annot_id)])),
+pub(crate) fn page_annotation_refs(doc: &Document, page_id: ObjectId) -> Result<Vec<Object>, String> {
+    let page = doc.get_dictionary(page_id).map_err(|e| e.to_string())?;
+    match page.get(b"Annots") {
+        Ok(Object::Array(annots)) => Ok(annots.clone()),
+        Ok(Object::Reference(id)) => doc
+            .get_object(*id)
+            .map_err(|e| e.to_string())?
+            .as_array()
+            .map_err(|_| "Page Annots reference is not an array".to_string())
+            .cloned(),
+        Ok(_) => Err("Page Annots is not an array or reference".to_string()),
+        Err(_) => Ok(Vec::new()),
     }
+}
+
+pub(crate) fn replace_page_annotation_refs(
+    doc: &mut Document,
+    page_id: ObjectId,
+    annots: Vec<Object>,
+) -> Result<(), String> {
+    let target = doc.get_dictionary(page_id).map_err(|e| e.to_string())?.get(b"Annots").ok().cloned();
+    if let Some(Object::Reference(id)) = target {
+        *doc.get_object_mut(id).map_err(|e| e.to_string())? = Object::Array(annots);
+    } else {
+        doc.get_dictionary_mut(page_id).map_err(|e| e.to_string())?.set(b"Annots", Object::Array(annots));
+    }
+    Ok(())
+}
+
+pub fn append_page_annotation(doc: &mut Document, page_id: ObjectId, annot_id: ObjectId) -> Result<(), String> {
+    let mut annots = page_annotation_refs(doc, page_id)?;
+    annots.push(Object::Reference(annot_id));
+    replace_page_annotation_refs(doc, page_id, annots)?;
     Ok(())
 }
 
@@ -67,10 +94,10 @@ pub fn remove_highlight(path: &Path, page_index: u32, index: u32) -> Result<(), 
     let pages = doc.get_pages();
     let page_id = *pages.get(&(page_index + 1)).ok_or("Page not found".to_string())?;
 
-    let annots = match doc.get_dictionary(page_id).map_err(|e| e.to_string())?.get(b"Annots") {
-        Ok(Object::Array(arr)) => arr.clone(),
-        _ => return Err("No annotations on this page".to_string()),
-    };
+    let annots = page_annotation_refs(&doc, page_id)?;
+    if annots.is_empty() {
+        return Err("No annotations on this page".to_string());
+    }
 
     let mut highlight_count = 0u32;
     let mut target_pos: Option<usize> = None;
@@ -98,7 +125,7 @@ pub fn remove_highlight(path: &Path, page_index: u32, index: u32) -> Result<(), 
     let pos = target_pos.ok_or("Highlight not found".to_string())?;
     let mut new_annots = annots;
     new_annots.remove(pos);
-    doc.get_dictionary_mut(page_id).map_err(|e| e.to_string())?.set(b"Annots", Object::Array(new_annots));
+    replace_page_annotation_refs(&mut doc, page_id, new_annots)?;
 
     crate::pdf::io::save_atomic(&mut doc, path)?;
     Ok(())
@@ -144,10 +171,10 @@ pub fn remove_text_note(path: &Path, page_index: u32, index: u32) -> Result<(), 
     let pages = doc.get_pages();
     let page_id = *pages.get(&(page_index + 1)).ok_or("Page not found".to_string())?;
 
-    let annots = match doc.get_dictionary(page_id).map_err(|e| e.to_string())?.get(b"Annots") {
-        Ok(Object::Array(arr)) => arr.clone(),
-        _ => return Err("No annotations on this page".to_string()),
-    };
+    let annots = page_annotation_refs(&doc, page_id)?;
+    if annots.is_empty() {
+        return Err("No annotations on this page".to_string());
+    }
 
     let mut note_count = 0u32;
     let mut target_pos: Option<usize> = None;
@@ -175,7 +202,7 @@ pub fn remove_text_note(path: &Path, page_index: u32, index: u32) -> Result<(), 
     let pos = target_pos.ok_or("Text note not found".to_string())?;
     let mut new_annots = annots;
     new_annots.remove(pos);
-    doc.get_dictionary_mut(page_id).map_err(|e| e.to_string())?.set(b"Annots", Object::Array(new_annots));
+    replace_page_annotation_refs(&mut doc, page_id, new_annots)?;
 
     crate::pdf::io::save_atomic(&mut doc, path)?;
     Ok(())
@@ -186,9 +213,11 @@ pub struct AnnotationData {
     pub subtype: String,
     pub rect: [f64; 4],
     pub color: Option<[f64; 3]>,
+    pub stroke_width: Option<f64>,
     pub contents: Option<String>,
     pub ink_points: Option<Vec<f64>>,
     pub line_endpoints: Option<[f64; 4]>,
+    pub line_endings: Option<[String; 2]>,
     pub stamp_kind: Option<String>,
     pub stamp_preset: Option<String>,
     pub is_redaction: bool,
@@ -214,10 +243,7 @@ pub(crate) fn annot_is_redaction(dict: &Dictionary) -> bool {
 }
 
 pub(crate) fn redaction_rects_on_page(doc: &Document, page_id: ObjectId) -> Vec<[f64; 4]> {
-    let Ok(page_dict) = doc.get_dictionary(page_id) else {
-        return Vec::new();
-    };
-    let Ok(Object::Array(arr)) = page_dict.get(b"Annots") else {
+    let Ok(arr) = page_annotation_refs(doc, page_id) else {
         return Vec::new();
     };
     let mut rects = Vec::new();
@@ -225,7 +251,7 @@ pub(crate) fn redaction_rects_on_page(doc: &Document, page_id: ObjectId) -> Vec<
         let Object::Reference(id) = annot_ref else {
             continue;
         };
-        let Some(annot_dict) = doc.get_object(*id).ok().and_then(|o| o.as_dict().ok()) else {
+        let Some(annot_dict) = doc.get_object(id).ok().and_then(|o| o.as_dict().ok()) else {
             continue;
         };
         if !annot_is_redaction(annot_dict) {
@@ -239,7 +265,7 @@ pub(crate) fn redaction_rects_on_page(doc: &Document, page_id: ObjectId) -> Vec<
     rects
 }
 
-fn parse_annotation_dict(annot_dict: &Dictionary) -> AnnotationData {
+fn parse_annotation_dict(annot_dict: &Dictionary, media: [f64; 4], rotation: i64) -> AnnotationData {
     let subtype = annot_dict
         .get(b"Subtype")
         .ok()
@@ -247,7 +273,7 @@ fn parse_annotation_dict(annot_dict: &Dictionary) -> AnnotationData {
         .map(|b| String::from_utf8_lossy(b).to_string())
         .unwrap_or_default();
 
-    let rect = if let Ok(Object::Array(rect_arr)) = annot_dict.get(b"Rect") {
+    let mut rect = if let Ok(Object::Array(rect_arr)) = annot_dict.get(b"Rect") {
         let get = |i: usize| rect_arr.get(i).map(obj_to_f64).unwrap_or(0.0);
         [get(0), get(1), get(2), get(3)]
     } else {
@@ -260,6 +286,15 @@ fn parse_annotation_dict(annot_dict: &Dictionary) -> AnnotationData {
             [get(0), get(1), get(2)]
         })
     });
+    let stroke_width = annot_dict
+        .get(b"BS")
+        .ok()
+        .and_then(|o| o.as_dict().ok())
+        .and_then(|dict| dict.get(b"W").ok())
+        .map(obj_to_f64)
+        .or_else(|| {
+            annot_dict.get(b"Border").ok().and_then(|o| o.as_array().ok()).and_then(|arr| arr.get(2).map(obj_to_f64))
+        });
 
     let contents = annot_contents(annot_dict);
     let ink_points = if subtype == "Ink" {
@@ -272,7 +307,7 @@ fn parse_annotation_dict(annot_dict: &Dictionary) -> AnnotationData {
     } else {
         None
     };
-    let line_endpoints = if subtype == "Line" {
+    let mut line_endpoints = if subtype == "Line" {
         annot_dict.get(b"L").ok().and_then(|o| o.as_array().ok()).map(|arr| {
             let get = |i: usize| arr.get(i).map(obj_to_f64).unwrap_or(0.0);
             [get(0), get(1), get(2), get(3)]
@@ -280,6 +315,33 @@ fn parse_annotation_dict(annot_dict: &Dictionary) -> AnnotationData {
     } else {
         None
     };
+    let line_endings = if subtype == "Line" {
+        annot_dict.get(b"LE").ok().and_then(|o| o.as_array().ok()).map(|arr| {
+            let get = |i: usize| {
+                arr.get(i)
+                    .and_then(|o| o.as_name().ok())
+                    .map(|name| String::from_utf8_lossy(name).to_string())
+                    .unwrap_or_else(|| "None".to_string())
+            };
+            [get(0), get(1)]
+        })
+    } else {
+        None
+    };
+    let uses_pdf_geometry = annot_dict.get(b"PandaShape").ok().and_then(|o| o.as_bool().ok()).unwrap_or(false);
+    if uses_pdf_geometry {
+        if let Ok(viewer_rect) = crate::pdf::coords::pdf_bounds_to_viewer_on_page(media, rect, rotation) {
+            rect = viewer_rect;
+        }
+        if let Some([x1, y1, x2, y2]) = line_endpoints {
+            if let (Ok(start), Ok(end)) = (
+                crate::pdf::coords::pdf_point_to_viewer_on_page(media, x1, y1, rotation),
+                crate::pdf::coords::pdf_point_to_viewer_on_page(media, x2, y2, rotation),
+            ) {
+                line_endpoints = Some([start.0, start.1, end.0, end.1]);
+            }
+        }
+    }
     let stamp_kind = annot_panda_stamp_kind(annot_dict);
     let stamp_preset = annot_panda_stamp(annot_dict);
     let is_redaction = annot_is_redaction(annot_dict);
@@ -287,9 +349,11 @@ fn parse_annotation_dict(annot_dict: &Dictionary) -> AnnotationData {
         subtype,
         rect,
         color,
+        stroke_width,
         contents,
         ink_points,
         line_endpoints,
+        line_endings,
         stamp_kind,
         stamp_preset,
         is_redaction,
@@ -297,18 +361,17 @@ fn parse_annotation_dict(annot_dict: &Dictionary) -> AnnotationData {
 }
 
 fn walk_page_annotations(doc: &Document, page_id: ObjectId) -> Result<Vec<AnnotationData>, String> {
-    let page_dict = doc.get_dictionary(page_id).map_err(|e| e.to_string())?;
+    let media = crate::pdf::coords::page_media_box(doc, page_id)?;
+    let rotation = crate::pdf::rotation::page_rotation(doc, page_id);
     let mut result = Vec::new();
-    if let Ok(Object::Array(arr)) = page_dict.get(b"Annots") {
-        for annot_ref in arr {
-            let id = match annot_ref {
-                Object::Reference(id) => *id,
-                _ => continue,
-            };
-            if let Ok(annot_obj) = doc.get_object(id) {
-                if let Ok(annot_dict) = annot_obj.as_dict() {
-                    result.push(parse_annotation_dict(annot_dict));
-                }
+    for annot_ref in page_annotation_refs(doc, page_id)? {
+        let id = match annot_ref {
+            Object::Reference(id) => id,
+            _ => continue,
+        };
+        if let Ok(annot_obj) = doc.get_object(id) {
+            if let Ok(annot_dict) = annot_obj.as_dict() {
+                result.push(parse_annotation_dict(annot_dict, media, rotation));
             }
         }
     }

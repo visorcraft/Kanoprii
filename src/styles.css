@@ -2079,6 +2079,37 @@ body {
   color: #fff;
 }
 
+.edit-shape-style-toggle {
+  align-items: stretch;
+}
+
+.pdf-edit-compact-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 6px;
+  font-size: 11px;
+  color: var(--pp-text);
+  background: var(--pp-surface);
+}
+
+.pdf-edit-compact-field input[type="color"] {
+  width: 24px;
+  height: 22px;
+  padding: 0;
+  border: 1px solid var(--pp-input-border);
+  background: transparent;
+}
+
+.pdf-edit-compact-field select {
+  height: 22px;
+  border: 1px solid var(--pp-input-border);
+  border-radius: 3px;
+  background: var(--pp-input-bg);
+  color: var(--pp-text);
+  font-size: 11px;
+}
+
 .shape-overlay,
 .shape-draft {
   position: absolute;
@@ -2389,11 +2420,6 @@ body {
   border: 2px solid var(--pp-accent);
   box-sizing: border-box;
   pointer-events: none;
-}
-
-.page-vector-draft {
-  border-style: dashed;
-  opacity: 0.8;
 }
 
 .text-edit-cursor {

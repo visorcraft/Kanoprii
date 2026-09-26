@@ -42,6 +42,17 @@ export default ts.config(
     },
   },
   {
+    files: ['scripts/**/*.mjs'],
+    languageOptions: {
+      ecmaVersion: 2024,
+      sourceType: 'module',
+      globals: globals.node,
+    },
+    rules: {
+      'no-console': 'off',
+    },
+  },
+  {
     ignores: [
       'dist/',
       'src-tauri/target/',

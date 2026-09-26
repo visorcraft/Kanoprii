@@ -625,6 +625,28 @@ fn viewer_point_to_pdf_rotation_maps_corners() {
 }
 
 #[test]
+fn annotation_coordinate_conversion_roundtrips_rotated_pages() {
+    use pdf::coords::{
+        pdf_bounds_to_viewer_on_page, pdf_point_to_viewer_on_page, viewer_bounds_to_pdf_on_page,
+        viewer_point_to_pdf_on_page,
+    };
+
+    let media = [10.0, 20.0, 605.0, 862.0];
+    let point = (123.0, 456.0);
+    let bounds = [100.0, 200.0, 350.0, 500.0];
+    for rotation in [0, 90, 180, 270] {
+        let pdf_point = viewer_point_to_pdf_on_page(media, point.0, point.1, rotation).unwrap();
+        let viewer_point = pdf_point_to_viewer_on_page(media, pdf_point.0, pdf_point.1, rotation).unwrap();
+        assert!((viewer_point.0 - point.0).abs() < 1e-6, "rotation {rotation} point x");
+        assert!((viewer_point.1 - point.1).abs() < 1e-6, "rotation {rotation} point y");
+
+        let pdf_bounds = viewer_bounds_to_pdf_on_page(media, bounds, rotation).unwrap();
+        let viewer_bounds = pdf_bounds_to_viewer_on_page(media, pdf_bounds, rotation).unwrap();
+        assert_coordinates_close(&viewer_bounds, &bounds);
+    }
+}
+
+#[test]
 fn search_pdf_text_rejects_empty_query() {
     let path = save(&mut build_pdf(1), "search_empty_query");
     let err = search_pdf_text(path.clone(), "   ".to_string(), false, false).unwrap_err();
@@ -946,6 +968,22 @@ fn reset_page_rotation_clears_rotate_entry() {
     reset_page_rotation(path.clone(), 0).unwrap();
     assert_eq!(rotation(&path), 0);
     let _ = std::fs::remove_file(&path);
+}
+
+#[test]
+fn inherited_indirect_rotation_can_be_overridden_with_zero() {
+    use pdf::rotation::{page_rotation, set_page_rotation};
+
+    let mut doc = build_pdf(1);
+    let page_id = *doc.get_pages().get(&1).unwrap();
+    let parent_id = doc.get_dictionary(page_id).unwrap().get(b"Parent").unwrap().as_reference().unwrap();
+    let rotate_id = doc.add_object(Object::Integer(90));
+    doc.get_dictionary_mut(parent_id).unwrap().set(b"Rotate", Object::Reference(rotate_id));
+    assert_eq!(page_rotation(&doc, page_id), 90);
+
+    set_page_rotation(&mut doc, page_id, 0).unwrap();
+    assert_eq!(page_rotation(&doc, page_id), 0);
+    assert_eq!(doc.get_dictionary(page_id).unwrap().get(b"Rotate").unwrap().as_i64().unwrap(), 0);
 }
 
 #[test]
@@ -19017,6 +19055,32 @@ fn remove_ink_stroke_rejects_missing_file() {
     assert!(!err.is_empty());
 }
 
+fn assert_coordinates_close(actual: &[f64], expected: &[f64]) {
+    assert_eq!(actual.len(), expected.len());
+    for (index, (actual, expected)) in actual.iter().zip(expected).enumerate() {
+        assert!((actual - expected).abs() < 0.001, "coordinate {index}: expected {expected}, got {actual}");
+    }
+}
+
+fn shape_payload(
+    kind: &str,
+    start: [f64; 2],
+    end: [f64; 2],
+    stroke_color: Option<[f64; 3]>,
+    stroke_width: Option<f64>,
+) -> ShapeAnnotationPayload {
+    ShapeAnnotationPayload {
+        page_index: 0,
+        kind: kind.to_string(),
+        x1: start[0],
+        y1: start[1],
+        x2: end[0],
+        y2: end[1],
+        stroke_color,
+        stroke_width,
+    }
+}
+
 #[test]
 fn square_shape_add_and_read_back() {
     let path = save(&mut build_pdf(1), "square");
@@ -19024,7 +19088,7 @@ fn square_shape_add_and_read_back() {
     let annots = get_annotations(path.clone(), 0).unwrap();
     assert_eq!(annots.len(), 1);
     assert_eq!(annots[0].subtype, "Square");
-    assert_eq!(annots[0].rect, [10.0, 20.0, 110.0, 80.0]);
+    assert_coordinates_close(&annots[0].rect, &[10.0, 20.0, 110.0, 80.0]);
     let _ = std::fs::remove_file(&path);
 }
 
@@ -19045,7 +19109,136 @@ fn line_shape_add_and_read_back() {
     let annots = get_annotations(path.clone(), 0).unwrap();
     assert_eq!(annots.len(), 1);
     assert_eq!(annots[0].subtype, "Line");
-    assert_eq!(annots[0].line_endpoints, Some([10.0, 10.0, 90.0, 70.0]));
+    assert_coordinates_close(annots[0].line_endpoints.as_ref().unwrap(), &[10.0, 10.0, 90.0, 70.0]);
+    let _ = std::fs::remove_file(&path);
+}
+
+#[test]
+fn arrow_shape_add_and_read_back() {
+    let path = save(&mut build_pdf(1), "arrow");
+    add_arrow(path.clone(), 0, 10.0, 10.0, 90.0, 70.0).unwrap();
+    let annots = get_annotations(path.clone(), 0).unwrap();
+    assert_eq!(annots.len(), 1);
+    assert_eq!(annots[0].subtype, "Line");
+    assert_coordinates_close(annots[0].line_endpoints.as_ref().unwrap(), &[10.0, 10.0, 90.0, 70.0]);
+    assert_eq!(annots[0].line_endings, Some(["None".to_string(), "OpenArrow".to_string()]));
+    let _ = std::fs::remove_file(&path);
+}
+
+#[test]
+fn styled_arrow_shape_add_and_read_back() {
+    let path = save(&mut build_pdf(1), "styled_arrow");
+    add_shape_annotation(
+        path.clone(),
+        shape_payload("arrow", [10.0, 10.0], [90.0, 70.0], Some([0.0, 0.25, 1.0]), Some(6.0)),
+    )
+    .unwrap();
+    let annots = get_annotations(path.clone(), 0).unwrap();
+    assert_eq!(annots.len(), 1);
+    assert_eq!(annots[0].subtype, "Line");
+    assert_eq!(annots[0].color, Some([0.0, 0.25, 1.0]));
+    assert_eq!(annots[0].stroke_width, Some(6.0));
+    assert_eq!(annots[0].line_endings, Some(["None".to_string(), "OpenArrow".to_string()]));
+
+    let doc = Document::load(&path).unwrap();
+    let page_id = *doc.get_pages().get(&1).unwrap();
+    let annot_id =
+        doc.get_dictionary(page_id).unwrap().get(b"Annots").unwrap().as_array().unwrap()[0].as_reference().unwrap();
+    let annot = doc.get_dictionary(annot_id).unwrap();
+    assert_eq!(annot.get(b"F").unwrap().as_i64().unwrap(), 4);
+    assert_eq!(pdf::coords::obj_to_f64(annot.get(b"BS").unwrap().as_dict().unwrap().get(b"W").unwrap()), 6.0);
+    let rect = annot.get(b"Rect").unwrap().as_array().unwrap();
+    assert!(pdf::coords::obj_to_f64(&rect[2]) > pdf::coords::obj_to_f64(&rect[0]));
+    assert!(pdf::coords::obj_to_f64(&rect[3]) > pdf::coords::obj_to_f64(&rect[1]));
+    let line = annot.get(b"L").unwrap().as_array().unwrap();
+    assert_ne!(pdf::coords::obj_to_f64(&line[0]), 10.0, "viewer x must be converted to PDF points");
+    let _ = std::fs::remove_file(&path);
+}
+
+#[test]
+fn styled_shape_rejects_non_finite_appearance() {
+    let path = save(&mut build_pdf(1), "styled_shape_non_finite");
+    let color_err = add_shape_annotation(
+        path.clone(),
+        shape_payload("square", [10.0, 10.0], [90.0, 70.0], Some([f64::NAN, 0.0, 0.0]), Some(2.0)),
+    )
+    .unwrap_err();
+    assert!(color_err.contains("stroke_color[0]"));
+    let width_err = add_shape_annotation(
+        path.clone(),
+        shape_payload("square", [10.0, 10.0], [90.0, 70.0], Some([1.0, 0.0, 0.0]), Some(f64::INFINITY)),
+    )
+    .unwrap_err();
+    assert!(width_err.contains("stroke_width"));
+    let bounds_err = add_shape_annotation(
+        path.clone(),
+        shape_payload("square", [-1.0, 10.0], [90.0, 70.0], Some([1.0, 0.0, 0.0]), Some(2.0)),
+    )
+    .unwrap_err();
+    assert!(bounds_err.contains("inside the page"));
+    let _ = std::fs::remove_file(&path);
+}
+
+#[test]
+fn axis_aligned_line_annotations_have_nonzero_bounds() {
+    let path = save(&mut build_pdf(1), "axis_aligned_shape_bounds");
+    add_line(path.clone(), 0, 100.0, 100.0, 100.0, 300.0).unwrap();
+    add_arrow(path.clone(), 0, 200.0, 400.0, 500.0, 400.0).unwrap();
+
+    let doc = Document::load(&path).unwrap();
+    let page_id = *doc.get_pages().get(&1).unwrap();
+    let annot_refs = doc.get_dictionary(page_id).unwrap().get(b"Annots").unwrap().as_array().unwrap();
+    for annot_ref in annot_refs {
+        let annot = doc.get_dictionary(annot_ref.as_reference().unwrap()).unwrap();
+        let rect = annot.get(b"Rect").unwrap().as_array().unwrap();
+        assert!(pdf::coords::obj_to_f64(&rect[2]) > pdf::coords::obj_to_f64(&rect[0]));
+        assert!(pdf::coords::obj_to_f64(&rect[3]) > pdf::coords::obj_to_f64(&rect[1]));
+    }
+    let _ = std::fs::remove_file(&path);
+}
+
+#[test]
+fn adding_shape_preserves_indirect_annots_array() {
+    let mut doc = build_pdf(1);
+    let page_id = *doc.get_pages().get(&1).unwrap();
+    let existing = doc.add_object(Object::Dictionary(Dictionary::from_iter(vec![
+        (b"Type".to_vec(), Object::Name(b"Annot".to_vec())),
+        (b"Subtype".to_vec(), Object::Name(b"Text".to_vec())),
+        (
+            b"Rect".to_vec(),
+            Object::Array(vec![Object::Integer(1), Object::Integer(1), Object::Integer(10), Object::Integer(10)]),
+        ),
+    ])));
+    let annots_id = doc.add_object(Object::Array(vec![Object::Reference(existing)]));
+    doc.get_dictionary_mut(page_id).unwrap().set(b"Annots", Object::Reference(annots_id));
+    let path = save(&mut doc, "indirect_annots");
+
+    add_square(path.clone(), 0, 20.0, 20.0, 80.0, 80.0).unwrap();
+
+    let doc = Document::load(&path).unwrap();
+    let page_id = *doc.get_pages().get(&1).unwrap();
+    assert_eq!(doc.get_dictionary(page_id).unwrap().get(b"Annots").unwrap().as_reference().unwrap(), annots_id);
+    assert_eq!(doc.get_object(annots_id).unwrap().as_array().unwrap().len(), 2);
+    let _ = std::fs::remove_file(&path);
+}
+
+#[test]
+fn shape_geometry_uses_inherited_media_box_and_rotation() {
+    let mut doc = build_pdf(1);
+    let page_id = *doc.get_pages().get(&1).unwrap();
+    let parent_id = doc.get_dictionary(page_id).unwrap().get(b"Parent").unwrap().as_reference().unwrap();
+    doc.get_dictionary_mut(page_id).unwrap().remove(b"MediaBox");
+    let parent = doc.get_dictionary_mut(parent_id).unwrap();
+    parent.set(
+        b"MediaBox",
+        Object::Array(vec![Object::Integer(0), Object::Integer(0), Object::Integer(612), Object::Integer(792)]),
+    );
+    parent.set(b"Rotate", Object::Integer(90));
+    let path = save(&mut doc, "inherited_shape_geometry");
+
+    add_arrow(path.clone(), 0, 10.0, 20.0, 300.0, 400.0).unwrap();
+    let annots = get_annotations(path.clone(), 0).unwrap();
+    assert_coordinates_close(annots[0].line_endpoints.as_ref().unwrap(), &[10.0, 20.0, 300.0, 400.0]);
     let _ = std::fs::remove_file(&path);
 }
 
@@ -19057,7 +19250,7 @@ fn remove_square_deletes_the_right_one() {
     remove_square(path.clone(), 0, 0).unwrap();
     let remaining = get_annotations(path.clone(), 0).unwrap();
     assert_eq!(remaining.len(), 1);
-    assert_eq!(remaining[0].rect, [20.0, 20.0, 30.0, 30.0]);
+    assert_coordinates_close(&remaining[0].rect, &[20.0, 20.0, 30.0, 30.0]);
     let _ = std::fs::remove_file(&path);
 }
 

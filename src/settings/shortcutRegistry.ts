@@ -85,7 +85,7 @@ export const SHORTCUT_REGISTRY: ShortcutBinding[] = [
   { commandId: 'redo', category: 'Edit', label: 'Redo', defaultShortcuts: ['Ctrl+Y', 'Ctrl+Shift+Z'] },
   { commandId: 'find', category: 'Edit', label: 'Find text', defaultShortcuts: ['Ctrl+F'] },
   { commandId: 'toggle-text-edit', category: 'Edit', label: 'Add text', defaultShortcuts: ['E'] },
-  { commandId: 'toggle-vector-edit', category: 'Edit', label: 'Edit vector', defaultShortcuts: ['G'] },
+  { commandId: 'toggle-vector-edit', category: 'Edit', label: 'Shapes', defaultShortcuts: ['G'] },
   { commandId: 'toggle-pdf-edit', category: 'Edit', label: 'Edit objects', defaultShortcuts: ['P'] },
   { commandId: 'toggle-image-insert', category: 'Edit', label: 'Add image', defaultShortcuts: ['I'] },
 

@@ -34,7 +34,7 @@ export const config = {
     path.join(root, 'e2e', 'specs', 'axe-a11y.spec.ts'),
   ],
   maxInstances: 1,
-  logLevel: 'info',
+  logLevel: process.env.WDIO_LOG_LEVEL === 'error' ? 'error' : 'info',
   baseUrl: 'http://localhost:4445',
   waitforTimeout: 15_000,
   connectionRetryTimeout: 120_000,

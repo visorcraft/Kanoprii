@@ -1,9 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { Rect } from '../app/usePdfEditState';
-import { VIEWER_PAGE_H, VIEWER_PAGE_W } from '../app/constants';
+import { moveRectWithinPage, resizeRectWithinPage, type ResizeHandle } from './selectionGeometry';
 import './ParagraphSelectionOverlay.css';
-
-type HandleDir = 'nw' | 'n' | 'ne' | 'w' | 'e' | 'sw' | 's' | 'se';
 
 type ParagraphSelectionOverlayProps = {
   draft: { pageRect: Rect };
@@ -17,13 +15,9 @@ type ParagraphSelectionOverlayProps = {
 
 const MIN_SIZE = 20;
 
-function clamp(value: number, min: number, max: number): number {
-  return Math.max(min, Math.min(max, value));
-}
-
 export function ParagraphSelectionOverlay({ draft, zoom, onUpdate, onEnterEdit, onDelete, onCancel, ariaLabel = 'Paragraph selection' }: ParagraphSelectionOverlayProps) {
   const { pageRect } = draft;
-  const [dragging, setDragging] = useState<{ kind: 'move' | HandleDir; start: Rect; pointerX: number; pointerY: number } | null>(null);
+  const [dragging, setDragging] = useState<{ kind: 'move' | ResizeHandle; start: Rect; pointerX: number; pointerY: number } | null>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -40,35 +34,12 @@ export function ParagraphSelectionOverlay({ draft, zoom, onUpdate, onEnterEdit, 
 
       if (dragging.kind === 'move') {
         onUpdate({
-          pageRect: {
-            ...start,
-            x: clamp(start.x + dx, 0, VIEWER_PAGE_W - start.w),
-            y: clamp(start.y + dy, 0, VIEWER_PAGE_H - start.h),
-          },
+          pageRect: moveRectWithinPage(start, start.x + dx, start.y + dy),
           geometryModified: true,
         });
         return;
       }
-
-      const next: Rect = { ...start };
-      const k = dragging.kind;
-      if (k.includes('e')) {
-        next.w = clamp(start.w + dx, MIN_SIZE, VIEWER_PAGE_W - start.x);
-      }
-      if (k.includes('s')) {
-        next.h = clamp(start.h + dy, MIN_SIZE, VIEWER_PAGE_H - start.y);
-      }
-      if (k.includes('w')) {
-        const newW = clamp(start.w - dx, MIN_SIZE, start.x + start.w);
-        next.x = start.x + start.w - newW;
-        next.w = newW;
-      }
-      if (k.includes('n')) {
-        const newH = clamp(start.h - dy, MIN_SIZE, start.y + start.h);
-        next.y = start.y + start.h - newH;
-        next.h = newH;
-      }
-      onUpdate({ pageRect: next, geometryModified: true });
+      onUpdate({ pageRect: resizeRectWithinPage(start, dragging.kind, dx, dy, MIN_SIZE), geometryModified: true });
     };
 
     const onUp = () => setDragging(null);
@@ -81,7 +52,7 @@ export function ParagraphSelectionOverlay({ draft, zoom, onUpdate, onEnterEdit, 
     };
   }, [dragging, onUpdate, zoom]);
 
-  const startDrag = (kind: 'move' | HandleDir) => (e: React.MouseEvent) => {
+  const startDrag = (kind: 'move' | ResizeHandle) => (e: React.MouseEvent) => {
     e.stopPropagation();
     e.preventDefault();
     setDragging({
@@ -108,11 +79,7 @@ export function ParagraphSelectionOverlay({ draft, zoom, onUpdate, onEnterEdit, 
           const dx = e.key === 'ArrowLeft' ? -step : e.key === 'ArrowRight' ? step : 0;
           const dy = e.key === 'ArrowUp' ? -step : e.key === 'ArrowDown' ? step : 0;
           onUpdate({
-            pageRect: {
-              ...pageRect,
-              x: clamp(pageRect.x + dx, 0, VIEWER_PAGE_W - pageRect.w),
-              y: clamp(pageRect.y + dy, 0, VIEWER_PAGE_H - pageRect.h),
-            },
+            pageRect: moveRectWithinPage(pageRect, pageRect.x + dx, pageRect.y + dy),
             geometryModified: true,
           });
         } else if (e.key === 'Enter' && onEnterEdit) {
@@ -131,7 +98,7 @@ export function ParagraphSelectionOverlay({ draft, zoom, onUpdate, onEnterEdit, 
       aria-label={ariaLabel}
     >
       <div className="paragraph-selection-frame" />
-      {(['nw', 'n', 'ne', 'w', 'e', 'sw', 's', 'se'] as HandleDir[]).map((handle) => (
+      {(['nw', 'n', 'ne', 'w', 'e', 'sw', 's', 'se'] as ResizeHandle[]).map((handle) => (
         <div
           key={handle}
           className={`paragraph-handle paragraph-handle-${handle}`}

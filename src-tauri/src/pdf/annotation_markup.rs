@@ -1,4 +1,7 @@
-use crate::pdf::annotations::{annot_is_redaction, annot_panda_stamp_kind, append_page_annotation};
+use crate::pdf::annotations::{
+    annot_is_redaction, annot_panda_stamp_kind, append_page_annotation, page_annotation_refs,
+    replace_page_annotation_refs,
+};
 use lopdf::{Dictionary, Document, Object, ObjectId, Stream};
 use serde::Serialize;
 use std::path::Path;
@@ -50,18 +53,7 @@ pub fn add_ink_stroke(path: &Path, page_index: u32, points: Vec<f64>) -> Result<
         (b"C".to_vec(), Object::Array(vec![Object::Real(0.0), Object::Real(0.0), Object::Real(1.0)])),
     ])));
 
-    let annots = doc.get_dictionary_mut(*page_id).map_err(|e| e.to_string())?.get_mut(b"Annots");
-
-    match annots {
-        Ok(Object::Array(ref mut arr)) => {
-            arr.push(Object::Reference(annot));
-        }
-        _ => {
-            doc.get_dictionary_mut(*page_id)
-                .map_err(|e| e.to_string())?
-                .set(b"Annots", Object::Array(vec![Object::Reference(annot)]));
-        }
-    }
+    append_page_annotation(&mut doc, *page_id, annot)?;
 
     crate::pdf::io::save_atomic(&mut doc, path)?;
     Ok(())
@@ -74,10 +66,10 @@ pub fn remove_ink_stroke(path: &Path, page_index: u32, index: u32) -> Result<(),
     let pages = doc.get_pages();
     let page_id = *pages.get(&(page_index + 1)).ok_or("Page not found".to_string())?;
 
-    let annots = match doc.get_dictionary(page_id).map_err(|e| e.to_string())?.get(b"Annots") {
-        Ok(Object::Array(arr)) => arr.clone(),
-        _ => return Err("No annotations on this page".to_string()),
-    };
+    let annots = page_annotation_refs(&doc, page_id)?;
+    if annots.is_empty() {
+        return Err("No annotations on this page".to_string());
+    }
 
     let mut ink_count = 0u32;
     let mut target_pos: Option<usize> = None;
@@ -105,26 +97,98 @@ pub fn remove_ink_stroke(path: &Path, page_index: u32, index: u32) -> Result<(),
     let pos = target_pos.ok_or("Ink stroke not found".to_string())?;
     let mut new_annots = annots;
     new_annots.remove(pos);
-    doc.get_dictionary_mut(page_id).map_err(|e| e.to_string())?.set(b"Annots", Object::Array(new_annots));
+    replace_page_annotation_refs(&mut doc, page_id, new_annots)?;
 
     crate::pdf::io::save_atomic(&mut doc, path)?;
     Ok(())
 }
 
-pub fn shape_rect_object(x1: f64, y1: f64, x2: f64, y2: f64) -> Object {
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum ShapeAnnotationKind {
+    Square,
+    Circle,
+    Line,
+    Arrow,
+}
+
+impl ShapeAnnotationKind {
+    fn parse(value: &str) -> Result<Self, String> {
+        match value {
+            "square" => Ok(Self::Square),
+            "circle" => Ok(Self::Circle),
+            "line" => Ok(Self::Line),
+            "arrow" => Ok(Self::Arrow),
+            _ => Err(format!("Unsupported shape kind: {value}")),
+        }
+    }
+
+    fn subtype(self) -> &'static [u8] {
+        match self {
+            Self::Square => b"Square",
+            Self::Circle => b"Circle",
+            Self::Line | Self::Arrow => b"Line",
+        }
+    }
+
+    fn is_line(self) -> bool {
+        matches!(self, Self::Line | Self::Arrow)
+    }
+}
+
+#[derive(Clone, Copy)]
+struct ShapeAppearance {
+    color: [f64; 3],
+    width: f64,
+}
+
+pub struct ShapeAnnotationArgs<'a> {
+    pub kind: &'a str,
+    pub start: [f64; 2],
+    pub end: [f64; 2],
+    pub stroke_color: Option<[f64; 3]>,
+    pub stroke_width: Option<f64>,
+}
+
+fn validate_shape_appearance(
+    stroke_color: Option<[f64; 3]>,
+    stroke_width: Option<f64>,
+) -> Result<ShapeAppearance, String> {
+    let mut color = stroke_color.unwrap_or([1.0, 0.0, 0.0]);
+    for (index, component) in color.iter_mut().enumerate() {
+        crate::pdf::coords::finite_f64(*component, &format!("stroke_color[{index}]"))?;
+        *component = component.clamp(0.0, 1.0);
+    }
+    let width = crate::pdf::coords::finite_f64(stroke_width.unwrap_or(2.0), "stroke_width")?.clamp(0.5, 24.0);
+    Ok(ShapeAppearance { color, width })
+}
+
+fn rect_object([left, bottom, right, top]: [f64; 4]) -> Object {
     Object::Array(vec![
-        Object::Real(x1 as f32),
-        Object::Real(y1 as f32),
-        Object::Real(x2 as f32),
-        Object::Real(y2 as f32),
+        Object::Real(left as f32),
+        Object::Real(bottom as f32),
+        Object::Real(right as f32),
+        Object::Real(top as f32),
     ])
 }
 
-pub fn shape_outline_fields(x1: f64, y1: f64, x2: f64, y2: f64) -> Vec<(Vec<u8>, Object)> {
+fn shape_appearance_fields(rect: [f64; 4], appearance: ShapeAppearance) -> Vec<(Vec<u8>, Object)> {
     vec![
-        (b"Rect".to_vec(), shape_rect_object(x1.min(x2), y1.min(y2), x1.max(x2), y1.max(y2))),
-        (b"C".to_vec(), Object::Array(vec![Object::Real(1.0), Object::Real(0.0), Object::Real(0.0)])),
-        (b"Border".to_vec(), Object::Array(vec![Object::Integer(0), Object::Integer(0), Object::Real(2.0)])),
+        (b"Rect".to_vec(), rect_object(rect)),
+        (
+            b"C".to_vec(),
+            Object::Array(appearance.color.into_iter().map(|component| Object::Real(component as f32)).collect()),
+        ),
+        (
+            b"Border".to_vec(),
+            Object::Array(vec![Object::Integer(0), Object::Integer(0), Object::Real(appearance.width as f32)]),
+        ),
+        (
+            b"BS".to_vec(),
+            Object::Dictionary(Dictionary::from_iter(vec![
+                (b"W".to_vec(), Object::Real(appearance.width as f32)),
+                (b"S".to_vec(), Object::Name(b"S".to_vec())),
+            ])),
+        ),
     ]
 }
 
@@ -135,10 +199,10 @@ pub fn remove_annotation_by_subtype(
     index: u32,
     not_found_msg: &str,
 ) -> Result<(), String> {
-    let annots = match doc.get_dictionary(page_id).map_err(|e| e.to_string())?.get(b"Annots") {
-        Ok(Object::Array(arr)) => arr.clone(),
-        _ => return Err("No annotations on this page".to_string()),
-    };
+    let annots = page_annotation_refs(doc, page_id)?;
+    if annots.is_empty() {
+        return Err("No annotations on this page".to_string());
+    }
 
     let mut match_count = 0u32;
     let mut target_pos: Option<usize> = None;
@@ -166,74 +230,119 @@ pub fn remove_annotation_by_subtype(
     let pos = target_pos.ok_or_else(|| not_found_msg.to_string())?;
     let mut new_annots = annots;
     new_annots.remove(pos);
-    doc.get_dictionary_mut(page_id).map_err(|e| e.to_string())?.set(b"Annots", Object::Array(new_annots));
+    replace_page_annotation_refs(doc, page_id, new_annots)?;
     Ok(())
 }
 
 pub fn add_square(path: &Path, page_index: u32, x1: f64, y1: f64, x2: f64, y2: f64) -> Result<(), String> {
-    for (name, v) in [("x1", x1), ("y1", y1), ("x2", x2), ("y2", y2)] {
-        crate::pdf::coords::finite_f64(v, name)?;
-    }
-    let mut doc = Document::load(path).map_err(|e| e.to_string())?;
-    let pages = doc.get_pages();
-    let page_id = *pages.get(&(page_index + 1)).ok_or("Page not found".to_string())?;
-
-    let mut fields = vec![
-        (b"Type".to_vec(), Object::Name(b"Annot".to_vec())),
-        (b"Subtype".to_vec(), Object::Name(b"Square".to_vec())),
-    ];
-    fields.extend(shape_outline_fields(x1, y1, x2, y2));
-    let annot = doc.add_object(Object::Dictionary(lopdf::Dictionary::from_iter(fields)));
-    append_page_annotation(&mut doc, page_id, annot)?;
-    crate::pdf::io::save_atomic(&mut doc, path)?;
-    Ok(())
+    add_shape_annotation(
+        path,
+        page_index,
+        ShapeAnnotationArgs { kind: "square", start: [x1, y1], end: [x2, y2], stroke_color: None, stroke_width: None },
+    )
 }
 
 pub fn add_circle(path: &Path, page_index: u32, x1: f64, y1: f64, x2: f64, y2: f64) -> Result<(), String> {
-    for (name, v) in [("x1", x1), ("y1", y1), ("x2", x2), ("y2", y2)] {
-        crate::pdf::coords::finite_f64(v, name)?;
-    }
-    let mut doc = Document::load(path).map_err(|e| e.to_string())?;
-    let pages = doc.get_pages();
-    let page_id = *pages.get(&(page_index + 1)).ok_or("Page not found".to_string())?;
-
-    let mut fields = vec![
-        (b"Type".to_vec(), Object::Name(b"Annot".to_vec())),
-        (b"Subtype".to_vec(), Object::Name(b"Circle".to_vec())),
-    ];
-    fields.extend(shape_outline_fields(x1, y1, x2, y2));
-    let annot = doc.add_object(Object::Dictionary(lopdf::Dictionary::from_iter(fields)));
-    append_page_annotation(&mut doc, page_id, annot)?;
-    crate::pdf::io::save_atomic(&mut doc, path)?;
-    Ok(())
+    add_shape_annotation(
+        path,
+        page_index,
+        ShapeAnnotationArgs { kind: "circle", start: [x1, y1], end: [x2, y2], stroke_color: None, stroke_width: None },
+    )
 }
 
 pub fn add_line(path: &Path, page_index: u32, x1: f64, y1: f64, x2: f64, y2: f64) -> Result<(), String> {
+    add_shape_annotation(
+        path,
+        page_index,
+        ShapeAnnotationArgs { kind: "line", start: [x1, y1], end: [x2, y2], stroke_color: None, stroke_width: None },
+    )
+}
+
+pub fn add_arrow(path: &Path, page_index: u32, x1: f64, y1: f64, x2: f64, y2: f64) -> Result<(), String> {
+    add_shape_annotation(
+        path,
+        page_index,
+        ShapeAnnotationArgs { kind: "arrow", start: [x1, y1], end: [x2, y2], stroke_color: None, stroke_width: None },
+    )
+}
+
+pub fn add_shape_annotation(path: &Path, page_index: u32, args: ShapeAnnotationArgs<'_>) -> Result<(), String> {
+    let [x1, y1] = args.start;
+    let [x2, y2] = args.end;
     for (name, v) in [("x1", x1), ("y1", y1), ("x2", x2), ("y2", y2)] {
         crate::pdf::coords::finite_f64(v, name)?;
     }
-    if (x2 - x1).hypot(y2 - y1) < 5.0 {
+    if !(0.0..=crate::pdf::coords::VIEWER_PAGE_W).contains(&x1)
+        || !(0.0..=crate::pdf::coords::VIEWER_PAGE_W).contains(&x2)
+        || !(0.0..=crate::pdf::coords::VIEWER_PAGE_H).contains(&y1)
+        || !(0.0..=crate::pdf::coords::VIEWER_PAGE_H).contains(&y2)
+    {
+        return Err("Shape coordinates must be inside the page".to_string());
+    }
+    let kind = ShapeAnnotationKind::parse(args.kind)?;
+    if kind.is_line() && (x2 - x1).hypot(y2 - y1) < 5.0 {
         return Err("Line is too short".to_string());
     }
+    if !kind.is_line() && ((x2 - x1).abs() < 2.0 || (y2 - y1).abs() < 2.0) {
+        return Err("Shape is too small".to_string());
+    }
+    let appearance = validate_shape_appearance(args.stroke_color, args.stroke_width)?;
 
     let mut doc = Document::load(path).map_err(|e| e.to_string())?;
     let pages = doc.get_pages();
     let page_id = *pages.get(&(page_index + 1)).ok_or("Page not found".to_string())?;
+    let media = crate::pdf::coords::page_media_box(&doc, page_id)?;
+    let rotation = crate::pdf::rotation::page_rotation(&doc, page_id);
+
+    let viewer_bounds = [x1.min(x2), y1.min(y2), x1.max(x2), y1.max(y2)];
+    let (pdf_rect, pdf_line) = if kind.is_line() {
+        let start = crate::pdf::coords::viewer_point_to_pdf_on_page(media, x1, y1, rotation)?;
+        let end = crate::pdf::coords::viewer_point_to_pdf_on_page(media, x2, y2, rotation)?;
+        let padding = (appearance.width * if kind == ShapeAnnotationKind::Arrow { 6.0 } else { 1.5 }).max(2.0);
+        (
+            [
+                start.0.min(end.0) - padding,
+                start.1.min(end.1) - padding,
+                start.0.max(end.0) + padding,
+                start.1.max(end.1) + padding,
+            ],
+            Some([start.0, start.1, end.0, end.1]),
+        )
+    } else {
+        (crate::pdf::coords::viewer_bounds_to_pdf_on_page(media, viewer_bounds, rotation)?, None)
+    };
+    for (index, value) in pdf_rect.iter().chain(pdf_line.as_ref().into_iter().flatten()).enumerate() {
+        crate::pdf::coords::finite_f64(*value, &format!("pdf_geometry[{index}]"))?;
+        if value.abs() > f64::from(f32::MAX) {
+            return Err(format!("pdf_geometry[{index}] is out of range"));
+        }
+    }
 
     let mut fields = vec![
         (b"Type".to_vec(), Object::Name(b"Annot".to_vec())),
-        (b"Subtype".to_vec(), Object::Name(b"Line".to_vec())),
-        (
+        (b"Subtype".to_vec(), Object::Name(kind.subtype().to_vec())),
+        (b"F".to_vec(), Object::Integer(4)),
+        (b"PandaShape".to_vec(), Object::Boolean(true)),
+    ];
+    fields.extend(shape_appearance_fields(pdf_rect, appearance));
+    if let Some([start_x, start_y, end_x, end_y]) = pdf_line {
+        fields.push((
             b"L".to_vec(),
             Object::Array(vec![
-                Object::Real(x1 as f32),
-                Object::Real(y1 as f32),
-                Object::Real(x2 as f32),
-                Object::Real(y2 as f32),
+                Object::Real(start_x as f32),
+                Object::Real(start_y as f32),
+                Object::Real(end_x as f32),
+                Object::Real(end_y as f32),
             ]),
-        ),
-    ];
-    fields.extend(shape_outline_fields(x1, y1, x2, y2));
+        ));
+        fields.push((
+            b"LE".to_vec(),
+            Object::Array(vec![
+                Object::Name(b"None".to_vec()),
+                Object::Name(if kind == ShapeAnnotationKind::Arrow { b"OpenArrow".to_vec() } else { b"None".to_vec() }),
+            ]),
+        ));
+    }
     let annot = doc.add_object(Object::Dictionary(lopdf::Dictionary::from_iter(fields)));
     append_page_annotation(&mut doc, page_id, annot)?;
     crate::pdf::io::save_atomic(&mut doc, path)?;
@@ -310,10 +419,10 @@ pub fn stamp_text_default_appearance(preset: &str) -> &'static str {
 }
 
 pub fn remove_panda_stamp(doc: &mut Document, page_id: ObjectId, kind: &str, index: u32) -> Result<(), String> {
-    let annots = match doc.get_dictionary(page_id).map_err(|e| e.to_string())?.get(b"Annots") {
-        Ok(Object::Array(arr)) => arr.clone(),
-        _ => return Err("No annotations on this page".to_string()),
-    };
+    let annots = page_annotation_refs(doc, page_id)?;
+    if annots.is_empty() {
+        return Err("No annotations on this page".to_string());
+    }
 
     let mut match_count = 0u32;
     let mut target_pos: Option<usize> = None;
@@ -340,7 +449,7 @@ pub fn remove_panda_stamp(doc: &mut Document, page_id: ObjectId, kind: &str, ind
     let pos = target_pos.ok_or_else(|| format!("{kind} stamp not found"))?;
     let mut new_annots = annots;
     new_annots.remove(pos);
-    doc.get_dictionary_mut(page_id).map_err(|e| e.to_string())?.set(b"Annots", Object::Array(new_annots));
+    replace_page_annotation_refs(doc, page_id, new_annots)?;
     Ok(())
 }
 
@@ -368,7 +477,7 @@ pub fn add_text_stamp(path: &Path, page_index: u32, x: f64, y: f64, preset: Stri
     let annot = doc.add_object(Object::Dictionary(lopdf::Dictionary::from_iter(vec![
         (b"Type".to_vec(), Object::Name(b"Annot".to_vec())),
         (b"Subtype".to_vec(), Object::Name(b"FreeText".to_vec())),
-        (b"Rect".to_vec(), shape_rect_object(x, y, x2, y2)),
+        (b"Rect".to_vec(), rect_object([x, y, x2, y2])),
         (b"Contents".to_vec(), Object::String(label.as_bytes().to_vec(), lopdf::StringFormat::Literal)),
         (
             b"DA".to_vec(),
@@ -451,7 +560,7 @@ pub fn add_image_stamp(path: &Path, page_index: u32, x: f64, y: f64, preset: Str
     let annot = doc.add_object(Object::Dictionary(lopdf::Dictionary::from_iter(vec![
         (b"Type".to_vec(), Object::Name(b"Annot".to_vec())),
         (b"Subtype".to_vec(), Object::Name(b"Stamp".to_vec())),
-        (b"Rect".to_vec(), shape_rect_object(x, y, x2, y2)),
+        (b"Rect".to_vec(), rect_object([x, y, x2, y2])),
         (b"AP".to_vec(), Object::Dictionary(ap)),
         (b"PandaStamp".to_vec(), Object::Name(preset.as_bytes().to_vec())),
         (b"PandaStampKind".to_vec(), Object::Name(b"image".to_vec())),
@@ -480,10 +589,10 @@ pub fn remove_image_stamp(path: &Path, page_index: u32, index: u32) -> Result<()
 }
 
 pub fn remove_redaction_at_index(doc: &mut Document, page_id: ObjectId, index: u32) -> Result<(), String> {
-    let annots = match doc.get_dictionary(page_id).map_err(|e| e.to_string())?.get(b"Annots") {
-        Ok(Object::Array(arr)) => arr.clone(),
-        _ => return Err("No annotations on this page".to_string()),
-    };
+    let annots = page_annotation_refs(doc, page_id)?;
+    if annots.is_empty() {
+        return Err("No annotations on this page".to_string());
+    }
 
     let mut redaction_count = 0u32;
     let mut target_pos: Option<usize> = None;
@@ -505,7 +614,7 @@ pub fn remove_redaction_at_index(doc: &mut Document, page_id: ObjectId, index: u
     let pos = target_pos.ok_or("Redaction not found".to_string())?;
     let mut new_annots = annots;
     new_annots.remove(pos);
-    doc.get_dictionary_mut(page_id).map_err(|e| e.to_string())?.set(b"Annots", Object::Array(new_annots));
+    replace_page_annotation_refs(doc, page_id, new_annots)?;
     Ok(())
 }
 
@@ -520,7 +629,7 @@ pub fn add_redaction(path: &Path, page_index: u32, x1: f64, y1: f64, x2: f64, y2
     let annot = doc.add_object(Object::Dictionary(lopdf::Dictionary::from_iter(vec![
         (b"Type".to_vec(), Object::Name(b"Annot".to_vec())),
         (b"Subtype".to_vec(), Object::Name(b"Square".to_vec())),
-        (b"Rect".to_vec(), shape_rect_object(x1, y1, x2, y2)),
+        (b"Rect".to_vec(), rect_object([x1, y1, x2, y2])),
         (b"C".to_vec(), Object::Array(vec![Object::Real(0.0), Object::Real(0.0), Object::Real(0.0)])),
         (b"IC".to_vec(), Object::Array(vec![Object::Real(0.0), Object::Real(0.0), Object::Real(0.0)])),
         (b"Border".to_vec(), Object::Array(vec![Object::Integer(0), Object::Integer(0), Object::Real(0.0)])),

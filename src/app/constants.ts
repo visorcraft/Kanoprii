@@ -41,7 +41,7 @@ export const TESSERACT_REMIND_DISMISSED_KEY =
   'kanoprii:tesseract-remind-dismissed';
 export const RECENT_PDF_LIMIT = 8;
 
-export type ShapeKind = 'square' | 'circle' | 'line';
+export type ShapeKind = 'square' | 'circle' | 'line' | 'arrow';
 export type StampKind = 'text' | 'image';
 
 export const STAMP_PRESETS = [

@@ -44,6 +44,8 @@ export function buildRibbonTabExtras(input: BuildRibbonTabExtrasInput): RibbonTa
         onInsertEditImage={input.onInsertEditImage}
         vectorEditMode={input.vectorEditMode}
         onToggleVectorEditMode={input.onToggleVectorEditMode}
+        shapeKind={input.shapeKind}
+        onShapeKindChange={input.onShapeKindChange}
         imageInsertMode={input.imageInsertMode}
         imageSourcePath={input.imageSourcePath}
         onOpenImageInsertModal={input.onOpenImageInsertModal}

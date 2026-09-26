@@ -8,6 +8,21 @@ import type { createStructuralEditRunner } from '../pdf/runStructuralEdit';
 import { getImageCoords as imageCoordsFromClick } from './getImageCoords';
 
 type CoordFn = (clientX: number, clientY: number) => { x: number; y: number };
+type DrawPoint = ReturnType<CoordFn>;
+type DrawRect = { x: number; y: number; w: number; h: number };
+
+function isLineShape(kind: ShapeKind): kind is Extract<ShapeKind, 'line' | 'arrow'> {
+  return kind === 'line' || kind === 'arrow';
+}
+
+function rectBetween(start: DrawPoint, end: DrawPoint): DrawRect {
+  return {
+    x: Math.min(start.x, end.x),
+    y: Math.min(start.y, end.y),
+    w: Math.abs(end.x - start.x),
+    h: Math.abs(end.y - start.y),
+  };
+}
 
 export type PageInteractionHandlerOptions = {
   filePath: string;
@@ -116,7 +131,7 @@ export function usePageInteractionHandlers(opts: PageInteractionHandlerOptions) 
 
     if (opts.vectorEditMode) {
       e.preventDefault();
-      if (opts.pdfEdit.vectorDraft) {
+      if (opts.pdfEdit.vectorDraft || opts.pdfEdit.shapeDraft) {
         opts.pdfEdit.onCancel();
         return;
       }
@@ -146,7 +161,7 @@ export function usePageInteractionHandlers(opts: PageInteractionHandlerOptions) 
       dragStateRef.current.armedByThisDown = true;
       const coords = getImageCoords(e.clientX, e.clientY);
       opts.setHighlightStart(coords);
-      if (opts.shapeMode && opts.shapeKind === 'line') {
+      if ((opts.shapeMode || opts.vectorEditMode) && isLineShape(opts.shapeKind)) {
         opts.setShapeLineEnd(coords);
       } else {
         opts.setHighlightRect({ x: coords.x, y: coords.y, w: 0, h: 0 });
@@ -154,6 +169,107 @@ export function usePageInteractionHandlers(opts: PageInteractionHandlerOptions) 
       opts.setDrawing(true);
     }
   }, [opts, getImageCoords]);
+
+  const commitRectDrawing = useCallback((rect: DrawRect) => {
+    const minSize = opts.formAddMode ? { w: 20, h: 10 } : opts.vectorEditMode ? { w: 4, h: 4 } : { w: 5, h: 5 };
+    if (rect.w < minSize.w || rect.h < minSize.h) return;
+    const endpoints = { pageIndex: opts.currentPage, x1: rect.x, y1: rect.y, x2: rect.x + rect.w, y2: rect.y + rect.h };
+
+    if (opts.redactMode) {
+      void opts.runEdit({
+        command: 'add_redaction',
+        args: endpoints,
+        afterEdit: async () => { await opts.refreshAnnotations(); },
+        toast: 'Redaction added',
+      });
+      return;
+    }
+    if (opts.imageInsertMode) {
+      if (!opts.imageSourcePath) return;
+      void opts.runEdit({
+        command: 'add_page_image',
+        args: { pageIndex: opts.currentPage, x: rect.x, y: rect.y, width: rect.w, height: rect.h, imagePath: opts.imageSourcePath },
+        afterEdit: async () => { await opts.renderPage(opts.filePath, opts.currentPage); },
+        toast: 'Image inserted',
+      });
+      return;
+    }
+    if (opts.vectorEditMode) {
+      if (isLineShape(opts.shapeKind)) return;
+      opts.pdfEdit.startDrawingShape({
+        pageIndex: opts.currentPage,
+        kind: opts.shapeKind,
+        geometry: { type: 'box', rect },
+      });
+      return;
+    }
+    if (opts.formAddMode) {
+      const name = opts.newFormFieldName.trim();
+      if (!name) return;
+      const base = { pageIndex: opts.currentPage, x: rect.x, y: rect.y, width: rect.w, height: rect.h, name };
+      const isChoice = opts.newFormFieldKind === 'choice';
+      const args = isChoice
+        ? { ...base, options: opts.newFormFieldOptions.split(',').map((option) => option.trim()).filter(Boolean), combo: true }
+        : base;
+      void opts.runEdit({
+        command: isChoice ? 'add_choice_form_field' : 'add_text_form_field',
+        args,
+        afterEdit: async () => {
+          opts.setFormAddMode(false);
+          opts.setShowAddFormFieldModal(false);
+          opts.setNewFormFieldName('');
+          await opts.loadFormFields(opts.filePath);
+        },
+        toast: 'Form field added',
+      });
+      return;
+    }
+    if (opts.highlightMode) {
+      void opts.runEdit({
+        command: 'add_highlight',
+        args: endpoints,
+        afterEdit: async () => { await opts.refreshAnnotations(); },
+        toast: 'Highlight added',
+      });
+      return;
+    }
+    if (opts.shapeMode && !isLineShape(opts.shapeKind)) {
+      void opts.runEdit({
+        command: opts.shapeKind === 'circle' ? 'add_circle' : 'add_square',
+        args: endpoints,
+        afterEdit: async () => { await opts.refreshAnnotations(); },
+        toast: opts.shapeKind === 'circle' ? 'Ellipse added' : 'Rectangle added',
+      });
+    }
+  }, [opts]);
+
+  const finishDrawing = useCallback((end: DrawPoint) => {
+    const start = opts.highlightStart;
+    if (!start) return;
+    opts.cancelDrawing();
+    dragStateRef.current.phase = 'idle';
+    dragStateRef.current.armedByThisDown = false;
+
+    if ((opts.shapeMode || opts.vectorEditMode) && isLineShape(opts.shapeKind)) {
+      if (Math.hypot(end.x - start.x, end.y - start.y) < 5) return;
+      if (opts.vectorEditMode) {
+        opts.pdfEdit.startDrawingShape({
+          pageIndex: opts.currentPage,
+          kind: opts.shapeKind,
+          geometry: { type: 'line', line: { x1: start.x, y1: start.y, x2: end.x, y2: end.y } },
+        });
+        return;
+      }
+      void opts.runEdit({
+        command: opts.shapeKind === 'arrow' ? 'add_arrow' : 'add_line',
+        args: { pageIndex: opts.currentPage, x1: start.x, y1: start.y, x2: end.x, y2: end.y },
+        afterEdit: async () => { await opts.refreshAnnotations(); },
+        toast: opts.shapeKind === 'arrow' ? 'Arrow added' : 'Line added',
+      });
+      return;
+    }
+    commitRectDrawing(rectBetween(start, end));
+  }, [commitRectDrawing, opts]);
 
   const handleDrawMouseUp = useCallback((e: React.MouseEvent) => {
     if (opts.drawMode && opts.inkDrawing) {
@@ -163,133 +279,9 @@ export function usePageInteractionHandlers(opts: PageInteractionHandlerOptions) 
       opts.commitInkStroke(points);
       return;
     }
-
-    if (!opts.drawing || !opts.highlightStart) return;
-
-    const isRectMode = opts.highlightMode || opts.shapeMode || opts.redactMode || opts.imageInsertMode || opts.vectorEditMode || opts.formAddMode;
-    if (!isRectMode) return;
-
-    const coords = getImageCoords(e.clientX, e.clientY);
-    const start = opts.highlightStart;
-
-    if (dragStateRef.current.phase === 'dragging') {
-      // Drag commit
-      if (opts.shapeMode && opts.shapeKind === 'line') {
-        const dist = Math.hypot(coords.x - start.x, coords.y - start.y);
-        opts.setDrawing(false);
-        opts.setHighlightStart(null);
-        opts.setShapeLineEnd(null);
-        dragStateRef.current.phase = 'idle';
-        dragStateRef.current.armedByThisDown = false;
-        if (dist >= 5) {
-          void opts.runEdit({
-            command: 'add_line',
-            args: { pageIndex: opts.currentPage, x1: start.x, y1: start.y, x2: coords.x, y2: coords.y },
-            afterEdit: async () => { await opts.refreshAnnotations(); },
-            toast: 'Line added',
-          });
-        }
-        return;
-      }
-
-      const rect = {
-        x: Math.min(start.x, coords.x),
-        y: Math.min(start.y, coords.y),
-        w: Math.abs(coords.x - start.x),
-        h: Math.abs(coords.y - start.y),
-      };
-
-      let minW = 5;
-      let minH = 5;
-      if (opts.formAddMode) { minW = 20; minH = 10; }
-      else if (opts.vectorEditMode) { minW = 4; minH = 4; }
-
-      opts.setDrawing(false);
-      opts.setHighlightStart(null);
-      opts.setHighlightRect(null);
-      dragStateRef.current.phase = 'idle';
-      dragStateRef.current.armedByThisDown = false;
-
-      if (rect.w < minW || rect.h < minH) return;
-
-      if (opts.redactMode) {
-        void opts.runEdit({
-          command: 'add_redaction',
-          args: { pageIndex: opts.currentPage, x1: rect.x, y1: rect.y, x2: rect.x + rect.w, y2: rect.y + rect.h },
-          afterEdit: async () => { await opts.refreshAnnotations(); },
-          toast: 'Redaction added',
-        });
-      } else if (opts.imageInsertMode) {
-        if (!opts.imageSourcePath) return;
-        void opts.runEdit({
-          command: 'add_page_image',
-          args: {
-            pageIndex: opts.currentPage,
-            x: rect.x,
-            y: rect.y,
-            width: rect.w,
-            height: rect.h,
-            imagePath: opts.imageSourcePath,
-          },
-          afterEdit: async () => { await opts.renderPage(opts.filePath, opts.currentPage); },
-          toast: 'Image inserted',
-        });
-      } else if (opts.vectorEditMode) {
-        void opts.runEdit<number>({
-          command: 'add_page_vector_rect',
-          args: { pageIndex: opts.currentPage, x: rect.x, y: rect.y, width: rect.w, height: rect.h },
-          afterEdit: async () => { await opts.renderPage(opts.filePath, opts.currentPage); },
-          toast: 'Vector shape added',
-          onSuccess: (index) => opts.pdfEdit.startEditingVector({
-            pageIndex: opts.currentPage,
-            index,
-            pageRect: rect,
-          }),
-        });
-      } else if (opts.formAddMode) {
-        if (!opts.newFormFieldName.trim()) return;
-        const base = { pageIndex: opts.currentPage, x: rect.x, y: rect.y, width: rect.w, height: rect.h };
-        let command: string;
-        let args: Record<string, unknown>;
-        if (opts.newFormFieldKind === 'choice') {
-          const options = opts.newFormFieldOptions.split(',').map((o) => o.trim()).filter(Boolean);
-          command = 'add_choice_form_field';
-          args = { ...base, name: opts.newFormFieldName.trim(), options, combo: true };
-        } else {
-          command = 'add_text_form_field';
-          args = { ...base, name: opts.newFormFieldName.trim() };
-        }
-        void opts.runEdit({
-          command,
-          args,
-          afterEdit: async () => {
-            opts.setFormAddMode(false);
-            opts.setShowAddFormFieldModal(false);
-            opts.setNewFormFieldName('');
-            await opts.loadFormFields(opts.filePath);
-          },
-          toast: 'Form field added',
-        });
-      } else if (opts.highlightMode) {
-        void opts.runEdit({
-          command: 'add_highlight',
-          args: { pageIndex: opts.currentPage, x1: rect.x, y1: rect.y, x2: rect.x + rect.w, y2: rect.y + rect.h },
-          afterEdit: async () => { await opts.refreshAnnotations(); },
-          toast: 'Highlight added',
-        });
-      } else if (opts.shapeMode) {
-        void opts.runEdit({
-          command: opts.shapeKind === 'circle' ? 'add_circle' : 'add_square',
-          args: { pageIndex: opts.currentPage, x1: rect.x, y1: rect.y, x2: rect.x + rect.w, y2: rect.y + rect.h },
-          afterEdit: async () => { await opts.refreshAnnotations(); },
-          toast: opts.shapeKind === 'circle' ? 'Ellipse added' : 'Rectangle added',
-        });
-      }
-    } else if (dragStateRef.current.phase === 'armed') {
-      // No significant drag - stay armed for click-click fallback
-      // Do NOT disarm; the next click (handled in handlePageClick) will commit
-    }
-  }, [opts, getImageCoords]);
+    if (!opts.drawing || !opts.highlightStart || dragStateRef.current.phase !== 'dragging') return;
+    finishDrawing(getImageCoords(e.clientX, e.clientY));
+  }, [finishDrawing, getImageCoords, opts]);
 
   const handlePageClick = useCallback((e: React.MouseEvent) => {
     if (opts.drawMode) return;
@@ -320,114 +312,12 @@ export function usePageInteractionHandlers(opts: PageInteractionHandlerOptions) 
     const isRectMode = opts.highlightMode || opts.shapeMode || opts.redactMode || opts.imageInsertMode || opts.vectorEditMode || opts.formAddMode;
     if (isRectMode) {
       if (!opts.drawing || !opts.highlightStart) return;
+      if (dragStateRef.current.phase !== 'armed') return;
       if (dragStateRef.current.armedByThisDown) {
         dragStateRef.current.armedByThisDown = false;
         return;
       }
-      const coords = getImageCoords(e.clientX, e.clientY);
-      const start = opts.highlightStart;
-
-      if (opts.shapeMode && opts.shapeKind === 'line') {
-        const dist = Math.hypot(coords.x - start.x, coords.y - start.y);
-        opts.cancelDrawing();
-        if (dist < 5) return;
-        void opts.runEdit({
-          command: 'add_line',
-          args: { pageIndex: opts.currentPage, x1: start.x, y1: start.y, x2: coords.x, y2: coords.y },
-          afterEdit: async () => { await opts.refreshAnnotations(); },
-          toast: 'Line added',
-        });
-        return;
-      }
-
-      const rect = {
-        x: Math.min(start.x, coords.x),
-        y: Math.min(start.y, coords.y),
-        w: Math.abs(coords.x - start.x),
-        h: Math.abs(coords.y - start.y),
-      };
-
-      let minW = 5;
-      let minH = 5;
-      if (opts.formAddMode) { minW = 20; minH = 10; }
-      else if (opts.vectorEditMode) { minW = 4; minH = 4; }
-
-      opts.cancelDrawing();
-      if (rect.w < minW || rect.h < minH) return;
-
-      if (opts.redactMode) {
-        void opts.runEdit({
-          command: 'add_redaction',
-          args: { pageIndex: opts.currentPage, x1: rect.x, y1: rect.y, x2: rect.x + rect.w, y2: rect.y + rect.h },
-          afterEdit: async () => { await opts.refreshAnnotations(); },
-          toast: 'Redaction added',
-        });
-      } else if (opts.imageInsertMode) {
-        if (!opts.imageSourcePath) return;
-        void opts.runEdit({
-          command: 'add_page_image',
-          args: {
-            pageIndex: opts.currentPage,
-            x: rect.x,
-            y: rect.y,
-            width: rect.w,
-            height: rect.h,
-            imagePath: opts.imageSourcePath,
-          },
-          afterEdit: async () => { await opts.renderPage(opts.filePath, opts.currentPage); },
-          toast: 'Image inserted',
-        });
-      } else if (opts.vectorEditMode) {
-        void opts.runEdit<number>({
-          command: 'add_page_vector_rect',
-          args: { pageIndex: opts.currentPage, x: rect.x, y: rect.y, width: rect.w, height: rect.h },
-          afterEdit: async () => { await opts.renderPage(opts.filePath, opts.currentPage); },
-          toast: 'Vector shape added',
-          onSuccess: (index) => opts.pdfEdit.startEditingVector({
-            pageIndex: opts.currentPage,
-            index,
-            pageRect: rect,
-          }),
-        });
-      } else if (opts.formAddMode) {
-        if (!opts.newFormFieldName.trim()) return;
-        const base = { pageIndex: opts.currentPage, x: rect.x, y: rect.y, width: rect.w, height: rect.h };
-        let command: string;
-        let args: Record<string, unknown>;
-        if (opts.newFormFieldKind === 'choice') {
-          const options = opts.newFormFieldOptions.split(',').map((o) => o.trim()).filter(Boolean);
-          command = 'add_choice_form_field';
-          args = { ...base, name: opts.newFormFieldName.trim(), options, combo: true };
-        } else {
-          command = 'add_text_form_field';
-          args = { ...base, name: opts.newFormFieldName.trim() };
-        }
-        void opts.runEdit({
-          command,
-          args,
-          afterEdit: async () => {
-            opts.setFormAddMode(false);
-            opts.setShowAddFormFieldModal(false);
-            opts.setNewFormFieldName('');
-            await opts.loadFormFields(opts.filePath);
-          },
-          toast: 'Form field added',
-        });
-      } else if (opts.highlightMode) {
-        void opts.runEdit({
-          command: 'add_highlight',
-          args: { pageIndex: opts.currentPage, x1: rect.x, y1: rect.y, x2: rect.x + rect.w, y2: rect.y + rect.h },
-          afterEdit: async () => { await opts.refreshAnnotations(); },
-          toast: 'Highlight added',
-        });
-      } else if (opts.shapeMode) {
-        void opts.runEdit({
-          command: opts.shapeKind === 'circle' ? 'add_circle' : 'add_square',
-          args: { pageIndex: opts.currentPage, x1: rect.x, y1: rect.y, x2: rect.x + rect.w, y2: rect.y + rect.h },
-          afterEdit: async () => { await opts.refreshAnnotations(); },
-          toast: opts.shapeKind === 'circle' ? 'Ellipse added' : 'Rectangle added',
-        });
-      }
+      finishDrawing(getImageCoords(e.clientX, e.clientY));
       return;
     }
 
@@ -448,7 +338,7 @@ export function usePageInteractionHandlers(opts: PageInteractionHandlerOptions) 
       opts.setShowNoteModal(true);
       return;
     }
-  }, [opts, getImageCoords]);
+  }, [finishDrawing, opts, getImageCoords]);
 
   const handlePageMouseMove = useCallback((e: React.MouseEvent) => {
     if (opts.drawMode && opts.inkDrawing) {
@@ -478,7 +368,7 @@ export function usePageInteractionHandlers(opts: PageInteractionHandlerOptions) 
       }
     }
 
-    if (opts.shapeMode && opts.shapeKind === 'line') {
+    if ((opts.shapeMode || opts.vectorEditMode) && isLineShape(opts.shapeKind)) {
       opts.setShapeLineEnd(coords);
       return;
     }

@@ -1,7 +1,9 @@
 import type { ReactNode } from 'react';
-import type { PdfEditState, TextStyle } from '../app/usePdfEditState';
+import type { ShapeKind } from '../app/constants';
+import type { PdfEditState, RgbColor, TextStyle } from '../app/usePdfEditState';
 import { fileNameFromPath } from '../app/utils';
 import { EditToolbar } from './EditToolbar';
+import { ShapeKindPicker } from './ShapeKindPicker';
 
 export type EditRibbonTabProps = {
   pdfEdit: PdfEditState;
@@ -12,6 +14,8 @@ export type EditRibbonTabProps = {
   onInsertEditImage?: () => void;
   vectorEditMode: boolean;
   onToggleVectorEditMode: () => void;
+  shapeKind: ShapeKind;
+  onShapeKindChange: (kind: ShapeKind) => void;
   imageInsertMode: boolean;
   imageSourcePath: string;
   onOpenImageInsertModal: () => void;
@@ -90,6 +94,22 @@ function ContextAction({
   );
 }
 
+function colorToHex(color: RgbColor): string {
+  const part = (value: number) => Math.max(0, Math.min(255, Math.round(value))).toString(16).padStart(2, '0');
+  return `#${part(color.r)}${part(color.g)}${part(color.b)}`;
+}
+
+function hexToRgb(value: string): RgbColor {
+  const hex = value.replace('#', '');
+  const int = Number.parseInt(hex, 16);
+  if (Number.isNaN(int)) return { r: 255, g: 0, b: 0 };
+  return {
+    r: (int >> 16) & 255,
+    g: (int >> 8) & 255,
+    b: int & 255,
+  };
+}
+
 export function EditRibbonTab({
   pdfEdit,
   onToggleEditMode,
@@ -99,6 +119,8 @@ export function EditRibbonTab({
   onInsertEditImage,
   vectorEditMode,
   onToggleVectorEditMode,
+  shapeKind,
+  onShapeKindChange,
   imageInsertMode,
   imageSourcePath,
   onOpenImageInsertModal,
@@ -140,7 +162,40 @@ export function EditRibbonTab({
         </div>
         <div className="ribbon-group pdf-edit-tool-group" role="group" aria-label="Graphics">
           <div className="ribbon-group-controls">
-            <EditTool label="Edit Vector" icon="vector" active={vectorEditMode} onClick={onToggleVectorEditMode} testId="vector" />
+            <EditTool label="Shapes" icon="vector" active={vectorEditMode} onClick={onToggleVectorEditMode} testId="vector" />
+            {vectorEditMode && (
+              <ShapeKindPicker
+                value={shapeKind}
+                onChange={onShapeKindChange}
+                ariaLabel="Edit shape kind"
+                className="edit-shape-kind-toggle"
+              />
+            )}
+            {vectorEditMode && (
+              <div className="shape-kind-toggle edit-shape-style-toggle" role="group" aria-label="Shape appearance">
+                <label className="pdf-edit-compact-field" title="Stroke color">
+                  <span>Stroke</span>
+                  <input
+                    type="color"
+                    value={colorToHex(pdfEdit.shapeStyle.strokeColor)}
+                    onChange={(e) => pdfEdit.updateShapeStyle({ strokeColor: hexToRgb(e.target.value) })}
+                    aria-label="Shape stroke color"
+                  />
+                </label>
+                <label className="pdf-edit-compact-field" title="Stroke width">
+                  <span>Width</span>
+                  <select
+                    value={String(pdfEdit.shapeStyle.strokeWidth)}
+                    onChange={(e) => pdfEdit.updateShapeStyle({ strokeWidth: Number(e.target.value) })}
+                    aria-label="Shape stroke width"
+                  >
+                    {[1, 2, 3, 4, 6, 8, 12].map((width) => (
+                      <option key={width} value={String(width)}>{width}px</option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+            )}
           </div>
           <span className="ribbon-group-label">Graphics</span>
         </div>
@@ -154,7 +209,7 @@ export function EditRibbonTab({
           {editTextRunMode && 'Click existing text to edit.'}
           {pdfEdit.editMode && !pdfEdit.textDraft && !pdfEdit.paragraphDraft && !pdfEdit.imageDraft &&
             (addingText ? 'Click the page to place text.' : 'Click text or an image to select it.')}
-          {vectorEditMode && !pdfEdit.vectorDraft && 'Click a vector to edit, or drag empty space to draw a rectangle.'}
+          {vectorEditMode && !pdfEdit.vectorDraft && !pdfEdit.shapeDraft && 'Click a legacy vector to edit, or drag empty space to draw a shape. Apply commits it; Cancel discards it.'}
           {!editTextRunMode && !pdfEdit.editMode && !vectorEditMode && 'Choose a tool, then click the page.'}
         </div>
       </div>
@@ -222,6 +277,20 @@ export function EditRibbonTab({
           <span className="pdf-edit-context-help">Drag to move/resize. Arrow keys nudge; Shift moves 10 px.</span>
           <div className="pdf-edit-context-actions">
             <ContextAction label="Delete" icon="delete" onClick={pdfEdit.onDeleteVector} tone="danger" />
+            <ContextAction label="Cancel" icon="close" onClick={pdfEdit.onCancel} />
+            <ContextAction label="Apply" icon="apply" onClick={pdfEdit.onApply} tone="primary" />
+          </div>
+        </div>
+      )}
+
+      {pdfEdit.shapeDraft && (
+        <div className="pdf-edit-context" role="toolbar" aria-label="Shape editing toolbar">
+          <span className="pdf-edit-context-label">
+            {pdfEdit.shapeDraft.kind === 'circle' ? 'Ellipse' : pdfEdit.shapeDraft.kind === 'line' ? 'Line' : pdfEdit.shapeDraft.kind === 'arrow' ? 'Arrow' : 'Rectangle'}
+          </span>
+          <span className="pdf-edit-context-help">Drag to move/resize. Arrow keys nudge; Shift moves 10 px. Apply commits the annotation.</span>
+          <div className="pdf-edit-context-actions">
+            <ContextAction label="Delete" icon="delete" onClick={pdfEdit.onDeleteShape} tone="danger" />
             <ContextAction label="Cancel" icon="close" onClick={pdfEdit.onCancel} />
             <ContextAction label="Apply" icon="apply" onClick={pdfEdit.onApply} tone="primary" />
           </div>

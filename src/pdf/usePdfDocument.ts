@@ -12,9 +12,11 @@ export interface PdfAnnotation {
   subtype: string;
   rect: [number, number, number, number];
   color: [number, number, number] | null;
+  stroke_width: number | null;
   contents: string | null;
   ink_points: number[] | null;
   line_endpoints: [number, number, number, number] | null;
+  line_endings: [string, string] | null;
   stamp_kind: string | null;
   stamp_preset: string | null;
   is_redaction: boolean;

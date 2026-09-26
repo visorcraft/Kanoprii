@@ -27,7 +27,7 @@ const GROUPED_ROWS: { label: string; commandIds: ShortcutCommandId[] }[] = [
   { label: 'Sign PDF', commandIds: ['sign-pdf'] },
   { label: 'Delete page', commandIds: ['delete-page'] },
   { label: 'Highlight / Note / Draw / Shape / Stamp / Redact', commandIds: ['toggle-highlight', 'toggle-note', 'toggle-draw', 'toggle-shape', 'toggle-stamp', 'toggle-redact'] },
-  { label: 'Add text / Edit objects / Edit vector / Add image', commandIds: ['toggle-text-edit', 'toggle-pdf-edit', 'toggle-vector-edit', 'toggle-image-insert'] },
+  { label: 'Add text / Edit objects / Shapes / Add image', commandIds: ['toggle-text-edit', 'toggle-pdf-edit', 'toggle-vector-edit', 'toggle-image-insert'] },
   { label: 'Forms panel', commandIds: ['toggle-forms'] },
   { label: 'Previous / next page', commandIds: ['previous-page', 'next-page'] },
   { label: 'First / last page', commandIds: ['first-page', 'last-page'] },

@@ -1,13 +1,26 @@
 use lopdf::{Document, Object, ObjectId};
 
 pub fn page_rotation(doc: &Document, page_id: ObjectId) -> i64 {
-    doc.get_dictionary(page_id).ok().and_then(|d| d.get(b"Rotate").ok()).and_then(|o| o.as_i64().ok()).unwrap_or(0)
+    let rotation = doc
+        .get_dictionary(page_id)
+        .ok()
+        .and_then(|d| d.get(b"Rotate").ok().cloned())
+        .or_else(|| crate::pdf::page_tree::inherited_page_attr(doc, page_id, b"Rotate"));
+    match rotation {
+        Some(Object::Reference(id)) => doc.get_object(id).ok().and_then(|o| o.as_i64().ok()).unwrap_or(0),
+        Some(value) => value.as_i64().unwrap_or(0),
+        None => 0,
+    }
 }
 
 pub fn set_page_rotation(doc: &mut Document, page_id: ObjectId, rotation: i64) -> Result<(), String> {
     let normalized = rotation.rem_euclid(360);
     if normalized == 0 {
-        doc.get_dictionary_mut(page_id).map_err(|e| e.to_string())?.remove(b"Rotate");
+        if crate::pdf::page_tree::inherited_page_attr(doc, page_id, b"Rotate").is_some() {
+            doc.get_dictionary_mut(page_id).map_err(|e| e.to_string())?.set(b"Rotate", Object::Integer(0));
+        } else {
+            doc.get_dictionary_mut(page_id).map_err(|e| e.to_string())?.remove(b"Rotate");
+        }
     } else {
         doc.get_dictionary_mut(page_id).map_err(|e| e.to_string())?.set(b"Rotate", Object::Integer(normalized));
     }

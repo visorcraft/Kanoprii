@@ -17,6 +17,7 @@ import { TextEditOverlay } from './TextEditOverlay';
 import { RichTextEditOverlay } from './RichTextEditOverlay';
 import { ImageSelectionOverlay } from './ImageSelectionOverlay';
 import { ParagraphSelectionOverlay } from './ParagraphSelectionOverlay';
+import { ObjectSelectionOverlay } from './ObjectSelectionOverlay';
 import type { PdfEditState } from '../app/usePdfEditState';
 
 type PdfPageViewProps = {
@@ -241,13 +242,49 @@ function PdfPageViewInner({
               )}
             {pdfEdit?.vectorDraft &&
               pdfEdit.vectorDraft.pageIndex === currentPage && (
-                <ParagraphSelectionOverlay
-                  draft={pdfEdit.vectorDraft}
+                <ObjectSelectionOverlay
+                  kind="box"
+                  rect={pdfEdit.vectorDraft.pageRect}
                   zoom={zoom * fitScale}
-                  onUpdate={({ pageRect }) => pdfEdit.onUpdateVectorRect(pageRect)}
+                  ariaLabel="Legacy vector selection"
+                  onUpdate={pdfEdit.onUpdateVectorRect}
+                  onApply={pdfEdit.onApply}
                   onDelete={pdfEdit.onDeleteVector}
                   onCancel={pdfEdit.onCancel}
-                  ariaLabel="Vector selection"
+                />
+              )}
+            {pdfEdit?.shapeDraft &&
+              pdfEdit.shapeDraft.pageIndex === currentPage &&
+              pdfEdit.shapeDraft.geometry.type === 'box' && (
+                <ObjectSelectionOverlay
+                  kind="box"
+                  rect={pdfEdit.shapeDraft.geometry.rect}
+                  boxShape={pdfEdit.shapeDraft.kind === 'circle' ? 'ellipse' : 'rectangle'}
+                  strokeColor={pdfEdit.shapeDraft.style.strokeColor}
+                  strokeWidth={pdfEdit.shapeDraft.style.strokeWidth}
+                  zoom={zoom * fitScale}
+                  ariaLabel={`${pdfEdit.shapeDraft.kind === 'circle' ? 'Ellipse' : 'Rectangle'} shape selection`}
+                  onUpdate={pdfEdit.onUpdateShapeBox}
+                  onApply={pdfEdit.onApply}
+                  onDelete={pdfEdit.onDeleteShape}
+                  onCancel={pdfEdit.onCancel}
+                />
+              )}
+            {pdfEdit?.shapeDraft &&
+              pdfEdit.shapeDraft.pageIndex === currentPage &&
+              pdfEdit.shapeDraft.geometry.type === 'line' && (
+                <ObjectSelectionOverlay
+                  kind="line"
+                  line={pdfEdit.shapeDraft.geometry.line}
+                  zoom={zoom * fitScale}
+                  arrowEnd={pdfEdit.shapeDraft.kind === 'arrow'}
+                  strokeColor={pdfEdit.shapeDraft.style.strokeColor}
+                  strokeWidth={pdfEdit.shapeDraft.style.strokeWidth}
+                  ariaLabel={pdfEdit.shapeDraft.kind === 'arrow' ? 'Arrow shape selection' : 'Line shape selection'}
+                  onUpdate={pdfEdit.onUpdateShapeLine}
+                  onApply={pdfEdit.onApply}
+                  onDelete={pdfEdit.onDeleteShape}
+                  onCancel={pdfEdit.onCancel}
                 />
               )}
             {pdfEdit?.paragraphDraft &&
@@ -288,6 +325,7 @@ function PdfPageViewInner({
               redactMode={redactMode}
               imageInsertMode={imageInsertMode}
               vectorEditMode={vectorEditMode}
+              editShapeStyle={pdfEdit?.shapeStyle}
               formAddMode={formAddMode}
               shapeKind={shapeKind}
               drawing={drawing}

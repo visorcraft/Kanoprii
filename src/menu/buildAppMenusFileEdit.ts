@@ -60,7 +60,7 @@ export function buildFileEditMenus(ctx: AppMenuContext): { fileMenu: MenuRoot; e
         shortcutCommandId: 'toggle-image-insert',
         active: ctx.imageInsertMode,
       }),
-      act('vector', ctx.vectorEditMode ? 'Edit vector (on)' : 'Edit vector', ctx.toggleVectorEditMode, {
+      act('vector', ctx.vectorEditMode ? 'Shapes (on)' : 'Shapes', ctx.toggleVectorEditMode, {
         shortcutCommandId: 'toggle-vector-edit',
         active: ctx.vectorEditMode,
       }),

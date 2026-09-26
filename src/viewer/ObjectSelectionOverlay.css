@@ -1,0 +1,85 @@
+.object-selection-overlay {
+  position: absolute;
+  box-sizing: border-box;
+  cursor: move;
+  outline: none;
+  z-index: 18;
+}
+
+.object-selection-frame {
+  position: absolute;
+  inset: 0;
+  border: 2px solid #2563eb;
+  background: rgba(37, 99, 235, 0.08);
+  pointer-events: none;
+}
+
+.object-selection-overlay.moving .object-selection-frame {
+  background: rgba(37, 99, 235, 0.14);
+}
+
+.object-selection-handle {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  padding: 0;
+  margin: -5px 0 0 -5px;
+  border: 2px solid #fff;
+  border-radius: 999px;
+  background: #2563eb;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.35);
+}
+
+.object-selection-handle:focus-visible,
+.object-selection-line-handle:focus-visible {
+  outline: 3px solid var(--pp-focus-ring, #f59e0b);
+  outline-offset: 2px;
+}
+
+.object-selection-handle-nw { left: 0; top: 0; cursor: nwse-resize; }
+.object-selection-handle-n { left: 50%; top: 0; cursor: ns-resize; }
+.object-selection-handle-ne { left: 100%; top: 0; cursor: nesw-resize; }
+.object-selection-handle-e { left: 100%; top: 50%; cursor: ew-resize; }
+.object-selection-handle-se { left: 100%; top: 100%; cursor: nwse-resize; }
+.object-selection-handle-s { left: 50%; top: 100%; cursor: ns-resize; }
+.object-selection-handle-sw { left: 0; top: 100%; cursor: nesw-resize; }
+.object-selection-handle-w { left: 0; top: 50%; cursor: ew-resize; }
+
+.object-selection-line-layer {
+  position: absolute;
+  inset: 0;
+  width: 800px;
+  height: 1132px;
+  overflow: visible;
+  outline: none;
+  z-index: 18;
+}
+
+.object-selection-line-hit {
+  stroke: transparent;
+  stroke-width: 14;
+  stroke-linecap: round;
+  cursor: move;
+}
+
+.object-selection-line {
+  stroke: currentColor;
+  stroke-linecap: round;
+  pointer-events: none;
+}
+
+.object-selection-arrow-head {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.object-selection-line-handle {
+  fill: #2563eb;
+  stroke: #fff;
+  stroke-width: 2;
+  cursor: pointer;
+  filter: drop-shadow(0 1px 2px rgba(15, 23, 42, 0.35));
+}
