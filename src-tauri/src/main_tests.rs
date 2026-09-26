@@ -549,15 +549,16 @@ fn merge_pdf_rejects_missing_source_file() {
 
 #[test]
 fn pdf_rect_to_viewer_px_maps_origin_and_scale() {
-    use pdf::coords::pdf_rect_to_viewer_px;
+    use pdf::coords::{pdf_rect_to_viewer_px, VIEWER_PAGE_W};
     use pdf::search::pdf_rect_to_search_pixels;
     use pdfium_render::prelude::*;
 
+    // Letter 612×792 aspect-fits to 1600×2071 inside the 1600×2264 viewer box.
     let full = pdf_rect_to_viewer_px(0.0, 0.0, 612.0, 792.0, 612.0, 792.0);
     assert!((full[0] - 0.0).abs() < 0.01);
-    assert!((full[2] - 800.0).abs() < 0.01);
+    assert!((full[2] - VIEWER_PAGE_W).abs() < 0.01);
     assert!((full[1] - 0.0).abs() < 0.01);
-    assert!((full[3] - 1132.0).abs() < 0.01);
+    assert!((full[3] - 2071.0).abs() < 0.01);
 
     let rect = PdfRect::new(PdfPoints::new(100.0), PdfPoints::new(72.0), PdfPoints::new(200.0), PdfPoints::new(180.0));
     let from_search = pdf_rect_to_search_pixels(rect, 612.0, 792.0);
@@ -965,7 +966,8 @@ fn crop_page_sets_crop_box() {
 #[test]
 fn crop_page_rejects_excessive_margins() {
     let path = save(&mut build_pdf(1), "crop_excess");
-    let err = crop_page(path.clone(), 0, 600.0, 600.0, 600.0, 600.0).unwrap_err();
+    // Margins are viewer pixels; letter fits ~1600×2071, so 600/side still leaves a box.
+    let err = crop_page(path.clone(), 0, 1200.0, 1200.0, 1200.0, 1200.0).unwrap_err();
     assert!(err.contains("too large"));
     let _ = std::fs::remove_file(&path);
 }
@@ -20402,13 +20404,14 @@ fn add_text_box_wraps_text_and_appends_to_page() {
         color: RgbColor { r: 0.0, g: 0.0, b: 0.0 },
         align: "left".to_string(),
     };
-    let box_rect = PdfRect { x: 72.0, y: 72.0, width: 100.0, height: 200.0 };
+    // Viewer coords (2× the pre-1.20 box) so wrap still yields two lines at 12pt.
+    let box_rect = PdfRect { x: 144.0, y: 144.0, width: 200.0, height: 400.0 };
     add_text_box(&mut doc, 0, "Hello world wide text", &style, &box_rect).unwrap();
 
     let page_id = *doc.get_pages().get(&1).unwrap();
     let content = String::from_utf8_lossy(&read_page_content(&doc, page_id).unwrap()).into_owned();
-    assert!(content.contains("Hello world"), "first wrapped line should appear");
-    assert!(content.contains("wide text"), "second wrapped line should appear");
+    assert!(content.contains("Hello world"), "first wrapped line should appear: {content}");
+    assert!(content.contains("wide text"), "second wrapped line should appear: {content}");
 
     std::fs::remove_file(&path).ok();
 }

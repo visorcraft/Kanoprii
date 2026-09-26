@@ -795,7 +795,8 @@ mod tests {
 
     #[test]
     fn pdfium_text_region_can_be_replaced_or_deleted() {
-        let source = PdfRect { x: 100.0, y: 100.0, width: 120.0, height: 30.0 };
+        // Viewer-space rect sized for the 1600×2264 frame (was 100×30 at 800×1132).
+        let source = PdfRect { x: 200.0, y: 200.0, width: 240.0, height: 60.0 };
         let style = style_with_align("left");
         let (mut edited, edited_page) = build_doc_with_text("BT /F1 12 Tf 1 0 0 1 100 700 Tm (Hidden) Tj ET");
         edit_text_region(&mut edited, 0, &source, "Replacement", &style, &source).unwrap();
@@ -868,8 +869,15 @@ mod tests {
         let (mut doc, page_id, content_id) = build_doc_with_image();
         doc.get_dictionary_mut(page_id).unwrap().set(b"Rotate", Object::Integer(90));
 
-        transform_page_image_viewer(&mut doc, 0, 0, &PdfRect { x: 0.0, y: 0.0, width: 800.0, height: 1132.0 }, 0.0)
-            .unwrap();
+        // Rotated letter display is 792×612 → aspect-fit 1600×1236 in the viewer box.
+        transform_page_image_viewer(
+            &mut doc,
+            0,
+            0,
+            &PdfRect { x: 0.0, y: 0.0, width: 1600.0, height: 1236.0 },
+            0.0,
+        )
+        .unwrap();
 
         let decoded = doc.get_object(content_id).unwrap().as_stream().unwrap().decode_content().unwrap();
         let cm = decoded
