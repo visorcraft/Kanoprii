@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ImageEditDraft, Rect } from '../app/usePdfEditState';
-import { VIEWER_PAGE_H, VIEWER_PAGE_W } from '../app/constants';
+import { activeViewerPageH, activeViewerPageW } from './viewerPageMetrics';
 import './ImageSelectionOverlay.css';
 
 type ImageSelectionOverlayProps = {
@@ -22,10 +22,10 @@ function clamp(value: number, min: number, max: number): number {
 }
 
 function clampRect(rect: Rect): Rect {
-  const x = clamp(rect.x, 0, VIEWER_PAGE_W - MIN_SIZE);
-  const y = clamp(rect.y, 0, VIEWER_PAGE_H - MIN_SIZE);
-  const maxW = VIEWER_PAGE_W - x;
-  const maxH = VIEWER_PAGE_H - y;
+  const x = clamp(rect.x, 0, activeViewerPageW() - MIN_SIZE);
+  const y = clamp(rect.y, 0, activeViewerPageH() - MIN_SIZE);
+  const maxW = activeViewerPageW() - x;
+  const maxH = activeViewerPageH() - y;
   const w = clamp(rect.w, MIN_SIZE, maxW);
   const h = clamp(rect.h, MIN_SIZE, maxH);
   return { x, y, w, h };
@@ -37,9 +37,9 @@ function resizeRect(start: Rect, kind: ResizeHandle, dx: number, dy: number, pre
   let right = start.x + start.w;
   let bottom = start.y + start.h;
   if (kind.includes('w')) left = clamp(left + dx, 0, right - MIN_SIZE);
-  if (kind.includes('e')) right = clamp(right + dx, left + MIN_SIZE, VIEWER_PAGE_W);
+  if (kind.includes('e')) right = clamp(right + dx, left + MIN_SIZE, activeViewerPageW());
   if (kind.includes('n')) top = clamp(top + dy, 0, bottom - MIN_SIZE);
-  if (kind.includes('s')) bottom = clamp(bottom + dy, top + MIN_SIZE, VIEWER_PAGE_H);
+  if (kind.includes('s')) bottom = clamp(bottom + dy, top + MIN_SIZE, activeViewerPageH());
 
   if (preserveRatio && kind.length === 2 && start.h > 0) {
     const ratio = start.w / start.h;
@@ -47,8 +47,8 @@ function resizeRect(start: Rect, kind: ResizeHandle, dx: number, dy: number, pre
     let h = bottom - top;
     if (Math.abs(w - start.w) >= Math.abs(h - start.h) * ratio) h = w / ratio;
     else w = h * ratio;
-    const maxW = kind.includes('w') ? start.x + start.w : VIEWER_PAGE_W - start.x;
-    const maxH = kind.includes('n') ? start.y + start.h : VIEWER_PAGE_H - start.y;
+    const maxW = kind.includes('w') ? start.x + start.w : activeViewerPageW() - start.x;
+    const maxH = kind.includes('n') ? start.y + start.h : activeViewerPageH() - start.y;
     const scale = Math.min(1, maxW / w, maxH / h);
     w *= scale;
     h *= scale;

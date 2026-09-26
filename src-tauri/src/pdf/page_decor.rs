@@ -1,5 +1,6 @@
 use crate::pdf::content::append_page_content;
-use crate::pdf::coords::{page_media_box, VIEWER_PAGE_H, VIEWER_PAGE_W};
+use crate::pdf::coords::{page_media_box, viewer_size_for_media};
+use crate::pdf::rotation::page_rotation;
 use crate::pdf::page_text::{ensure_helvetica_font, escape_pdf_literal_string, viewer_point_to_pdf};
 use lopdf::{Dictionary, Document, Object, ObjectId, Stream};
 use std::path::Path;
@@ -278,8 +279,9 @@ pub fn build_page_border_ops(doc: &Document, page_id: ObjectId, inset: f64) -> R
     if mw <= 0.0 || mh <= 0.0 {
         return Err("Invalid page size".to_string());
     }
-    let pad_x = inset * mw / VIEWER_PAGE_W;
-    let pad_y = inset * mh / VIEWER_PAGE_H;
+    let (vw, vh) = viewer_size_for_media(mw, mh, page_rotation(doc, page_id));
+    let pad_x = inset * mw / vw;
+    let pad_y = inset * mh / vh;
     let x = media[0] + pad_x;
     let y = media[1] + pad_y;
     let w = mw - 2.0 * pad_x;

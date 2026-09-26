@@ -473,8 +473,8 @@ body {
 .birdseye-page img {
   display: block;
   width: 100%;
-  aspect-ratio: 100 / 141;
-  object-fit: cover;
+  height: auto;
+  object-fit: contain;
   border-radius: 6px;
   background: #ffffff;
 }
@@ -1591,7 +1591,7 @@ body {
   display: flex;
   justify-content: center;
   content-visibility: auto;
-  contain-intrinsic-size: 824px 1156px;
+  contain-intrinsic-size: 1624px 2288px;
 }
 
 .continuous-page-slot .page-scale {

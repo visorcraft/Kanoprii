@@ -35,7 +35,7 @@ export function CropModal({
   return (
     <Modal onClose={onClose}>
       <h3>Crop {applyAll ? 'All Pages' : `Page ${currentPage + 1}`}</h3>
-      <p className="modal-help">Trim margins (viewer pixels, max ~800×1132).</p>
+      <p className="modal-help">Trim margins (viewer pixels, max ~1600×2264).</p>
       {pageWidth !== undefined && pageHeight !== undefined && !applyAll && (
         <p className="muted">MediaBox: {Math.round(pageWidth)}×{Math.round(pageHeight)} pt</p>
       )}

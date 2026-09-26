@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { ParagraphEditDraft, Rect, TextEditDraft, TextStyle } from '../app/usePdfEditState';
-import { VIEWER_PAGE_H, VIEWER_PAGE_W } from '../app/constants';
+import { activeViewerPageH, activeViewerPageW } from './viewerPageMetrics';
 import './RichTextEditOverlay.css';
 
 type ResizeHandleKind = 'tl' | 'tr' | 'bl' | 'br';
@@ -29,17 +29,17 @@ function clamp(value: number, min: number, max: number): number {
 }
 
 function comfortableTextRect(rect: Rect, text: string, fontPx: number): Rect {
-  const x = clamp(rect.x, 0, VIEWER_PAGE_W - MIN_W);
-  const y = clamp(rect.y, 0, VIEWER_PAGE_H - MIN_H);
+  const x = clamp(rect.x, 0, activeViewerPageW() - MIN_W);
+  const y = clamp(rect.y, 0, activeViewerPageH() - MIN_H);
   const lineHeight = fontPx * 1.25;
   return {
     x,
     y,
-    w: clamp(Math.max(rect.w, COMFORTABLE_W), MIN_W, VIEWER_PAGE_W - x),
+    w: clamp(Math.max(rect.w, COMFORTABLE_W), MIN_W, activeViewerPageW() - x),
     h: clamp(
       Math.max(rect.h, COMFORTABLE_H, text.split('\n').length * lineHeight + 12),
       MIN_H,
-      VIEWER_PAGE_H - y,
+      activeViewerPageH() - y,
     ),
   };
 }
@@ -64,8 +64,8 @@ function getFixedCorner(rect: Rect, kind: ResizeHandleKind): { x: number; y: num
 function clampMove(rect: Rect): Rect {
   return {
     ...rect,
-    x: clamp(rect.x, 0, VIEWER_PAGE_W - rect.w),
-    y: clamp(rect.y, 0, VIEWER_PAGE_H - rect.h),
+    x: clamp(rect.x, 0, activeViewerPageW() - rect.w),
+    y: clamp(rect.y, 0, activeViewerPageH() - rect.h),
   };
 }
 
@@ -74,14 +74,14 @@ function clampResize(rect: Rect, fixed: { x: number; y: number }, kind: ResizeHa
     case 'br': {
       const x = fixed.x;
       const y = fixed.y;
-      const w = clamp(rect.w, MIN_W, VIEWER_PAGE_W - x);
-      const h = clamp(rect.h, MIN_H, VIEWER_PAGE_H - y);
+      const w = clamp(rect.w, MIN_W, activeViewerPageW() - x);
+      const h = clamp(rect.h, MIN_H, activeViewerPageH() - y);
       return { x, y, w, h };
     }
     case 'tr': {
       const x = fixed.x;
       const y = clamp(rect.y, 0, fixed.y - MIN_H);
-      const w = clamp(rect.w, MIN_W, VIEWER_PAGE_W - x);
+      const w = clamp(rect.w, MIN_W, activeViewerPageW() - x);
       const h = fixed.y - y;
       return { x, y, w, h };
     }
@@ -89,7 +89,7 @@ function clampResize(rect: Rect, fixed: { x: number; y: number }, kind: ResizeHa
       const x = clamp(rect.x, 0, fixed.x - MIN_W);
       const y = fixed.y;
       const w = fixed.x - x;
-      const h = clamp(rect.h, MIN_H, VIEWER_PAGE_H - y);
+      const h = clamp(rect.h, MIN_H, activeViewerPageH() - y);
       return { x, y, w, h };
     }
     case 'tl': {
@@ -113,11 +113,11 @@ export function RichTextEditOverlay({
 }: RichTextEditOverlayProps) {
   const fontPx =
     pageHeightPt && pageHeightPt > 0
-      ? draft.style.fontSize * (VIEWER_PAGE_H / pageHeightPt)
+      ? draft.style.fontSize * (activeViewerPageH() / pageHeightPt)
       : draft.style.fontSize;
   const fontScaleX =
     pageWidthPt && pageHeightPt && pageWidthPt > 0 && pageHeightPt > 0
-      ? (VIEWER_PAGE_W / pageWidthPt) / (VIEWER_PAGE_H / pageHeightPt)
+      ? (activeViewerPageW() / pageWidthPt) / (activeViewerPageH() / pageHeightPt)
       : 1;
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [rect, setRect] = useState<Rect>(() => comfortableTextRect(draft.pageRect, draft.text, fontPx));
@@ -146,7 +146,7 @@ export function RichTextEditOverlay({
     const textarea = textareaRef.current;
     if (!textarea) return;
     const current = rectRef.current;
-    const height = clamp(Math.max(current.h, textarea.scrollHeight + 4), MIN_H, VIEWER_PAGE_H - current.y);
+    const height = clamp(Math.max(current.h, textarea.scrollHeight + 4), MIN_H, activeViewerPageH() - current.y);
     if (height === current.h) return;
     const next = { ...current, h: height };
     updateRect(next);

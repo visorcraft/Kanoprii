@@ -17,7 +17,12 @@ type UseContinuousScrollOptions = {
 };
 
 export function useContinuousScroll(opts: UseContinuousScrollOptions) {
-  const { requestPage, getPageUrl } = usePageRenderQueue(opts.filePath, opts.pdfRevision, opts.showHiddenLayers);
+  const { requestPage, getPageUrl } = usePageRenderQueue(
+    opts.filePath,
+    opts.pdfRevision,
+    opts.showHiddenLayers,
+    opts.pageSizes,
+  );
 
   const onCurrentPageChange = useCallback(
     (page: number) => {

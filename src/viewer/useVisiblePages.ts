@@ -37,7 +37,13 @@ export function useVisiblePages({
   const placeholderHeight = useCallback(
     (page: number) => {
       const size = pageSizes[page];
-      const aspect = size && size.width > 0 ? size.height / size.width : DEFAULT_ASPECT;
+      const pw = size && size.width > 0
+        ? (size.rotation % 180 === 0 ? size.width : size.height)
+        : PDF_BASE_WIDTH;
+      const ph = size && size.height > 0
+        ? (size.rotation % 180 === 0 ? size.height : size.width)
+        : PDF_BASE_HEIGHT;
+      const aspect = pw > 0 ? ph / pw : DEFAULT_ASPECT;
       return PDF_BASE_WIDTH * aspect * zoom + 24;
     },
     [pageSizes, zoom],

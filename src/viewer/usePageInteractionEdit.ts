@@ -2,7 +2,8 @@ import { useCallback } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import type { DocumentSessionData } from '../app/documentSessionTypes';
 import type { PdfEditState, Rect, TextStyle } from '../app/usePdfEditState';
-import { VIEWER_PAGE_H, pageHeightPtFor } from '../app/constants';
+import { pageHeightPtFor } from '../app/constants';
+import { activeViewerPageH } from './viewerPageMetrics';
 import type { PdfPageSize } from '../app/types';
 import { runStructuralEdit, type StructuralEditDeps } from '../pdf/runStructuralEdit';
 import type { PageTextRun } from '../pdf/useTextLayerLoader';
@@ -94,7 +95,7 @@ export function usePageInteractionEdit(deps: UsePageInteractionEditOptions) {
   const fontPxAt = useCallback(
     (pageIndex: number) => {
       const pt = pageHeightPtFor(pageSizes?.[pageIndex]);
-      return pt && pt > 0 ? pdfEdit.style.fontSize * (VIEWER_PAGE_H / pt) : pdfEdit.style.fontSize;
+      return pt && pt > 0 ? pdfEdit.style.fontSize * (activeViewerPageH() / pt) : pdfEdit.style.fontSize;
     },
     [pageSizes, pdfEdit.style.fontSize],
   );

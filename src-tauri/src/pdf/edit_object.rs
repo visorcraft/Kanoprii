@@ -398,7 +398,7 @@ pub fn transform_page_image(
 }
 
 /// Move, resize, or rotate one page-level image occurrence using an
-/// 800x1132 viewer-space rectangle.
+/// Axis-aligned hit bounds after rotation in viewer-space pixels.
 pub fn transform_page_image_viewer(
     doc: &mut Document,
     page_index: u32,

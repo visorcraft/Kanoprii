@@ -4,9 +4,9 @@ import type { SessionViewerCache } from '../app/documentSessionTypes';
 
 // Base resolution each page is rendered at. Zoom is applied as a CSS transform
 // on top of this so the rendered image and the annotation overlays scale
-// together and stay aligned at any zoom level.
-export const PDF_BASE_WIDTH = 800;
-export const PDF_BASE_HEIGHT = 1132;
+// together and stay aligned at any zoom level. Keep in sync with VIEWER_PAGE_*.
+export const PDF_BASE_WIDTH = 1600;
+export const PDF_BASE_HEIGHT = 2264;
 
 export interface PdfAnnotation {
   subtype: string;

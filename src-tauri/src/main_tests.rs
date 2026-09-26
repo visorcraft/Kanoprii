@@ -568,16 +568,30 @@ fn pdf_rect_to_viewer_px_maps_origin_and_scale() {
 }
 
 #[test]
+fn viewer_size_preserves_landscape_aspect() {
+    use pdf::coords::{viewer_size_for_dims, viewer_size_for_media, VIEWER_PAGE_H, VIEWER_PAGE_W};
+
+    let (w, h) = viewer_size_for_dims(960.0, 540.0);
+    assert_eq!(w, VIEWER_PAGE_W);
+    assert_eq!(h, 900.0);
+    assert!((w / h - 960.0 / 540.0).abs() < 1e-9);
+
+    // A4 portrait still fills the legacy viewer box.
+    let (w, h) = viewer_size_for_media(595.0, 842.0, 0);
+    assert_eq!((w, h), (VIEWER_PAGE_W, VIEWER_PAGE_H));
+}
+
+#[test]
 fn viewer_point_to_pdf_rotation_maps_corners() {
-    use pdf::coords::{viewer_point_to_pdf_with_rotation, VIEWER_PAGE_H, VIEWER_PAGE_W};
+    use pdf::coords::{viewer_point_to_pdf_with_rotation, viewer_size_for_media};
 
     // A4 portrait, unrotated MediaBox 595 x 842.
     let (mw, mh) = (595.0_f64, 842.0_f64);
-    let (w, h) = (VIEWER_PAGE_W, VIEWER_PAGE_H);
     let close = |a: f64, b: f64, label: &str| {
         assert!((a - b).abs() < 1e-6, "{label}: got {a}, want {b}");
     };
 
+    let (w, h) = viewer_size_for_media(mw, mh, 0);
     // R=0 reproduces the legacy mapping: viewer top-left -> page top-left.
     let (px, py) = viewer_point_to_pdf_with_rotation(mw, mh, 0.0, 0.0, 0);
     close(px, 0.0, "r0 top-left x");
@@ -590,6 +604,7 @@ fn viewer_point_to_pdf_rotation_maps_corners() {
     close(py, mh / 2.0, "r0 center y");
 
     // R=90 clockwise: viewer top-left -> page bottom-left.
+    let (w, h) = viewer_size_for_media(mw, mh, 90);
     let (px, py) = viewer_point_to_pdf_with_rotation(mw, mh, 0.0, 0.0, 90);
     close(px, 0.0, "r90 top-left x");
     close(py, 0.0, "r90 top-left y");
@@ -602,6 +617,7 @@ fn viewer_point_to_pdf_rotation_maps_corners() {
     close(py, mh / 2.0, "r90 center y");
 
     // R=180: viewer top-left -> page bottom-right.
+    let (w, h) = viewer_size_for_media(mw, mh, 180);
     let (px, py) = viewer_point_to_pdf_with_rotation(mw, mh, 0.0, 0.0, 180);
     close(px, mw, "r180 top-left x");
     close(py, 0.0, "r180 top-left y");
@@ -610,6 +626,7 @@ fn viewer_point_to_pdf_rotation_maps_corners() {
     close(py, mh, "r180 bottom-right y");
 
     // R=270: viewer top-left -> page top-right.
+    let (w, h) = viewer_size_for_media(mw, mh, 270);
     let (px, py) = viewer_point_to_pdf_with_rotation(mw, mh, 0.0, 0.0, 270);
     close(px, mw, "r270 top-left x");
     close(py, mh, "r270 top-left y");

@@ -65,8 +65,9 @@ pub(crate) fn render_page_redacted_with_doc(
     let media = page_media_box(doc, page_id)?;
     let page_w = (media[2] - media[0]) as f32;
     let page_h = (media[3] - media[1]) as f32;
-    let render_w = f64::from(EXPORT_RENDER_W);
-    let render_h = f64::from(EXPORT_RENDER_H);
+    // Render aspect-fits inside EXPORT_RENDER_*; map rects into the actual bitmap.
+    let render_w = f64::from(img.width());
+    let render_h = f64::from(img.height());
 
     for rect in rects_pdf {
         let (x, y, w, h) = pdf_rect_to_render_px(*rect, page_w, page_h, render_w, render_h);
@@ -192,14 +193,18 @@ static REDACT_TEMP_COUNTER: std::sync::atomic::AtomicU64 = std::sync::atomic::At
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::pdf::coords::{VIEWER_PAGE_H, VIEWER_PAGE_W};
 
     #[test]
     fn redaction_pixel_rect_maps_and_flips() {
-        let (x, y, w, h) = pdf_rect_to_render_px([72.0, 700.0, 200.0, 720.0], 612.0, 792.0, 1600.0, 2264.0);
-        let viewer = crate::pdf::coords::pdf_rect_to_viewer_px(72.0, 700.0, 200.0, 720.0, 612.0, 792.0);
-        let sx = 1600.0 / VIEWER_PAGE_W;
-        let sy = 2264.0 / VIEWER_PAGE_H;
+        let page_w = 612.0_f32;
+        let page_h = 792.0_f32;
+        let (vw, vh) = crate::pdf::coords::viewer_size_for_dims(f64::from(page_w), f64::from(page_h));
+        let render_w = 1600.0;
+        let render_h = (1600.0 * vh / vw).round();
+        let (x, y, w, h) = pdf_rect_to_render_px([72.0, 700.0, 200.0, 720.0], page_w, page_h, render_w, render_h);
+        let viewer = crate::pdf::coords::pdf_rect_to_viewer_px(72.0, 700.0, 200.0, 720.0, page_w, page_h);
+        let sx = render_w / vw;
+        let sy = render_h / vh;
         assert_eq!(x, (viewer[0] * sx).round() as i32);
         assert_eq!(y, (viewer[1] * sy).round() as i32);
         assert!(w > 0);

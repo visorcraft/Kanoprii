@@ -1,4 +1,5 @@
-use crate::pdf::coords::{page_media_box, VIEWER_PAGE_H, VIEWER_PAGE_W};
+use crate::pdf::coords::{page_media_box, viewer_size_for_media};
+use crate::pdf::rotation::page_rotation;
 use lopdf::{Document, Object, ObjectId};
 use std::path::Path;
 
@@ -47,10 +48,11 @@ pub fn apply_expand_margins(
     if mw <= 0.0 || mh <= 0.0 {
         return Err("Invalid page size".to_string());
     }
-    let left = media[0] - margin_left * mw / VIEWER_PAGE_W;
-    let bottom = media[1] - margin_bottom * mh / VIEWER_PAGE_H;
-    let right = media[2] + margin_right * mw / VIEWER_PAGE_W;
-    let top = media[3] + margin_top * mh / VIEWER_PAGE_H;
+    let (vw, vh) = viewer_size_for_media(mw, mh, page_rotation(doc, page_id));
+    let left = media[0] - margin_left * mw / vw;
+    let bottom = media[1] - margin_bottom * mh / vh;
+    let right = media[2] + margin_right * mw / vw;
+    let top = media[3] + margin_top * mh / vh;
     if right <= left || top <= bottom {
         return Err("Expand margins are too large".to_string());
     }
@@ -116,10 +118,11 @@ pub fn apply_shrink_margins(
     if mw <= 0.0 || mh <= 0.0 {
         return Err("Invalid page size".to_string());
     }
-    let left = media[0] + margin_left * mw / VIEWER_PAGE_W;
-    let bottom = media[1] + margin_bottom * mh / VIEWER_PAGE_H;
-    let right = media[2] - margin_right * mw / VIEWER_PAGE_W;
-    let top = media[3] - margin_top * mh / VIEWER_PAGE_H;
+    let (vw, vh) = viewer_size_for_media(mw, mh, page_rotation(doc, page_id));
+    let left = media[0] + margin_left * mw / vw;
+    let bottom = media[1] + margin_bottom * mh / vh;
+    let right = media[2] - margin_right * mw / vw;
+    let top = media[3] - margin_top * mh / vh;
     if right <= left || top <= bottom {
         return Err("Shrink margins are too large".to_string());
     }

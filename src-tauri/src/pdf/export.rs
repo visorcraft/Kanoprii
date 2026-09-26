@@ -2,8 +2,8 @@ use crate::pdf::render;
 use std::fs;
 use std::path::Path;
 
-pub const EXPORT_RENDER_W: i32 = 1600;
-pub const EXPORT_RENDER_H: i32 = 2264;
+pub const EXPORT_RENDER_W: i32 = 3200;
+pub const EXPORT_RENDER_H: i32 = 4528;
 
 pub type ParityPageRenderFn = fn(&Path, u32, i32, i32) -> Result<Vec<u8>, String>;
 

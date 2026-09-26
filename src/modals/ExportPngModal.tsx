@@ -43,7 +43,7 @@ export function ExportPngModal({
   return (
     <Modal onClose={onClose}>
       <h3>Export Image</h3>
-      <p className="modal-help">Render PDF pages to PNG, JPEG, WebP, BMP, TIFF, GIF, PPM, TGA, or ICO images (1600×2264). The open PDF is not modified.</p>
+      <p className="modal-help">Render PDF pages to PNG, JPEG, WebP, BMP, TIFF, GIF, PPM, TGA, or ICO images (3200×4528). The open PDF is not modified.</p>
       <label>Format:</label>
       <select
         className="modal-input"

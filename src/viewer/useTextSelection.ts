@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
-import { PDF_BASE_HEIGHT, PDF_BASE_WIDTH } from '../pdf/usePdfDocument';
+import { activeViewerPageH, activeViewerPageW } from './viewerPageMetrics';
 
 export type NaturalRect = { x: number; y: number; w: number; h: number };
 
@@ -42,7 +42,7 @@ export function useTextSelection(pageContainerRef: RefObject<HTMLElement | null>
         const y = (clientRect.top - containerBox.top) / scale;
         const w = clientRect.width / scale;
         const h = clientRect.height / scale;
-        if (x + w < 0 || y + h < 0 || x > PDF_BASE_WIDTH || y > PDF_BASE_HEIGHT) continue;
+        if (x + w < 0 || y + h < 0 || x > activeViewerPageW() || y > activeViewerPageH()) continue;
         rects.push({ x, y, w, h });
       }
     }

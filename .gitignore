@@ -54,3 +54,4 @@ Thumbs.db
 
 # Local release-artifact cache kept by clean_visorcraft_repos
 /_releases/
+squashfs-root/

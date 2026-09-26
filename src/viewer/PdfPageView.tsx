@@ -1,7 +1,8 @@
 import { memo, useCallback, useLayoutEffect, useRef, useState } from 'react';
 import type React from 'react';
 import type { ShapeKind } from '../app/constants';
-import { pageHeightPtFor, pageWidthPtFor, VIEWER_PAGE_H, VIEWER_PAGE_W } from '../app/constants';
+import { pageHeightPtFor, pageWidthPtFor, viewerPageSize } from '../app/constants';
+import { syncViewerPageMetrics } from './viewerPageMetrics';
 import type {
   AnnotationData,
   FormFieldData,
@@ -130,15 +131,24 @@ function PdfPageViewInner({
     if (imgRef) imgRef.current = node;
   }, [imgRef]);
 
+  const pageViewer = viewerPageSize(pageSizes?.[currentPage]);
+
+  useLayoutEffect(() => {
+    // Continuous view mounts every visible page; only the active slot owns
+    // pageContainerRef and should publish coordinate-space metrics.
+    if (!pageContainerRef) return;
+    syncViewerPageMetrics(pageSizes?.[currentPage]);
+  }, [currentPage, pageContainerRef, pageSizes]);
+
   useLayoutEffect(() => {
     const image = localImgRef.current;
     if (!image) return;
-    const update = () => setFitScale(image.clientWidth > 0 ? image.clientWidth / VIEWER_PAGE_W : 1);
+    const update = () => setFitScale(image.clientWidth > 0 ? image.clientWidth / pageViewer.w : 1);
     update();
     const observer = new ResizeObserver(update);
     observer.observe(image);
     return () => observer.disconnect();
-  }, [imageSrc]);
+  }, [imageSrc, pageViewer.w]);
 
   const cursorClass = [
     highlightMode ? 'highlight-cursor' : '',
@@ -193,8 +203,8 @@ function PdfPageViewInner({
                 position: 'absolute',
                 left: 0,
                 top: 0,
-                width: VIEWER_PAGE_W,
-                height: VIEWER_PAGE_H,
+                width: pageViewer.w,
+                height: pageViewer.h,
                 transform: `scale(${fitScale})`,
                 transformOrigin: 'top left',
               }}
@@ -338,6 +348,8 @@ function PdfPageViewInner({
               showFormsPanel={showFormsPanel}
               formFields={formFields}
               currentPage={currentPage}
+              viewerWidth={pageViewer.w}
+              viewerHeight={pageViewer.h}
               onRemoveHighlight={onRemoveHighlight}
               onRemoveRedaction={onRemoveRedaction}
               onRemoveStamp={onRemoveStamp}

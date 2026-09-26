@@ -35,7 +35,7 @@ export function TitleBar({ title }: TitleBarProps) {
           onClick={() => void win?.minimize()}
         >
           <TitleBarIcon>
-            <path d="M1.5 6 L5 3 L8.5 6" />
+            <path d="M1.5 4 L5 7 L8.5 4" />
           </TitleBarIcon>
         </button>
         <button
@@ -46,7 +46,7 @@ export function TitleBar({ title }: TitleBarProps) {
           onClick={() => void win?.toggleMaximize()}
         >
           <TitleBarIcon>
-            <path d="M1.5 4 L5 7 L8.5 4" />
+            <path d="M1.5 6 L5 3 L8.5 6" />
           </TitleBarIcon>
         </button>
         <button

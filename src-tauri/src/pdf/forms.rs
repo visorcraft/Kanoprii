@@ -5,7 +5,8 @@ use lopdf::{Dictionary, Document, Object, ObjectId};
 use serde::Serialize;
 
 use crate::pdf::annotations::append_page_annotation;
-use crate::pdf::coords::{obj_to_f64, page_media_box, viewer_rect_to_pdf, VIEWER_PAGE_H, VIEWER_PAGE_W};
+use crate::pdf::coords::{obj_to_f64, page_media_box, viewer_rect_to_pdf, viewer_size_for_media};
+use crate::pdf::rotation::page_rotation;
 
 fn pdf_object_string(obj: &Object) -> Option<String> {
     match obj {
@@ -22,10 +23,11 @@ fn pdf_rect_to_viewer(doc: &Document, page_id: ObjectId, rect: [f64; 4]) -> Resu
     if mw <= 0.0 || mh <= 0.0 {
         return Err("Invalid page size".to_string());
     }
-    let x1 = (rect[0] - media[0]) * VIEWER_PAGE_W / mw;
-    let x2 = (rect[2] - media[0]) * VIEWER_PAGE_W / mw;
-    let y1 = (media[3] - rect[3]) * VIEWER_PAGE_H / mh;
-    let y2 = (media[3] - rect[1]) * VIEWER_PAGE_H / mh;
+    let (vw, vh) = viewer_size_for_media(mw, mh, page_rotation(doc, page_id));
+    let x1 = (rect[0] - media[0]) * vw / mw;
+    let x2 = (rect[2] - media[0]) * vw / mw;
+    let y1 = (media[3] - rect[3]) * vh / mh;
+    let y2 = (media[3] - rect[1]) * vh / mh;
     Ok([x1, y1, x2, y2])
 }
 

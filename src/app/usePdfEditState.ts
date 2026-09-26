@@ -53,7 +53,7 @@ export interface TextEditDraft {
   pageIndex: number;
   point: Point;
   text: string;
-  /** Rectangle in natural page coordinates (800x1132 viewer space) where the overlay is placed. */
+  /** Rectangle in natural page coordinates (viewer pixel space) where the overlay is placed. */
   pageRect: Rect;
   /** Source of truth for the active text edit. New edits start from the top-level style. */
   style: TextStyle;
@@ -75,7 +75,7 @@ export interface ImageEditDraft {
   index: number;
   width?: number;
   height?: number;
-  /** Rectangle in natural page coordinates (800x1132 viewer space) for the selection frame. */
+  /** Rectangle in natural page coordinates (viewer pixel space) for the selection frame. */
   pageRect: Rect;
   /** Rotation angle in degrees, counter-clockwise from upright. */
   rotation?: number;
@@ -88,7 +88,7 @@ export interface ParagraphEditDraft {
   /** Indices of decoded text lines that form this paragraph. */
   lineIndices: number[];
   text: string;
-  /** Rectangle in natural page coordinates (800x1132 viewer space) for the paragraph edit box. */
+  /** Rectangle in natural page coordinates (viewer pixel space) for the paragraph edit box. */
   pageRect: Rect;
   style: TextStyle;
   /** Original values used to skip unchanged paragraph edits. */

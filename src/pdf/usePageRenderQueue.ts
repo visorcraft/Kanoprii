@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
+import { viewerPageSize } from '../app/constants';
+import type { PdfPageSize } from '../app/types';
 import { PDF_BASE_HEIGHT, PDF_BASE_WIDTH } from './usePdfDocument';
 
 const CACHE_LIMIT = 20;
@@ -9,10 +11,17 @@ type CacheEntry = {
   key: string;
 };
 
-export function usePageRenderQueue(filePath: string, pdfRevision: number, showHiddenLayers: boolean) {
+export function usePageRenderQueue(
+  filePath: string,
+  pdfRevision: number,
+  showHiddenLayers: boolean,
+  pageSizes: PdfPageSize[] = [],
+) {
   const cacheRef = useRef(new Map<number, CacheEntry>());
   const inflightRef = useRef(new Set<number>());
   const queueRef = useRef<Promise<void>>(Promise.resolve());
+  const pageSizesRef = useRef(pageSizes);
+  pageSizesRef.current = pageSizes;
   const renderKey = `${filePath}\0${pdfRevision}\0${showHiddenLayers ? 1 : 0}`;
   const renderKeyRef = useRef(renderKey);
   const generationRef = useRef(0);
@@ -56,6 +65,7 @@ export function usePageRenderQueue(filePath: string, pdfRevision: number, showHi
       const pathAtStart = filePath;
       const generationAtStart = generationRef.current;
       const keyAtStart = renderKey;
+      const dims = viewerPageSize(pageSizesRef.current[page]);
 
       queueRef.current = queueRef.current
         .then(async () => {
@@ -65,8 +75,8 @@ export function usePageRenderQueue(filePath: string, pdfRevision: number, showHi
             const bytes = await invoke<number[]>(cmd, {
               path: pathAtStart,
               pageIndex: page,
-              width: PDF_BASE_WIDTH,
-              height: PDF_BASE_HEIGHT,
+              width: dims.w || PDF_BASE_WIDTH,
+              height: dims.h || PDF_BASE_HEIGHT,
             });
             if (generationAtStart !== generationRef.current) return;
             const blob = new Blob([new Uint8Array(bytes)], { type: 'image/png' });

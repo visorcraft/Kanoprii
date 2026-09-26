@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Rect, RgbColor, ShapeLineGeometry } from '../app/usePdfEditState';
-import { VIEWER_PAGE_H, VIEWER_PAGE_W } from '../app/constants';
+import { activeViewerPageH, activeViewerPageW } from './viewerPageMetrics';
 import {
   moveLineEndpoint,
   moveLineWithinPage,
@@ -256,8 +256,8 @@ function LineSelectionOverlay(props: LineSelectionProps) {
       role="region"
       aria-label={props.ariaLabel}
       className="object-selection-line-layer"
-      viewBox={`0 0 ${VIEWER_PAGE_W} ${VIEWER_PAGE_H}`}
-      style={{ color: rgbCss(props.strokeColor) }}
+      viewBox={`0 0 ${activeViewerPageW()} ${activeViewerPageH()}`}
+      style={{ color: rgbCss(props.strokeColor), width: activeViewerPageW(), height: activeViewerPageH() }}
       onKeyDown={(e) => handleActionKey(e, props, nudge)}
       onClick={(e) => e.stopPropagation()}
     >

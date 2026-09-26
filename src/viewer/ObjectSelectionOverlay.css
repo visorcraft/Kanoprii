@@ -48,8 +48,7 @@
 .object-selection-line-layer {
   position: absolute;
   inset: 0;
-  width: 800px;
-  height: 1132px;
+  /* size set inline from active viewer page metrics */
   overflow: visible;
   outline: none;
   z-index: 18;

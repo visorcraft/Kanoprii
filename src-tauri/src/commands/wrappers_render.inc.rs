@@ -135,7 +135,7 @@ fn search_pdf_text(
     let pdfium = get_pdfium()?;
     search_pdf_text_impl(&pdfium, &PathBuf::from(path), &query, match_case, match_whole_word)
 }
-/// Character layout for the viewer text-selection layer (viewer px at 800×1132).
+/// Character layout for the viewer text-selection layer (viewer px, aspect-fitted).
 #[tauri::command]
 fn get_page_text_layout(path: String, page_index: u32) -> Result<Vec<pdf::text_layer::PageTextRun>, String> {
     let pdfium = get_pdfium()?;

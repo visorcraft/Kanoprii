@@ -1,8 +1,28 @@
 use lopdf::{Document, Object, ObjectId};
 
-/// Viewer render size - must stay aligned with `BASE_W` / `BASE_H` in `App.tsx`.
-pub const VIEWER_PAGE_W: f64 = 800.0;
-pub const VIEWER_PAGE_H: f64 = 1132.0;
+/// Max viewer bitmap box. Pages are aspect-fitted inside this so landscape (and
+/// other non-A4) pages are not stretched. A4 portrait still lands on 1600×2264.
+/// Keep aligned with `VIEWER_PAGE_W` / `VIEWER_PAGE_H` in the frontend.
+pub const VIEWER_PAGE_W: f64 = 1600.0;
+pub const VIEWER_PAGE_H: f64 = 2264.0;
+
+/// Aspect-fit `dw`×`dh` (already post-rotation display size) into the viewer max box.
+pub fn viewer_size_for_dims(dw: f64, dh: f64) -> (f64, f64) {
+    if !(dw > 0.0 && dh > 0.0) {
+        return (VIEWER_PAGE_W, VIEWER_PAGE_H);
+    }
+    let scale = (VIEWER_PAGE_W / dw).min(VIEWER_PAGE_H / dh);
+    ((dw * scale).round().max(1.0), (dh * scale).round().max(1.0))
+}
+
+/// Aspect-fit viewer size for an unrotated MediaBox plus `/Rotate`.
+pub fn viewer_size_for_media(mw: f64, mh: f64, rotation: i64) -> (f64, f64) {
+    let (dw, dh) = match rotation.rem_euclid(360) {
+        90 | 270 => (mh, mw),
+        _ => (mw, mh),
+    };
+    viewer_size_for_dims(dw, dh)
+}
 
 /// Reject NaN/±Infinity on a coordinate-sized input. Returns the value
 /// unchanged when finite so call sites stay trivial. Used at every public
@@ -26,8 +46,9 @@ pub fn pdf_rect_to_render_px(
     render_h: f64,
 ) -> (i32, i32, i32, i32) {
     let viewer = pdf_rect_to_viewer_px(rect[0], rect[1], rect[2], rect[3], page_w, page_h);
-    let sx = render_w / VIEWER_PAGE_W;
-    let sy = render_h / VIEWER_PAGE_H;
+    let (vw, vh) = viewer_size_for_dims(f64::from(page_w).max(1.0), f64::from(page_h).max(1.0));
+    let sx = render_w / vw;
+    let sy = render_h / vh;
     let x = (viewer[0] * sx).round() as i32;
     let y = (viewer[1] * sy).round() as i32;
     let w = ((viewer[2] - viewer[0]) * sx).round().max(1.0) as i32;
@@ -35,12 +56,11 @@ pub fn pdf_rect_to_render_px(
     (x, y, w, h)
 }
 
-/// Map PDF-point bounds to viewer pixel rect `[left, top, right, bottom]` at 800×1132.
+/// Map PDF-point bounds to viewer pixel rect `[left, top, right, bottom]`.
 pub fn pdf_rect_to_viewer_px(left: f64, bottom: f64, right: f64, top: f64, page_w: f32, page_h: f32) -> [f64; 4] {
-    let sw = VIEWER_PAGE_W;
-    let sh = VIEWER_PAGE_H;
     let pw = f64::from(page_w).max(1.0);
     let ph = f64::from(page_h).max(1.0);
+    let (sw, sh) = viewer_size_for_dims(pw, ph);
     let left_px = left / pw * sw;
     let right_px = right / pw * sw;
     let top_px = (ph - top) / ph * sh;
@@ -89,29 +109,31 @@ pub fn viewer_rect_to_pdf(
     if mw <= 0.0 || mh <= 0.0 || w <= 0.0 || h <= 0.0 {
         return Err("Invalid page or image size".to_string());
     }
-    let px = x * mw / VIEWER_PAGE_W;
-    let pw = w * mw / VIEWER_PAGE_W;
-    let ph = h * mh / VIEWER_PAGE_H;
-    let py = mh - (y * mh / VIEWER_PAGE_H) - ph;
+    let rotation = crate::pdf::rotation::page_rotation(doc, page_id);
+    let (vw, vh) = viewer_size_for_media(mw, mh, rotation);
+    let px = x * mw / vw;
+    let pw = w * mw / vw;
+    let ph = h * mh / vh;
+    let py = mh - (y * mh / vh) - ph;
     Ok((px, py, pw, ph))
 }
 
-/// Map a viewer-space point (top-left origin, 800x1132) to a PDF user-space
-/// point (bottom-left origin), honouring `/Rotate` (clockwise 0/90/180/270).
-/// `mw`/`mh` are the unrotated MediaBox dimensions. Rotation 0 and any
-/// non-canonical value reproduce the legacy mapping, so upright pages are
-/// bit-for-bit unchanged.
+/// Map a viewer-space point (top-left origin) to a PDF user-space point
+/// (bottom-left origin), honouring `/Rotate` (clockwise 0/90/180/270).
+/// `mw`/`mh` are the unrotated MediaBox dimensions. Viewer size is the
+/// aspect-fitted bitmap for that page, so landscape pages are not stretched.
 ///
 /// The viewer bitmap is the page rendered with `/Rotate` applied, so on a
 /// 90/270 page the viewer axes map to the swapped MediaBox axes. Only the
 /// location is rotated; callers still draw glyphs in page space, so text
 /// continues to rotate with the page as before.
 pub fn viewer_point_to_pdf_with_rotation(mw: f64, mh: f64, vx: f64, vy: f64, rotation: i64) -> (f64, f64) {
+    let (vw, vh) = viewer_size_for_media(mw, mh, rotation);
     match rotation.rem_euclid(360) {
-        90 => (vy * mw / VIEWER_PAGE_H, vx * mh / VIEWER_PAGE_W),
-        180 => (mw - vx * mw / VIEWER_PAGE_W, vy * mh / VIEWER_PAGE_H),
-        270 => (mw - vy * mw / VIEWER_PAGE_H, mh - vx * mh / VIEWER_PAGE_W),
-        _ => (vx * mw / VIEWER_PAGE_W, mh - vy * mh / VIEWER_PAGE_H),
+        90 => (vy * mw / vh, vx * mh / vw),
+        180 => (mw - vx * mw / vw, vy * mh / vh),
+        270 => (mw - vy * mw / vh, mh - vx * mh / vw),
+        _ => (vx * mw / vw, mh - vy * mh / vh),
     }
 }
 
@@ -131,13 +153,14 @@ pub fn pdf_point_to_viewer_on_page(media: [f64; 4], px: f64, py: f64, rotation: 
     if mw <= 0.0 || mh <= 0.0 {
         return Err("Invalid page size".to_string());
     }
+    let (vw, vh) = viewer_size_for_media(mw, mh, rotation);
     let x = px - media[0];
     let y = py - media[1];
     let point = match rotation.rem_euclid(360) {
-        90 => (y * VIEWER_PAGE_W / mh, x * VIEWER_PAGE_H / mw),
-        180 => ((mw - x) * VIEWER_PAGE_W / mw, y * VIEWER_PAGE_H / mh),
-        270 => ((mh - y) * VIEWER_PAGE_W / mh, (mw - x) * VIEWER_PAGE_H / mw),
-        _ => (x * VIEWER_PAGE_W / mw, (mh - y) * VIEWER_PAGE_H / mh),
+        90 => (y * vw / mh, x * vh / mw),
+        180 => ((mw - x) * vw / mw, y * vh / mh),
+        270 => ((mh - y) * vw / mh, (mw - x) * vh / mw),
+        _ => (x * vw / mw, (mh - y) * vh / mh),
     };
     Ok(point)
 }

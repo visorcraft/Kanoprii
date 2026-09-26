@@ -1,5 +1,4 @@
 import { useId } from 'react';
-import { PDF_BASE_HEIGHT, PDF_BASE_WIDTH } from '../pdf/usePdfDocument';
 import type { ShapeKind } from '../app/constants';
 import type { ShapeStyle } from '../app/usePdfEditState';
 import type { AnnotationData, FormFieldData, PageTextEdit, PageVectorEdit } from '../app/types';
@@ -38,6 +37,8 @@ export type PdfPageOverlaysProps = {
   showFormsPanel: boolean;
   formFields: FormFieldData[];
   currentPage: number;
+  viewerWidth: number;
+  viewerHeight: number;
   onRemoveHighlight: (index: number) => void;
   onRemoveRedaction: (index: number) => void;
   onRemoveStamp: (kind: 'text' | 'image', index: number) => void;
@@ -70,6 +71,8 @@ export function PdfPageOverlays({
   showFormsPanel,
   formFields,
   currentPage,
+  viewerWidth,
+  viewerHeight,
   onRemoveHighlight,
   onRemoveRedaction,
   onRemoveStamp,
@@ -222,7 +225,7 @@ export function PdfPageOverlays({
 {/* Freehand ink strokes and line shapes */}
 <svg
   className="ink-overlay"
-  viewBox={`0 0 ${PDF_BASE_WIDTH} ${PDF_BASE_HEIGHT}`}
+  viewBox={`0 0 ${viewerWidth} ${viewerHeight}`}
   aria-hidden={!drawMode && !shapeMode && !vectorEditMode}
 >
   <defs>

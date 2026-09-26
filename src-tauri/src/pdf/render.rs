@@ -9,10 +9,22 @@ use lopdf::Document;
 const CACHE_CAPACITY: usize = 8;
 
 /// Maximum width or height (in pixels) accepted for any render command.
-/// 8× the base viewer size (800×1132) is plenty for any sane preview; PDFium
+/// 8× the base viewer size (1600×2264) is plenty for any sane preview; PDFium
 /// happily allocates multi-GB bitmaps on i32::MAX, which is reachable from a
 /// hostile JS frontend. Mirrors the cap in render_pdf_page_with_all_layers_visible.
-pub(crate) const MAX_RENDER_DIM: i32 = 800 * 8;
+pub(crate) const MAX_RENDER_DIM: i32 = 1600 * 8;
+
+/// Aspect-fit a page's display size into a caller-requested max box so landscape
+/// (and other non-matching) pages are not stretched by `PdfPage::render`.
+pub(crate) fn aspect_fit_render_dims(page_w: f64, page_h: f64, max_w: i32, max_h: i32) -> (i32, i32) {
+    if !(page_w > 0.0 && page_h > 0.0) {
+        return (max_w.max(1), max_h.max(1));
+    }
+    let scale = (f64::from(max_w) / page_w).min(f64::from(max_h) / page_h);
+    let width = (page_w * scale).round() as i32;
+    let height = (page_h * scale).round() as i32;
+    (width.clamp(1, MAX_RENDER_DIM), height.clamp(1, MAX_RENDER_DIM))
+}
 
 struct CacheEntry {
     document: Document,
@@ -174,7 +186,9 @@ pub fn render_page_bytes(
         return Err("Page index out of range".to_string());
     }
     let page = document.pages().get(page_index as PdfPageIndex).map_err(|e| e.to_string())?;
-    let bitmap = page.render(width as Pixels, height as Pixels, None).map_err(|e| e.to_string())?;
+    let (render_w, render_h) =
+        aspect_fit_render_dims(f64::from(page.width().value), f64::from(page.height().value), width, height);
+    let bitmap = page.render(render_w as Pixels, render_h as Pixels, None).map_err(|e| e.to_string())?;
     let image = bitmap.as_image().map_err(|e| e.to_string())?;
     let mut buffer = Vec::new();
     image.write_to(&mut std::io::Cursor::new(&mut buffer), format).map_err(|e| e.to_string())?;
@@ -189,7 +203,9 @@ pub fn render_pdf_thumbnails(pdfium: &Pdfium, path: &Path, width: i32, height: i
 
     for i in 0..page_count {
         let page = document.pages().get(i as PdfPageIndex).map_err(|e| e.to_string())?;
-        let bitmap = page.render(width as Pixels, height as Pixels, None).map_err(|e| e.to_string())?;
+        let (render_w, render_h) =
+            aspect_fit_render_dims(f64::from(page.width().value), f64::from(page.height().value), width, height);
+        let bitmap = page.render(render_w as Pixels, render_h as Pixels, None).map_err(|e| e.to_string())?;
         let image = bitmap.as_image().map_err(|e| e.to_string())?;
         let mut buffer = Vec::new();
         image.write_to(&mut std::io::Cursor::new(&mut buffer), image::ImageFormat::Png).map_err(|e| e.to_string())?;
@@ -205,6 +221,12 @@ mod tests {
     use lopdf::{Dictionary, Object, Stream};
     use std::fs;
     use std::sync::atomic::{AtomicU64, Ordering};
+
+    #[test]
+    fn aspect_fit_keeps_landscape_ratio() {
+        assert_eq!(aspect_fit_render_dims(960.0, 540.0, 1600, 2264), (1600, 900));
+        assert_eq!(aspect_fit_render_dims(595.0, 842.0, 1600, 2264), (1600, 2264));
+    }
 
     static TEST_DIR_COUNTER: AtomicU64 = AtomicU64::new(0);
 
