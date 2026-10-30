@@ -18483,7 +18483,10 @@ fn build_pdf_with_ccitt_image() -> Document {
     for row in 0..height {
         let black = if row % 2 == 0 { 8 } else { 24 };
         encoder
-            .encode_line(repeat_n(Color::White, (width as usize) - black).chain(repeat_n(Color::Black, black)), width)
+            .encode_line(
+                repeat_n(Color::White, (width as usize) - black).chain(repeat_n(Color::Black, black)),
+                u32::from(width),
+            )
             .unwrap();
     }
     let encoded = encoder.finish().unwrap().finish();
@@ -19691,8 +19694,8 @@ fn pdf_image_stream_bytes_ccitt_g4_to_png() {
     let height = 2u16;
     let writer = VecWriter::new();
     let mut encoder = Encoder::new(writer);
-    encoder.encode_line(repeat_n(Color::White, width as usize), width).unwrap();
-    encoder.encode_line(repeat_n(Color::White, 4).chain(repeat_n(Color::Black, 4)), width).unwrap();
+    encoder.encode_line(repeat_n(Color::White, width as usize), u32::from(width)).unwrap();
+    encoder.encode_line(repeat_n(Color::White, 4).chain(repeat_n(Color::Black, 4)), u32::from(width)).unwrap();
     let encoded = encoder.finish().unwrap().finish();
 
     let stream = Stream::new(

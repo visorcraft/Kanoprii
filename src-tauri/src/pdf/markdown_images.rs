@@ -186,7 +186,7 @@ fn cmyk_samples_to_png(width: u32, height: u32, bytes: &[u8]) -> Option<Vec<u8>>
         return None;
     }
     let mut rgb = Vec::with_capacity((width as usize * height as usize) * 3);
-    for chunk in bytes[..expected].chunks_exact(4) {
+    for chunk in bytes[..expected].as_chunks::<4>().0 {
         rgb.extend_from_slice(&cmyk_pixel_to_rgb(chunk[0], chunk[1], chunk[2], chunk[3]));
     }
     raw_image_to_png(width, height, rgb)
@@ -250,10 +250,10 @@ fn ccitt_pixel_value(color: fax::Color, black_is_1: bool) -> u8 {
 fn ccitt_samples_to_png(columns: u16, rows: Option<u16>, k: i64, black_is_1: bool, bytes: &[u8]) -> Option<Vec<u8>> {
     use fax::decoder::{self, pels};
 
-    let width = columns;
+    let width = u32::from(columns);
     let mut gray_rows: Vec<Vec<u8>> = Vec::new();
     if k < 0 {
-        let height_limit = rows;
+        let height_limit = rows.map(u32::from);
         decoder::decode_g4(bytes.iter().copied(), width, height_limit, |transitions| {
             let row = pels(transitions, width).map(|color| ccitt_pixel_value(color, black_is_1)).collect::<Vec<_>>();
             gray_rows.push(row);
@@ -280,7 +280,7 @@ fn ccitt_samples_to_png(columns: u16, rows: Option<u16>, k: i64, black_is_1: boo
     }
     let height = gray_rows.len() as u32;
     let flat: Vec<u8> = gray_rows.into_iter().flatten().collect();
-    gray_samples_to_png(width as u32, height, &flat)
+    gray_samples_to_png(width, height, &flat)
 }
 
 fn run_length_decode(bytes: &[u8]) -> Vec<u8> {

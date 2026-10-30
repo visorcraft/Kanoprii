@@ -216,7 +216,7 @@ pub fn list_page_images(doc: &Document, page_index: u32) -> Result<Vec<PageImage
         image_resources.insert(name.clone(), (id, width, height));
     }
 
-    let bytes = doc.get_page_content(page_id).map_err(|e| e.to_string())?;
+    let bytes = doc.get_page_content(page_id);
     let content = lopdf::content::Content::decode(&bytes).map_err(|e| e.to_string())?;
     let mut ctm = [1.0, 0.0, 0.0, 1.0, 0.0, 0.0];
     let mut stack = Vec::new();

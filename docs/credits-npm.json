@@ -1,25 +1,25 @@
 [
   {
     "name": "@tauri-apps/api",
-    "version": "2.11.1",
+    "version": "2.12.4",
     "license": "MIT OR Apache-2.0",
     "url": "https://github.com/tauri-apps/tauri"
   },
   {
     "name": "@tauri-apps/plugin-dialog",
-    "version": "2.7.2",
+    "version": "2.8.4",
     "license": "MIT OR Apache-2.0",
     "url": "https://github.com/tauri-apps/plugins-workspace"
   },
   {
     "name": "@tauri-apps/plugin-process",
-    "version": "2.3.1",
+    "version": "2.4.0",
     "license": "MIT OR Apache-2.0",
     "url": "https://github.com/tauri-apps/plugins-workspace"
   },
   {
     "name": "@tauri-apps/plugin-updater",
-    "version": "2.10.1",
+    "version": "2.14.1",
     "license": "MIT OR Apache-2.0",
     "url": "https://github.com/tauri-apps/plugins-workspace"
   },
@@ -31,19 +31,19 @@
   },
   {
     "name": "marked",
-    "version": "18.0.7",
+    "version": "18.1.2",
     "license": "MIT",
     "url": "https://marked.js.org/"
   },
   {
     "name": "react",
-    "version": "19.2.8",
+    "version": "19.3.1",
     "license": "MIT",
     "url": "https://react.dev/"
   },
   {
     "name": "react-dom",
-    "version": "19.2.8",
+    "version": "19.3.1",
     "license": "MIT",
     "url": "https://react.dev/"
   }

@@ -870,14 +870,8 @@ mod tests {
         doc.get_dictionary_mut(page_id).unwrap().set(b"Rotate", Object::Integer(90));
 
         // Rotated letter display is 792×612 → aspect-fit 1600×1236 in the viewer box.
-        transform_page_image_viewer(
-            &mut doc,
-            0,
-            0,
-            &PdfRect { x: 0.0, y: 0.0, width: 1600.0, height: 1236.0 },
-            0.0,
-        )
-        .unwrap();
+        transform_page_image_viewer(&mut doc, 0, 0, &PdfRect { x: 0.0, y: 0.0, width: 1600.0, height: 1236.0 }, 0.0)
+            .unwrap();
 
         let decoded = doc.get_object(content_id).unwrap().as_stream().unwrap().decode_content().unwrap();
         let cm = decoded

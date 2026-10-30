@@ -1,7 +1,7 @@
 use crate::pdf::content::append_page_content;
 use crate::pdf::coords::{page_media_box, viewer_size_for_media};
-use crate::pdf::rotation::page_rotation;
 use crate::pdf::page_text::{ensure_helvetica_font, escape_pdf_literal_string, viewer_point_to_pdf};
+use crate::pdf::rotation::page_rotation;
 use lopdf::{Dictionary, Document, Object, ObjectId, Stream};
 use std::path::Path;
 
