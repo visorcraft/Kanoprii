@@ -240,14 +240,6 @@ pub(crate) fn flatten_annotations_in_doc(doc: &mut Document, start_page: u32, en
     Ok(removed)
 }
 
-pub(crate) fn flatten_all_annotations_in_doc(doc: &mut Document) -> Result<u32, String> {
-    let total = doc.get_pages().len() as u32;
-    if total == 0 {
-        return Ok(0);
-    }
-    flatten_annotations_in_doc(doc, 0, total - 1)
-}
-
 pub fn add_page_header(path: &Path, start_page: u32, end_page: u32, text: &str) -> Result<u32, String> {
     let trimmed = text.trim();
     if trimmed.is_empty() {

@@ -1,4 +1,4 @@
-use std::collections::BTreeSet;
+use std::collections::{BTreeSet, HashMap, HashSet};
 use std::path::Path;
 
 use crate::pdf::coords::obj_to_f64;
@@ -199,12 +199,16 @@ pub fn build_print_pdf(
     }
 
     let target_size = paper_size_in_points(&opts.paper_size, &opts.orientation)?;
+    // Original widget rects. A field listed on two pages, or twice on one page,
+    // must be mapped from this snapshot. Mapping the already-moved rect again
+    // throws the field off the printed page.
+    let mut original_widget_rects: HashMap<ObjectId, [f64; 4]> = HashMap::new();
 
     let new_page_ids: Vec<ObjectId> = selected_pages
         .iter()
         .map(|&idx| {
             let page_id = *doc.get_pages().get(&(idx + 1)).ok_or_else(|| format!("Page index out of bounds: {idx}"))?;
-            transform_page_for_print(&mut doc, page_id, target_size, opts)
+            transform_page_for_print(&mut doc, page_id, target_size, opts, &mut original_widget_rects)
         })
         .collect::<Result<Vec<_>, _>>()?;
 
@@ -226,10 +230,6 @@ pub fn build_print_pdf(
     let new_kids: Vec<Object> = new_page_ids.iter().map(|id| Object::Reference(*id)).collect();
     set_pages_kids(&mut doc, pages_ref, new_kids)?;
 
-    if let Ok(catalog) = doc.catalog_mut() {
-        catalog.remove(b"AcroForm");
-    }
-
     crate::pdf::io::save_atomic(&mut doc, output_path)?;
     Ok(())
 }
@@ -240,8 +240,142 @@ pub fn apply_redactions_for_print(doc: &mut Document) -> Result<(), String> {
 }
 
 pub fn flatten_annotations_for_print(doc: &mut Document) -> Result<(), String> {
-    crate::pdf::page_decor::flatten_all_annotations_in_doc(doc)?;
+    // Drop markup (highlights, links, stamps). Widget annotations are the
+    // form fields; removing them is what made filled values disappear on print.
+    // The separate Flatten Annotations command still removes every annotation.
+    let page_ids: Vec<ObjectId> = doc.get_pages().values().copied().collect();
+    for page_id in page_ids {
+        retain_widget_annots(doc, page_id)?;
+    }
     Ok(())
+}
+
+fn retain_widget_annots(doc: &mut Document, page_id: ObjectId) -> Result<(), String> {
+    let Some(annots) = doc.get_dictionary(page_id).ok().and_then(|d| d.get(b"Annots").ok()).cloned() else {
+        return Ok(());
+    };
+    let Some(entries) = annot_entries(doc, &annots) else {
+        return Ok(());
+    };
+    let kept: Vec<Object> = entries.into_iter().filter(|obj| annot_is_widget(doc, obj)).collect();
+    let page = doc.get_dictionary_mut(page_id).map_err(|e| e.to_string())?;
+    if kept.is_empty() {
+        page.remove(b"Annots");
+    } else {
+        page.set(b"Annots", Object::Array(kept));
+    }
+    Ok(())
+}
+
+fn annot_entries(doc: &Document, annots: &Object) -> Option<Vec<Object>> {
+    match annots {
+        Object::Array(arr) => Some(arr.clone()),
+        Object::Reference(id) => doc.get_object(*id).ok()?.as_array().ok().cloned(),
+        _ => None,
+    }
+}
+
+fn annot_is_widget(doc: &Document, obj: &Object) -> bool {
+    let Some(dict) = (match obj {
+        Object::Reference(id) => doc.get_dictionary(*id).ok(),
+        Object::Dictionary(d) => Some(d),
+        _ => None,
+    }) else {
+        return false;
+    };
+    dict.get(b"Subtype").ok().and_then(|o| o.as_name().ok()) == Some(b"Widget") || dict.get(b"FT").is_ok()
+}
+
+/// PDF annotation flag bit 3. Printers skip a widget when this is clear.
+const ANNOT_FLAG_PRINT: i64 = 4;
+
+fn annot_flag_bits(dict: &Dictionary) -> i64 {
+    // /F is an integer in the spec. Some writers emit a real. as_i64()
+    // rejects reals, and treating that as 0 would wipe the other flags.
+    dict.get(b"F").ok().map(obj_to_f64).unwrap_or(0.0) as i64
+}
+
+fn ensure_annot_prints(dict: &mut Dictionary) {
+    let flags = annot_flag_bits(dict);
+    if flags & ANNOT_FLAG_PRINT == 0 {
+        dict.set(b"F", Object::Integer(flags | ANNOT_FLAG_PRINT));
+    }
+}
+
+fn rect_values(doc: &Document, obj: &Object) -> Option<[f64; 4]> {
+    let arr = match obj {
+        Object::Array(values) => values.clone(),
+        Object::Reference(id) => doc.get_object(*id).ok()?.as_array().ok()?.clone(),
+        _ => return None,
+    };
+    if arr.len() < 4 {
+        return None;
+    }
+    Some([obj_to_f64(&arr[0]), obj_to_f64(&arr[1]), obj_to_f64(&arr[2]), obj_to_f64(&arr[3])])
+}
+
+fn widget_rect(doc: &Document, id: ObjectId) -> Option<[f64; 4]> {
+    let rect_obj = doc.get_dictionary(id).ok()?.get(b"Rect").ok()?.clone();
+    rect_values(doc, &rect_obj)
+}
+
+fn write_mapped_rect(dict: &mut Dictionary, rect: [f64; 4], scale: f64, tx: f64, ty: f64) {
+    dict.set(
+        b"Rect",
+        Object::Array(vec![
+            Object::Real((scale * rect[0] + tx) as f32),
+            Object::Real((scale * rect[1] + ty) as f32),
+            Object::Real((scale * rect[2] + tx) as f32),
+            Object::Real((scale * rect[3] + ty) as f32),
+        ]),
+    );
+}
+
+/// Move a form widget onto the printed page. Annotation rects sit outside the
+/// content stream, so they do not pick up the `cm` that scales page content.
+fn place_widget_for_print(
+    doc: &mut Document,
+    annot: &Object,
+    scale: f64,
+    tx: f64,
+    ty: f64,
+    new_page_id: ObjectId,
+    original_rects: &mut HashMap<ObjectId, [f64; 4]>,
+) -> Option<Object> {
+    match annot {
+        Object::Reference(id) => {
+            let id = *id;
+            let rect = match original_rects.get(&id) {
+                Some(rect) => Some(*rect),
+                None => {
+                    let rect = widget_rect(doc, id);
+                    if let Some(rect) = rect {
+                        original_rects.insert(id, rect);
+                    }
+                    rect
+                }
+            };
+            let dict = doc.get_dictionary_mut(id).ok()?;
+            if let Some(rect) = rect {
+                write_mapped_rect(dict, rect, scale, tx, ty);
+            }
+            dict.set(b"P", Object::Reference(new_page_id));
+            ensure_annot_prints(dict);
+            Some(Object::Reference(id))
+        }
+        Object::Dictionary(src) => {
+            let mut dict = src.clone();
+            if let Some(rect_obj) = dict.get(b"Rect").ok().cloned() {
+                if let Some(rect) = rect_values(doc, &rect_obj) {
+                    write_mapped_rect(&mut dict, rect, scale, tx, ty);
+                }
+            }
+            dict.set(b"P", Object::Reference(new_page_id));
+            ensure_annot_prints(&mut dict);
+            Some(Object::Dictionary(dict))
+        }
+        _ => None,
+    }
 }
 
 /// Resolve the OCProperties /D default-config dictionary, handling both
@@ -585,6 +719,7 @@ fn transform_page_for_print(
     page_id: ObjectId,
     target_size: (f64, f64),
     opts: &PrintOptions,
+    original_widget_rects: &mut HashMap<ObjectId, [f64; 4]>,
 ) -> Result<ObjectId, String> {
     let mut page_dict = doc.get_dictionary(page_id).map_err(|e| e.to_string())?.clone();
 
@@ -634,10 +769,34 @@ fn transform_page_for_print(
             Object::Real(target_h as f32),
         ]),
     );
+    let annots = page_dict.get(b"Annots").ok().cloned();
     page_dict.remove(b"Annots");
     page_dict.remove(b"Parent");
 
     let new_page_id = doc.add_object(Object::Dictionary(page_dict));
+    if let Some(annots) = annots {
+        if let Some(entries) = annot_entries(doc, &annots) {
+            let mut kept = Vec::new();
+            let mut seen = HashSet::new();
+            for entry in entries {
+                if let Object::Reference(id) = &entry {
+                    if !seen.insert(*id) {
+                        continue;
+                    }
+                }
+                if annot_is_widget(doc, &entry) {
+                    if let Some(placed) =
+                        place_widget_for_print(doc, &entry, scale, tx, ty, new_page_id, original_widget_rects)
+                    {
+                        kept.push(placed);
+                    }
+                }
+            }
+            if !kept.is_empty() {
+                doc.get_dictionary_mut(new_page_id).map_err(|e| e.to_string())?.set(b"Annots", Object::Array(kept));
+            }
+        }
+    }
     Ok(new_page_id)
 }
 
@@ -1206,6 +1365,245 @@ mod tests {
         let cy = (ih - 1 - (150.0 * sy) as u32).min(ih - 1);
         let pixel = img.get_pixel(cx, cy);
         assert!(pixel[0] < 30 && pixel[1] < 30 && pixel[2] < 30, "redacted area should be black, got {:?}", pixel);
+
+        let _ = fs::remove_file(&source);
+        let _ = fs::remove_file(&output);
+    }
+
+    fn letter_print_opts(margins: PrintMargins) -> PrintOptions {
+        PrintOptions {
+            page_range: None,
+            orientation: "portrait".to_string(),
+            paper_size: "letter".to_string(),
+            scaling: "none".to_string(),
+            margins,
+            color_mode: "color".to_string(),
+            include_watermarks: true,
+            printer_name: None,
+            copies: None,
+            duplex: None,
+        }
+    }
+
+    /// One text widget (value Hello, rect 100 200 300 220) plus a highlight
+    /// that print must still drop. `indirect_rect` stores /Rect as its own object.
+    fn minimal_pdf_with_text_widget(path: &Path, indirect_rect: bool) {
+        let mut doc = Document::with_version("1.4");
+        let pages_id = doc.new_object_id();
+        let page_id = doc.new_object_id();
+        let content_id = doc.new_object_id();
+        doc.objects.insert(content_id, Object::Stream(Stream::new(Dictionary::new(), b"BT ET".to_vec())));
+
+        let rect =
+            Object::Array(vec![Object::Real(100.0), Object::Real(200.0), Object::Real(300.0), Object::Real(220.0)]);
+        let rect_obj = if indirect_rect { Object::Reference(doc.add_object(rect)) } else { rect };
+        let widget_id = doc.add_object(Object::Dictionary(Dictionary::from_iter(vec![
+            (b"Type".to_vec(), Object::Name(b"Annot".to_vec())),
+            (b"Subtype".to_vec(), Object::Name(b"Widget".to_vec())),
+            (b"FT".to_vec(), Object::Name(b"Tx".to_vec())),
+            (b"T".to_vec(), Object::String(b"Name".to_vec(), lopdf::StringFormat::Literal)),
+            (b"V".to_vec(), Object::String(b"Hello".to_vec(), lopdf::StringFormat::Literal)),
+            (b"Rect".to_vec(), rect_obj),
+            (b"P".to_vec(), Object::Reference(page_id)),
+        ])));
+        let highlight_id = doc.add_object(Object::Dictionary(Dictionary::from_iter(vec![
+            (b"Type".to_vec(), Object::Name(b"Annot".to_vec())),
+            (b"Subtype".to_vec(), Object::Name(b"Highlight".to_vec())),
+            (
+                b"Rect".to_vec(),
+                Object::Array(vec![Object::Real(10.0), Object::Real(10.0), Object::Real(50.0), Object::Real(30.0)]),
+            ),
+        ])));
+
+        let mut page = Dictionary::new();
+        page.set("Type", Object::Name(b"Page".to_vec()));
+        page.set("Parent", Object::Reference(pages_id));
+        page.set("MediaBox", Object::Array(vec![0.into(), 0.into(), 612.into(), 792.into()]));
+        page.set("Contents", Object::Reference(content_id));
+        page.set("Annots", Object::Array(vec![Object::Reference(widget_id), Object::Reference(highlight_id)]));
+        doc.objects.insert(page_id, Object::Dictionary(page));
+
+        let mut pages = Dictionary::new();
+        pages.set("Type", Object::Name(b"Pages".to_vec()));
+        pages.set("Kids", Object::Array(vec![Object::Reference(page_id)]));
+        pages.set("Count", Object::Integer(1));
+        doc.objects.insert(pages_id, Object::Dictionary(pages));
+
+        let acro_id = doc.add_object(Object::Dictionary(Dictionary::from_iter(vec![(
+            b"Fields".to_vec(),
+            Object::Array(vec![Object::Reference(widget_id)]),
+        )])));
+        let mut catalog = Dictionary::new();
+        catalog.set("Type", Object::Name(b"Catalog".to_vec()));
+        catalog.set("Pages", Object::Reference(pages_id));
+        catalog.set("AcroForm", Object::Reference(acro_id));
+        let catalog_id = doc.add_object(Object::Dictionary(catalog));
+        doc.trailer.set("Root", Object::Reference(catalog_id));
+        doc.save(path).unwrap();
+    }
+
+    fn printed_widget(doc: &Document) -> (ObjectId, &Dictionary) {
+        let page_id = *doc.get_pages().get(&1).unwrap();
+        let page = doc.get_dictionary(page_id).unwrap();
+        let annots = page.get(b"Annots").unwrap().as_array().unwrap();
+        assert_eq!(annots.len(), 1, "highlight must be dropped and the widget kept");
+        let widget_id = annots[0].as_reference().unwrap();
+        let widget = doc.get_dictionary(widget_id).unwrap();
+        assert_eq!(widget.get(b"Subtype").unwrap().as_name().unwrap(), b"Widget");
+        assert!(doc.catalog().unwrap().get(b"AcroForm").is_ok());
+        (page_id, widget)
+    }
+
+    #[test]
+    fn build_print_pdf_keeps_form_fields() {
+        let dir = test_dir();
+        let source = dir.join("source.pdf");
+        let output = dir.join("output.pdf");
+        minimal_pdf_with_text_widget(&source, false);
+
+        build_print_pdf(&source, &letter_print_opts(PrintMargins::None), &[0], &output).unwrap();
+
+        let doc = Document::load(&output).unwrap();
+        let (page_id, widget) = printed_widget(&doc);
+        match widget.get(b"V").unwrap() {
+            Object::String(bytes, _) => assert_eq!(bytes, b"Hello"),
+            other => panic!("field value missing: {other:?}"),
+        }
+        let rect = widget.get(b"Rect").unwrap().as_array().unwrap();
+        let got = [obj_to_f64(&rect[0]), obj_to_f64(&rect[1]), obj_to_f64(&rect[2]), obj_to_f64(&rect[3])];
+        for (actual, expected) in got.iter().zip([100.0, 200.0, 300.0, 220.0]) {
+            assert!((actual - expected).abs() < 0.02, "rect {got:?}");
+        }
+        assert_eq!(widget.get(b"P").unwrap().as_reference().unwrap(), page_id);
+        let flags = widget.get(b"F").unwrap().as_i64().unwrap();
+        assert_eq!(flags & 4, 4, "widget must be flagged to print");
+
+        let _ = fs::remove_file(&source);
+        let _ = fs::remove_file(&output);
+    }
+
+    #[test]
+    fn build_print_pdf_moves_form_fields_with_margins() {
+        let dir = test_dir();
+        let source = dir.join("source.pdf");
+        let output = dir.join("output.pdf");
+        minimal_pdf_with_text_widget(&source, true);
+
+        let margins = PrintMargins::Custom { top: 10.0, right: 0.0, bottom: 0.0, left: 20.0 };
+        build_print_pdf(&source, &letter_print_opts(margins), &[0], &output).unwrap();
+
+        let doc = Document::load(&output).unwrap();
+        let (_, widget) = printed_widget(&doc);
+        let rect = widget.get(b"Rect").unwrap().as_array().unwrap();
+        let got = [obj_to_f64(&rect[0]), obj_to_f64(&rect[1]), obj_to_f64(&rect[2]), obj_to_f64(&rect[3])];
+        // scale 1, tx = 10, ty = -5 on letter with those margins.
+        for (actual, expected) in got.iter().zip([110.0, 195.0, 310.0, 215.0]) {
+            assert!((actual - expected).abs() < 0.02, "rect {got:?}");
+        }
+
+        let _ = fs::remove_file(&source);
+        let _ = fs::remove_file(&output);
+    }
+
+    #[test]
+    fn build_print_pdf_scales_form_fields() {
+        let dir = test_dir();
+        let source = dir.join("source.pdf");
+        let output = dir.join("output.pdf");
+        minimal_pdf_with_text_widget(&source, false);
+
+        let mut opts = letter_print_opts(PrintMargins::None);
+        opts.paper_size = "a4".into();
+        opts.scaling = "fit".into();
+        build_print_pdf(&source, &opts, &[0], &output).unwrap();
+
+        let doc = Document::load(&output).unwrap();
+        let (_, widget) = printed_widget(&doc);
+        let rect = widget.get(b"Rect").unwrap().as_array().unwrap();
+        let got = [obj_to_f64(&rect[0]), obj_to_f64(&rect[1]), obj_to_f64(&rect[2]), obj_to_f64(&rect[3])];
+        // Letter 612x792 fitted onto A4 595x842, no margins.
+        // scale = 595/612, tx = 0, ty = (842 - 770) / 2 = 36.
+        let scale = 595.0 / 612.0;
+        let expected = [scale * 100.0, scale * 200.0 + 36.0, scale * 300.0, scale * 220.0 + 36.0];
+        for (actual, expected) in got.iter().zip(expected) {
+            assert!((actual - expected).abs() < 0.05, "rect {got:?}");
+        }
+
+        let _ = fs::remove_file(&source);
+        let _ = fs::remove_file(&output);
+    }
+
+    /// The same widget is on both pages and listed twice on each. /F is a real
+    /// so the Print bit has to be merged onto the existing Hidden bit.
+    fn minimal_pdf_with_shared_widget(path: &Path) {
+        let mut doc = Document::with_version("1.4");
+        let pages_id = doc.new_object_id();
+        let page_ids: Vec<ObjectId> = (0..2).map(|_| doc.new_object_id()).collect();
+        let content_id = doc.add_object(Object::Stream(Stream::new(Dictionary::new(), b"BT ET".to_vec())));
+        let widget_id = doc.add_object(Object::Dictionary(Dictionary::from_iter(vec![
+            (b"Type".to_vec(), Object::Name(b"Annot".to_vec())),
+            (b"Subtype".to_vec(), Object::Name(b"Widget".to_vec())),
+            (b"FT".to_vec(), Object::Name(b"Tx".to_vec())),
+            (b"T".to_vec(), Object::String(b"Name".to_vec(), lopdf::StringFormat::Literal)),
+            (b"V".to_vec(), Object::String(b"Hello".to_vec(), lopdf::StringFormat::Literal)),
+            (b"F".to_vec(), Object::Real(2.0)),
+            (
+                b"Rect".to_vec(),
+                Object::Array(vec![Object::Real(100.0), Object::Real(200.0), Object::Real(300.0), Object::Real(220.0)]),
+            ),
+            (b"P".to_vec(), Object::Reference(page_ids[0])),
+        ])));
+        for &page_id in &page_ids {
+            let mut page = Dictionary::new();
+            page.set("Type", Object::Name(b"Page".to_vec()));
+            page.set("Parent", Object::Reference(pages_id));
+            page.set("MediaBox", Object::Array(vec![0.into(), 0.into(), 612.into(), 792.into()]));
+            page.set("Contents", Object::Reference(content_id));
+            page.set("Annots", Object::Array(vec![Object::Reference(widget_id), Object::Reference(widget_id)]));
+            doc.objects.insert(page_id, Object::Dictionary(page));
+        }
+        let mut pages = Dictionary::new();
+        pages.set("Type", Object::Name(b"Pages".to_vec()));
+        pages.set("Kids", Object::Array(page_ids.iter().copied().map(Object::Reference).collect()));
+        pages.set("Count", Object::Integer(2));
+        doc.objects.insert(pages_id, Object::Dictionary(pages));
+        let acro_id = doc.add_object(Object::Dictionary(Dictionary::from_iter(vec![(
+            b"Fields".to_vec(),
+            Object::Array(vec![Object::Reference(widget_id)]),
+        )])));
+        let mut catalog = Dictionary::new();
+        catalog.set("Type", Object::Name(b"Catalog".to_vec()));
+        catalog.set("Pages", Object::Reference(pages_id));
+        catalog.set("AcroForm", Object::Reference(acro_id));
+        let catalog_id = doc.add_object(Object::Dictionary(catalog));
+        doc.trailer.set("Root", Object::Reference(catalog_id));
+        doc.save(path).unwrap();
+    }
+
+    #[test]
+    fn build_print_pdf_maps_shared_widget_once() {
+        let dir = test_dir();
+        let source = dir.join("source.pdf");
+        let output = dir.join("output.pdf");
+        minimal_pdf_with_shared_widget(&source);
+
+        let margins = PrintMargins::Custom { top: 10.0, right: 0.0, bottom: 0.0, left: 20.0 };
+        build_print_pdf(&source, &letter_print_opts(margins), &[0, 1], &output).unwrap();
+
+        let doc = Document::load(&output).unwrap();
+        assert_eq!(doc.get_pages().len(), 2);
+        for page_number in [1, 2] {
+            let page_id = *doc.get_pages().get(&page_number).unwrap();
+            let annots = doc.get_dictionary(page_id).unwrap().get(b"Annots").unwrap().as_array().unwrap();
+            assert_eq!(annots.len(), 1, "duplicate widget ref must be listed once");
+            let widget = doc.get_dictionary(annots[0].as_reference().unwrap()).unwrap();
+            let rect = widget.get(b"Rect").unwrap().as_array().unwrap();
+            let got = [obj_to_f64(&rect[0]), obj_to_f64(&rect[1]), obj_to_f64(&rect[2]), obj_to_f64(&rect[3])];
+            for (actual, expected) in got.iter().zip([110.0, 195.0, 310.0, 215.0]) {
+                assert!((actual - expected).abs() < 0.02, "page {page_number} rect {got:?}");
+            }
+            assert_eq!(widget.get(b"F").unwrap().as_i64().unwrap(), 6, "Hidden bit must survive");
+        }
 
         let _ = fs::remove_file(&source);
         let _ = fs::remove_file(&output);
