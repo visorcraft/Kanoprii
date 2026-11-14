@@ -25,7 +25,9 @@
   position: absolute;
   width: 12px;
   height: 12px;
+  margin: 0;
   padding: 0;
+  box-sizing: border-box;
   background: var(--pp-accent, #0066cc);
   border: 1px solid var(--pp-surface, #fff);
   border-radius: 2px;

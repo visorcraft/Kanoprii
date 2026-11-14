@@ -72,10 +72,19 @@ export function ImageSelectionOverlay({
   const [rotation, setRotation] = useState<number>(draft.rotation ?? 0);
   const [dragging, setDragging] = useState<DragKind | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const dragStartPosRef = useRef<{ x: number; y: number } | null>(null);
-  const dragStartRectRef = useRef<Rect | null>(null);
   const rectRef = useRef(rect);
   const rotationRef = useRef(rotation);
+  const dragListenersRef = useRef<{ move: (ev: MouseEvent) => void; up: () => void } | null>(null);
+
+  const clearDragListeners = useCallback(() => {
+    const listeners = dragListenersRef.current;
+    if (!listeners) return;
+    window.removeEventListener('mousemove', listeners.move);
+    window.removeEventListener('mouseup', listeners.up);
+    dragListenersRef.current = null;
+  }, []);
+
+  useEffect(() => clearDragListeners, [clearDragListeners]);
 
   const updateRect = useCallback((next: Rect) => {
     rectRef.current = next;
@@ -88,12 +97,15 @@ export function ImageSelectionOverlay({
   }, []);
 
   useEffect(() => {
+    // Don't clobber an in-progress drag with the last committed draft.
+    if (dragging) return;
     updateRect(draft.pageRect);
-  }, [draft.pageRect, updateRect]);
+  }, [draft.pageRect, dragging, updateRect]);
 
   useEffect(() => {
+    if (dragging) return;
     updateRotation(draft.rotation ?? 0);
-  }, [draft.rotation, updateRotation]);
+  }, [draft.rotation, dragging, updateRotation]);
 
   useEffect(() => {
     containerRef.current?.focus();
@@ -113,65 +125,57 @@ export function ImageSelectionOverlay({
       e.stopPropagation();
       e.preventDefault();
       containerRef.current?.focus();
+      // Bind the gesture immediately. Waiting for a useEffect lets WebKit
+      // finish a button/pointer drag before the listeners exist, so the
+      // resize never lands.
+      const startPos = { x: e.clientX, y: e.clientY };
+      const startRect = rectRef.current;
+      clearDragListeners();
       setDragging(kind);
-      dragStartPosRef.current = { x: e.clientX, y: e.clientY };
-      dragStartRectRef.current = rectRef.current;
+
+      const onMouseMove = (ev: MouseEvent) => {
+        if (kind === 'rotate') {
+          const box = containerRef.current?.getBoundingClientRect();
+          if (!box) return;
+          const cx = box.left + box.width / 2;
+          const cy = box.top + box.height / 2;
+          const angle = Math.atan2(ev.clientY - cy, ev.clientX - cx);
+          const degrees = -((angle * 180) / Math.PI + 90);
+          const normalized = ((degrees % 360) + 360) % 360;
+          updateRotation(normalized);
+          return;
+        }
+
+        const dx = (ev.clientX - startPos.x) / zoom;
+        const dy = (ev.clientY - startPos.y) / zoom;
+
+        if (kind === 'move') {
+          updateRect(
+            clampRect({
+              x: startRect.x + dx,
+              y: startRect.y + dy,
+              w: startRect.w,
+              h: startRect.h,
+            })
+          );
+          return;
+        }
+
+        updateRect(resizeRect(startRect, kind, dx, dy, ev.shiftKey));
+      };
+
+      const onMouseUp = () => {
+        clearDragListeners();
+        setDragging(null);
+        onUpdate({ rect: rectRef.current, rotation: rotationRef.current });
+      };
+
+      dragListenersRef.current = { move: onMouseMove, up: onMouseUp };
+      window.addEventListener('mousemove', onMouseMove);
+      window.addEventListener('mouseup', onMouseUp);
     },
-    []
+    [clearDragListeners, onUpdate, updateRect, updateRotation, zoom]
   );
-
-  useEffect(() => {
-    if (!dragging) return;
-
-    const startPos = dragStartPosRef.current;
-    const startRect = dragStartRectRef.current;
-    if (!startPos || !startRect) return;
-
-    const onMouseMove = (e: MouseEvent) => {
-      if (dragging === 'rotate') {
-        const box = containerRef.current?.getBoundingClientRect();
-        if (!box) return;
-        const cx = box.left + box.width / 2;
-        const cy = box.top + box.height / 2;
-        const angle = Math.atan2(e.clientY - cy, e.clientX - cx);
-        const degrees = -((angle * 180) / Math.PI + 90);
-        const normalized = ((degrees % 360) + 360) % 360;
-        updateRotation(normalized);
-        return;
-      }
-
-      const dx = (e.clientX - startPos.x) / zoom;
-      const dy = (e.clientY - startPos.y) / zoom;
-
-      if (dragging === 'move') {
-        updateRect(
-          clampRect({
-            x: startRect.x + dx,
-            y: startRect.y + dy,
-            w: startRect.w,
-            h: startRect.h,
-          })
-        );
-        return;
-      }
-
-      updateRect(resizeRect(startRect, dragging, dx, dy, e.shiftKey));
-    };
-
-    const onMouseUp = () => {
-      setDragging(null);
-      onUpdate({ rect: rectRef.current, rotation: rotationRef.current });
-      dragStartPosRef.current = null;
-      dragStartRectRef.current = null;
-    };
-
-    window.addEventListener('mousemove', onMouseMove);
-    window.addEventListener('mouseup', onMouseUp, { once: true });
-    return () => {
-      window.removeEventListener('mousemove', onMouseMove);
-      window.removeEventListener('mouseup', onMouseUp);
-    };
-  }, [dragging, onUpdate, updateRect, updateRotation, zoom]);
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
@@ -209,7 +213,11 @@ export function ImageSelectionOverlay({
         width: rect.w,
         height: rect.h,
       }}
-      onMouseDown={(e) => handleMouseDown(e, 'move')}
+      onMouseDown={(e) => {
+        const target = e.target as HTMLElement;
+        if (target.closest('.image-selection-handle, .image-selection-handle-rotate')) return;
+        handleMouseDown(e, 'move');
+      }}
       onKeyDown={handleKeyDown}
       role="dialog"
       aria-label="Image selection"
@@ -220,16 +228,18 @@ export function ImageSelectionOverlay({
         aria-hidden="true"
       />
       {RESIZE_HANDLES.map((kind) => (
-        <button
+        <div
           key={kind}
-          type="button"
+          role="button"
+          tabIndex={0}
           className={`image-selection-handle image-selection-handle-${kind}`}
           onMouseDown={(e) => handleMouseDown(e, kind)}
           aria-label={`Resize image ${kind}`}
         />
       ))}
-      <button
-        type="button"
+      <div
+        role="button"
+        tabIndex={0}
         className="image-selection-handle-rotate"
         onMouseDown={(e) => handleMouseDown(e, 'rotate')}
         aria-label="Rotate image"

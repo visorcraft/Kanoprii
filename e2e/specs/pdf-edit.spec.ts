@@ -244,8 +244,10 @@ describe('PDF Edit Mode', () => {
       const transform = getComputedStyle(document.querySelector('.rich-text-edit-textarea')!).transform;
       return Number(transform.match(/^matrix\(([^,]+)/)?.[1] ?? 1);
     });
-    expect(scaleX).toBeLessThan(0.6);
-    expect(scaleX).toBeGreaterThan(0.4);
+    // The viewer aspect-fits the rotated page, so horizontal and vertical
+    // pixels-per-point stay equal and the preview is not stretched.
+    expect(scaleX).toBeGreaterThan(0.97);
+    expect(scaleX).toBeLessThan(1.03);
   });
 
   it('commits Add Text at the preview baseline', async () => {
@@ -268,9 +270,10 @@ describe('PDF Edit Mode', () => {
       const page = document.querySelector('.page-image')!.getBoundingClientRect();
       const input = document.querySelector('.rich-text-edit-textarea')!.getBoundingClientRect();
       const fontSize = Number.parseFloat(getComputedStyle(document.querySelector('.rich-text-edit-textarea')!).fontSize);
-      const transform = getComputedStyle(document.querySelector('.page-overlay-scale')!).transform;
+      const overlay = document.querySelector('.page-overlay-scale') as HTMLElement;
+      const transform = getComputedStyle(overlay).transform;
       const scale = Number(transform.match(/^matrix\(([^,]+)/)?.[1] ?? 1);
-      return { x: input.left - page.left, baseline: input.top - page.top + fontSize * scale, scale, expectedScale: page.width / 800 };
+      return { x: input.left - page.left, baseline: input.top - page.top + fontSize * scale, scale, expectedScale: page.width / overlay.offsetWidth };
     });
     await $('.edit-toolbar-apply').click();
     await browser.waitUntil(
@@ -934,9 +937,12 @@ describe('PDF Edit Mode', () => {
 
       const center = await browser.execute(() => {
         const page = document.querySelector('.page-image')!.getBoundingClientRect();
+        const overlay = document.querySelector('.page-overlay-scale') as HTMLElement;
+        // Seeded viewer rect is x=80, y=100, w=160, h=100; click its center
+        // in the current aspect-fit viewer box (not the old 800×1132 frame).
         return {
-          x: Math.round(page.left + page.width * (160 / 800)),
-          y: Math.round(page.top + page.height * (150 / 1132)),
+          x: Math.round(page.left + page.width * (160 / overlay.offsetWidth)),
+          y: Math.round(page.top + page.height * (150 / overlay.offsetHeight)),
         };
       });
       await browser.action('pointer').move(center).down({ button: 0 }).up({ button: 0 }).perform();
