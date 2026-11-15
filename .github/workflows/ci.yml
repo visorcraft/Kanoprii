@@ -44,6 +44,16 @@ jobs:
           echo "SCCACHE_GHA_ENABLED=true" >> $GITHUB_ENV
           echo "SCCACHE_CACHE_SIZE=2G" >> $GITHUB_ENV
 
+      # sccache 0.17+ expands cargo's rustc @argfile and respawns rustc with the
+      # full argv. underskrift's command line is about 34k characters, past
+      # CreateProcess's 32767 limit (os error 206). A short target directory
+      # shrinks every -L and --extern path enough to fit. The default
+      # src-tauri/target path does not.
+      - name: Shorten the Cargo target dir on Windows
+        if: runner.os == 'Windows'
+        shell: bash
+        run: echo "CARGO_TARGET_DIR=C:/t" >> "$GITHUB_ENV"
+
       - name: Install Linux system deps
         if: runner.os == 'Linux'
         run: |

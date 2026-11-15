@@ -8,6 +8,16 @@ ignore = [
   # Comes from Tauri's webkit2gtk/wry dependency tree; not actionable here.
   # Tracked in: https://github.com/visorcraft/Kanoprii/issues/2
   "RUSTSEC-2024-0429",
+  # RUSTSEC-2026-0387: timing side channels in crypto-bigint 0.5.5, reached
+  # only through underskrift 0.1.4 → p256/p384/p521 0.13 → elliptic-curve 0.13.
+  # The patched crate line is crypto-bigint >=0.7.6, which elliptic-curve 0.13
+  # cannot use (0.14 / p256 0.14 is the first stack that depends on it).
+  # Upstream underskrift (kushaldas/underskrift, last push 2026-06-22) and the
+  # visorcraft pin still require the 0.13 curve crates, so no compatible
+  # upgrade exists. Remove this ignore when underskrift depends on p256 >=0.14
+  # (or another signer that pulls crypto-bigint >=0.7.6) and `cargo audit`
+  # no longer reports RUSTSEC-2026-0387.
+  "RUSTSEC-2026-0387",
 ]
 
 [output]
