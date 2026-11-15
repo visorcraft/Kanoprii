@@ -742,6 +742,9 @@ describe('PDF Edit Mode', () => {
 
     const before = await selection.getSize();
     const handle = await $('.image-selection-handle-se');
+    await browser.execute(() => {
+      document.querySelector('.image-selection-handle-se')?.scrollIntoView({ block: 'center', inline: 'center' });
+    });
     const handleCenter = await browser.execute(() => {
       const rect = document.querySelector('.image-selection-handle-se')!.getBoundingClientRect();
       return { x: Math.round(rect.left + rect.width / 2), y: Math.round(rect.top + rect.height / 2) };

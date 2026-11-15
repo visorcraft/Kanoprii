@@ -74,6 +74,7 @@ export function ImageSelectionOverlay({
   const containerRef = useRef<HTMLDivElement>(null);
   const rectRef = useRef(rect);
   const rotationRef = useRef(rotation);
+  const draggingRef = useRef<DragKind | null>(null);
   const dragListenersRef = useRef<{ move: (ev: MouseEvent) => void; up: () => void } | null>(null);
 
   const clearDragListeners = useCallback(() => {
@@ -98,9 +99,11 @@ export function ImageSelectionOverlay({
 
   useEffect(() => {
     // Don't clobber an in-progress drag with the last committed draft.
-    if (dragging) return;
+    // `dragging` is intentionally not a dependency: ending the gesture must
+    // not copy a stale draft back over the size the pointer just set.
+    if (draggingRef.current) return;
     updateRect(draft.pageRect);
-  }, [draft.pageRect, dragging, updateRect]);
+  }, [draft.pageRect, updateRect]);
 
   useEffect(() => {
     if (dragging) return;
@@ -108,7 +111,12 @@ export function ImageSelectionOverlay({
   }, [draft.rotation, dragging, updateRotation]);
 
   useEffect(() => {
-    containerRef.current?.focus();
+    const node = containerRef.current;
+    node?.focus();
+    // Inserted images are centered on a page taller than the window, so the
+    // southeast handle starts below the scrollport. A pointer drag there never
+    // reaches the handle and the box stays the same size.
+    node?.scrollIntoView({ block: 'center', inline: 'nearest' });
   }, []);
 
   useEffect(() => {
@@ -131,6 +139,7 @@ export function ImageSelectionOverlay({
       const startPos = { x: e.clientX, y: e.clientY };
       const startRect = rectRef.current;
       clearDragListeners();
+      draggingRef.current = kind;
       setDragging(kind);
 
       const onMouseMove = (ev: MouseEvent) => {
@@ -166,8 +175,10 @@ export function ImageSelectionOverlay({
 
       const onMouseUp = () => {
         clearDragListeners();
+        const next = { rect: rectRef.current, rotation: rotationRef.current };
+        draggingRef.current = null;
         setDragging(null);
-        onUpdate({ rect: rectRef.current, rotation: rotationRef.current });
+        onUpdate(next);
       };
 
       dragListenersRef.current = { move: onMouseMove, up: onMouseUp };
